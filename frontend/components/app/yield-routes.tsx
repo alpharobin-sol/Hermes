@@ -13,10 +13,14 @@ import { IS_DEVNET } from "@/lib/network";
 import { useLoading } from "./layout/loading-context";
 import { DepositDialog } from "./deposit-dialog";
 
+// Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
+export type BalanceIssue = "insufficient" | "fee-reserve" | null;
+
 interface YieldRoutesProps {
   token: Token;
   amount: number;
   riskProfile: RiskTier;
+  balanceIssue: BalanceIssue;
   onDeposited?: () => void;
 }
 
@@ -37,7 +41,7 @@ function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
   return order.indexOf(route.risk) <= order.indexOf(profile);
 }
 
-export function YieldRoutes({ token, amount, riskProfile, onDeposited }: YieldRoutesProps) {
+export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposited }: YieldRoutesProps) {
   const [routes, setRoutes] = useState<YieldRoute[]>([]);
   const [isLoading, setIsLoadingRoutes] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +224,12 @@ export function YieldRoutes({ token, amount, riskProfile, onDeposited }: YieldRo
                   </div>
                 </div>
 
-                <RouteAction route={route} highlight={index === 0 && canDeposit} onDeposit={() => handleDeposit(route)} />
+                <RouteAction
+                  route={route}
+                  highlight={index === 0 && canDeposit}
+                  balanceIssue={balanceIssue}
+                  onDeposit={() => handleDeposit(route)}
+                />
               </div>
             </div>
           );
@@ -269,10 +278,28 @@ function RiskBar({ risk }: { risk: RiskTier }) {
   );
 }
 
-function RouteAction({ route, highlight, onDeposit }: { route: YieldRoute; highlight: boolean; onDeposit: () => void }) {
+function RouteAction({
+  route,
+  highlight,
+  balanceIssue,
+  onDeposit,
+}: {
+  route: YieldRoute;
+  highlight: boolean;
+  balanceIssue: BalanceIssue;
+  onDeposit: () => void;
+}) {
   const base =
     "flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-medium transition-all whitespace-nowrap";
   const outline = "border border-border/50 text-foreground hover:border-primary/50 hover:text-primary";
+
+  if (route.deposit && balanceIssue) {
+    return (
+      <button disabled className={cn(base, "border border-destructive/30 text-destructive cursor-not-allowed")}>
+        Insufficient balance
+      </button>
+    );
+  }
 
   if (route.deposit) {
     return (
