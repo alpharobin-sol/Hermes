@@ -402,30 +402,28 @@ export class StablecoinService {
     try {
       logger.info('Fetching Raydium CLMM stable pool yields...');
       
-      const response = await this.client.get('https://api.raydium.io/v2/ammV3/ammPools');
-      const pools = response.data.data;
-
-      const stablePools = pools.filter((pool: any) => {
-        const mint1 = pool.mintA?.symbol?.toLowerCase() || '';
-        const mint2 = pool.mintB?.symbol?.toLowerCase() || '';
-        const isStable1 = mint1.includes('usdc') || mint1.includes('usdt');
-        const isStable2 = mint2.includes('usdc') || mint2.includes('usdt');
-        return isStable1 && isStable2;
+      // Ask for USDC/USDT CLMM pools only. The old v2 endpoint returned every Raydium pool
+      // (~225 MB of JSON), which needed close to 1 GB of memory to parse.
+      const response = await this.client.get('https://api-v3.raydium.io/pools/info/mint', {
+        params: {
+          mint1: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+          mint2: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+          poolType: 'concentrated',
+          poolSortField: 'liquidity',
+          sortType: 'desc',
+          pageSize: 20,
+          page: 1,
+        },
       });
+      const topPools = response.data?.data?.data || [];
 
       const yields: StablecoinYieldData[] = [];
 
-      // Sort by TVL and limit to top 20 pools
-      const topPools = stablePools
-        .sort((a: any, b: any) => (parseFloat(b.tvl || 0) - parseFloat(a.tvl || 0)))
-        .slice(0, 20);
-
       for (const pool of topPools) {
-        let feeAPR = parseFloat(pool.day?.feeApr || pool.week?.feeApr || 0);
-        let rewardAPR = parseFloat(pool.day?.rewardApr || 0);
-        // Check if values are percentages (> 1) and convert to decimal
-        if (feeAPR > 1) feeAPR = feeAPR / 100;
-        if (rewardAPR > 1) rewardAPR = rewardAPR / 100;
+        // v3 reports APRs in percent, and rewardApr as one entry per reward token
+        const feeAPR = parseFloat(pool.day?.feeApr || pool.week?.feeApr || 0) / 100;
+        const rewardAPR = (Array.isArray(pool.day?.rewardApr) ? pool.day.rewardApr : [])
+          .reduce((sum: number, apr: number) => sum + (Number(apr) || 0), 0) / 100;
         const totalAPY = aprToApy(feeAPR + rewardAPR);
 
         yields.push({

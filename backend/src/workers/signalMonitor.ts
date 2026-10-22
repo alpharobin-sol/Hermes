@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 import signalEngine, { SignalSeverity } from '../engine/signalEngine';
 import dpoEngine from '../engine/dpo';
 import { prisma } from '../db/prisma';
+import { workersEnabled } from '../config/runtime';
 
 const CHECK_INTERVAL = parseInt(process.env.SIGNAL_CHECK_INTERVAL_MINUTES || '5') * 60 * 1000;
 
@@ -169,8 +170,8 @@ export class SignalMonitor {
 
 const signalMonitorInstance = new SignalMonitor();
 
-// Auto-start on import (skip in test env)
-if (process.env.NODE_ENV !== 'test') {
+// Auto-start on import (skip in test env, and when workers are off since it needs Postgres)
+if (process.env.NODE_ENV !== 'test' && workersEnabled()) {
   signalMonitorInstance.start().catch(err => {
     logger.error('Failed to start signal monitor:', err);
   });

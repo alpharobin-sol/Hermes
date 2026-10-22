@@ -1,8 +1,7 @@
 import dotenv from 'dotenv';
 import { createApp } from './api';
 import { logger } from './utils/logger';
-import { startYieldCollector } from './workers/yieldCollector';
-import { startDPOWorker } from './workers/dpoWorker';
+import { workersEnabled } from './config/runtime';
 import { yieldRefresher } from './workers/yield-refresher';
 import signalMonitor from './workers/signalMonitor';
 
@@ -24,21 +23,29 @@ async function main() {
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
     
-    // Start background workers
-    logger.info('Starting background workers...');
-    await Promise.all([
-      startYieldCollector(),
-      startDPOWorker(),
-    ]);
-    
-    // Yield refresher auto-starts on import (every 10 minutes)
+    // Yield refresher auto-starts on import (every 10 minutes). It only warms the in-memory cache.
     logger.info('Yield refresher status:', yieldRefresher.getStatus());
     
-    // Signal monitor auto-starts on import (every 5 minutes)
-    logger.info('Signal monitor status:', signalMonitor.getStatus());
+    if (workersEnabled()) {
+      // Imported lazily: these modules open a Redis connection as soon as they load
+      logger.info('Starting background workers...');
+      const [{ startYieldCollector }, { startDPOWorker }] = await Promise.all([
+        import('./workers/yieldCollector'),
+        import('./workers/dpoWorker'),
+      ]);
+      await Promise.all([
+        startYieldCollector(),
+        startDPOWorker(),
+      ]);
+      
+      // Signal monitor auto-starts on import (every 5 minutes)
+      logger.info('Signal monitor status:', signalMonitor.getStatus());
+      logger.info('🚨 Signal Engine activated - monitoring for risks');
+    } else {
+      logger.info('Background workers disabled (ENABLE_WORKERS=false). Running API only.');
+    }
     
     logger.info('HERMES backend started successfully');
-    logger.info('🚨 Signal Engine activated - monitoring for risks');
     
     // Graceful shutdown
     process.on('SIGTERM', async () => {

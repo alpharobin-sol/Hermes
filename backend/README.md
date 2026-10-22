@@ -111,6 +111,17 @@ YIELD_COLLECTION_INTERVAL_MINUTES=10
 DPO_WORKER_INTERVAL_MINUTES=30
 ```
 
+### Deploy to Render (API only)
+
+`render.yaml` at the repo root deploys the API without Postgres or Redis (`ENABLE_WORKERS=false`).
+Yields and deposit routes work in this mode. `/api/yields/best` needs the yield collector's database, so the app falls back to `/api/yields`.
+
+1. Render → New → Blueprint → pick this repo.
+2. Fill in `JUPITER_API_KEY` and `SOLANA_RPC_URL` when asked.
+3. Set `NEXT_PUBLIC_API_BASE_URL` in the frontend's Vercel project to the Render URL, then redeploy the frontend.
+
+The free plan sleeps after 15 minutes without traffic, so the first request after a quiet spell can take up to a minute.
+
 ## 📡 API Endpoints
 
 ### Yield Data
