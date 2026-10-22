@@ -8,7 +8,8 @@ const router = Router();
 
 /**
  * GET /api/yields?token=SOL
- * Live yield routes, highest APY first. `token` filters by what the user deposits.
+ * Live yield routes Hermes can deposit into, highest APY first. `token` filters by what the user deposits.
+ * `all=true` adds the view-only routes the site hides for now.
  */
 router.get('/', async (req: Request, res: Response) => {
   const token = req.query.token ? String(req.query.token).toUpperCase() : undefined;
@@ -17,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const data = await getYieldRoutes(token as InputToken | undefined);
+    const data = await getYieldRoutes(token as InputToken | undefined, req.query.all === 'true' || undefined);
     return res.json({
       success: true,
       network: solanaNetwork(),

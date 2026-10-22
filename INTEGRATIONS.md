@@ -12,7 +12,7 @@ Devnet takes the same steps with test SOL, under the `devnet` key.
 
 ## 1. View only
 
-Rates show on the site. The button opens the protocol's own app.
+The route is in the registry with a live rate. The site hides view-only routes for now (`/api/yields?all=true` lists them, `SHOW_VIEW_ONLY_ROUTES=true` shows them on the site). When shown, the button opens the protocol's own app.
 
 - [ ] Route added to the registry with its rate source
 - [ ] APY and TVL from `/api/yields` checked against the protocol's own app. Write down the date and both numbers.
@@ -45,12 +45,12 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 | Jupiter (jupSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |
 | Drift (dSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |
 | Helius (hSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap, price impact 0.1 to 0.2% |
-| Sanctum Infinity (INF) | view only | pending | | | |
-| Bybit (bbSOL) | view only | pending | | | |
-| JPool (JSOL) | view only | pending | | | |
-| BlazeStake (bSOL) | view only | pending | | | |
-| Kamino Lend SOL, USDC, USDT | view only | pending | | | Phase 1, step 2 |
-| Jupiter Lend SOL, USDC, USDT | view only | pending | | | Phase 1, step 3 |
+| Sanctum Infinity (INF) | view only, hidden | pending | | | |
+| Bybit (bbSOL) | view only, hidden | pending | | | |
+| JPool (JSOL) | view only, hidden | pending | | | |
+| BlazeStake (bSOL) | view only, hidden | pending | | | |
+| Kamino Lend SOL, USDC, USDT | view only, hidden | pending | | | Phase 1, step 2 |
+| Jupiter Lend SOL, USDC, USDT | view only, hidden | pending | | | Phase 1, step 3 |
 | MarginFi | not listed | | | | Phase 1, step 4. Needs a live rate source first. |
 
 The six beta routes predate this gate. Their rate checks against each protocol's app are still to do.

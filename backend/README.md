@@ -42,7 +42,9 @@ The risk tier comes from TVL only: low at $100M and above, moderate from $10M, h
 
 `GET /api/yields?token=SOL`
 
-Routes for one deposit token (SOL, USDC or USDT), highest APY first. Each route has `deposit`: `live`, `beta` or `null` for the network the API runs on. `null` means the route is view only and links out to the protocol's app.
+Routes Hermes can deposit into for one token (SOL, USDC or USDT), highest APY first. Each route has `deposit`: `live` or `beta` for the network the API runs on.
+
+Add `all=true` to include view-only routes (`deposit: null`). They link out to the protocol's app and are hidden on the site for now. `SHOW_VIEW_ONLY_ROUTES=true` includes them by default.
 
 `POST /api/deposit/quote` with `{ routeId, amount, slippageBps? }`
 

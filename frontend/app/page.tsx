@@ -44,7 +44,7 @@ const faqs = [
   },
   {
     question: "Which routes can I deposit into from Hermes?",
-    answer: "Routes marked Deposit run inside Hermes. Others show their live rates and link to the protocol's own app while their in-app deposits are being integrated, one protocol at a time.",
+    answer: "Every route Hermes shows deposits inside Hermes. Protocols are added one at a time, after their deposits pass our checks. Routes still in beta are labeled and capped per deposit.",
   },
   {
     question: "What are the risks?",

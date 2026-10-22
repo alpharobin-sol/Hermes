@@ -32,12 +32,22 @@ export function riskTier(tvl: number): RiskTier {
   return 'high';
 }
 
+// View-only routes (no in-app deposit on this network) stay in the registry and keep their live
+// rates, but the site leaves them out until each one gets an in-app deposit. Set to true to show them.
+const SHOW_VIEW_ONLY_ROUTES = process.env.SHOW_VIEW_ONLY_ROUTES === 'true';
+
 /**
- * Every registry route that has a live rate, highest APY first
+ * Registry routes that have a live rate, highest APY first.
+ * Only routes Hermes can deposit into, unless includeViewOnly or SHOW_VIEW_ONLY_ROUTES is set.
  */
-export async function getYieldRoutes(token?: InputToken): Promise<YieldRoute[]> {
+export async function getYieldRoutes(
+  token?: InputToken,
+  includeViewOnly: boolean = SHOW_VIEW_ONLY_ROUTES
+): Promise<YieldRoute[]> {
   const network = solanaNetwork();
-  const routes = ROUTES.filter((route) => !token || route.token === token);
+  const routes = ROUTES.filter(
+    (route) => (!token || route.token === token) && (includeViewOnly || depositStatus(route, network) !== null)
+  );
 
   const rows = await Promise.all(
     routes.map(async (route): Promise<YieldRoute | null> => {
