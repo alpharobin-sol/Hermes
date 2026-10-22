@@ -3,11 +3,13 @@ import { cn } from "@/lib/utils";
 import { RiskMeter } from "./RiskMeter";
 import { TokenSelector, type Token } from "./TokenSelector";
 import { YieldRoutes } from "./yield-routes";
+import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances";
 
-const tokens: Token[] = [
-  { symbol: "SOL", name: "Solana", icon: "/brand-logos/solanaLogoMark.svg", balance: 12.5 },
-  { symbol: "USDC", name: "USD Coin", icon: "/brand-logos/usdcLogoMark.svg", balance: 1250.0 },
-  { symbol: "USDT", name: "Tether", icon: "/brand-logos/tetherLogoMark.svg", balance: 500.0 },
+// Balances are filled in from the connected wallet
+const baseTokens: Token[] = [
+  { symbol: "SOL", name: "Solana", icon: "/brand-logos/solanaLogoMark.svg", balance: 0 },
+  { symbol: "USDC", name: "USD Coin", icon: "/brand-logos/usdcLogoMark.svg", balance: 0 },
+  { symbol: "USDT", name: "Tether", icon: "/brand-logos/tetherLogoMark.svg", balance: 0 },
   // { symbol: "jitoSOL", name: "Jito Staked SOL", icon: "/brand-logos/usdcLogoMark.svg", balance: 5.2 },
   // { symbol: "mSOL", name: "Marinade SOL", icon: "/brand-logos/usdcLogoMark.svg", balance: 3.1 },
 ];
@@ -22,7 +24,13 @@ function formatNumber(num: number): string {
 }
 
 export function YieldPanel() {
-  const [selectedToken, setSelectedToken] = useState(tokens[0]);
+  const { balances, refresh: refreshBalances } = useTokenBalances();
+  const tokens = useMemo(
+    () => baseTokens.map((token) => ({ ...token, balance: balances[token.symbol] ?? 0 })),
+    [balances]
+  );
+  const [selectedSymbol, setSelectedSymbol] = useState(baseTokens[0].symbol);
+  const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0];
   const [amount, setAmount] = useState("");
   const [riskProfile, setRiskProfile] = useState<RiskProfile>("moderate");
   const [showRoutes, setShowRoutes] = useState(false);
@@ -42,12 +50,18 @@ export function YieldPanel() {
     } else {
       setShowRoutes(false);
     }
-  }, [numericAmount, selectedToken]);
+  }, [numericAmount, selectedToken.symbol]);
 
   const quickAmounts = ["25%", "50%", "75%", "MAX"];
 
+  // Keep some SOL back so the deposit can pay its own fees
+  const spendableBalance =
+    selectedToken.symbol === "SOL"
+      ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE)
+      : selectedToken.balance;
+
   const handleQuickAmount = (pct: string) => {
-    const balance = selectedToken.balance;
+    const balance = spendableBalance;
     if (pct === "MAX") {
       setAmount(balance.toFixed(2));
       return;
@@ -57,7 +71,7 @@ export function YieldPanel() {
   };
 
   const getActiveQuickAmount = (pct: string) => {
-    const balance = selectedToken.balance;
+    const balance = spendableBalance;
     if (pct === "MAX") return numericAmount === balance;
     const percentage = Number.parseInt(pct.replace("%", ""));
     return numericAmount === +((balance * percentage) / 100).toFixed(2);
@@ -80,7 +94,7 @@ export function YieldPanel() {
 
              <div className="flex flex-col items-end justify-end gap-2">
               <button
-                onClick={() => setAmount(formatNumber(selectedToken.balance))}
+                onClick={() => handleQuickAmount("MAX")}
                 className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
               >
                 <span className="text-caption">Balance:</span>
@@ -144,7 +158,7 @@ export function YieldPanel() {
             <TokenSelector
               tokens={tokens}
               selectedToken={selectedToken}
-              onSelect={setSelectedToken}
+              onSelect={(token) => setSelectedSymbol(token.symbol)}
 
             />
           </div>
@@ -157,6 +171,7 @@ export function YieldPanel() {
           token={selectedToken}
           amount={numericAmount}
           riskProfile={riskProfile}
+          onDeposited={refreshBalances}
         />
       )}
     </div>

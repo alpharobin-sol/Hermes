@@ -227,10 +227,19 @@ router.get('/best', async (req: Request, res: Response) => {
       maxRisk,
     } = req.query;
     
+    // The app sends low/moderate/high, the router engine expects conservative/moderate/aggressive
+    const riskProfiles: Record<string, 'conservative' | 'moderate' | 'aggressive'> = {
+      low: 'conservative',
+      conservative: 'conservative',
+      moderate: 'moderate',
+      high: 'aggressive',
+      aggressive: 'aggressive',
+    };
+    
     const criteria = {
       amount: parseFloat(amount as string),
       asset: asset as string,
-      riskProfile: riskProfile as 'conservative' | 'moderate' | 'aggressive',
+      riskProfile: riskProfiles[riskProfile as string] || 'moderate',
       minAPY: minAPY ? parseFloat(minAPY as string) : undefined,
       maxRisk: maxRisk ? parseFloat(maxRisk as string) : undefined,
     };

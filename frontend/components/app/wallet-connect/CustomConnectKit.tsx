@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function CustomConnectButton({ className, small }: Props) {
-  const { connected, publicKey, select, connect, disconnect, wallets } =
+  const { connected, publicKey, wallet, select, connect, disconnect, wallets } =
     useWallet()
   const [open, setOpen] = useState(false)
 
@@ -22,9 +22,14 @@ export function CustomConnectButton({ className, small }: Props) {
       .slice(-4)}`
     : ""
 
-  const handleSelectWallet = async (walletName: string) => {
-    select(walletName as any)
-    await connect()
+  // The provider's autoConnect connects once the selection lands. Calling connect() here would race it.
+  const handleSelectWallet = (walletName: string) => {
+    if (wallet?.adapter.name === walletName) {
+      // Already selected (e.g. the user rejected the first popup), so select() would be a no-op
+      connect().catch((err) => console.warn("Wallet connection failed", err))
+    } else {
+      select(walletName as any)
+    }
     setOpen(false)
   }
 

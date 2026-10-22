@@ -9,10 +9,11 @@ export interface RiskStats {
   bgClass: string;        // Optional: for badge background
 }
 
+// The backend riskScore is a safety score: higher means safer
 export const getRiskStats = (riskScore: number): RiskStats => {
   const score = Math.max(0, Math.min(100, Math.round(riskScore)));
 
-  if (score <= 33) {
+  if (score >= 67) {
     return {
       level: "low",
       label: "Low Risk",
@@ -21,7 +22,7 @@ export const getRiskStats = (riskScore: number): RiskStats => {
     };
   }
 
-  if (score <= 66) {
+  if (score >= 34) {
     return {
       level: "moderate",
       label: "Moderate Risk",
