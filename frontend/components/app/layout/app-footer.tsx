@@ -8,8 +8,8 @@ export function AppFooter() {
         
         {/* Left side - Logo, Copyright, Links */}
         <div className="flex items-center gap-4">
-          {/* Logo and Copyright - hidden on mobile */}
-          <div className="hidden items-center gap-x-4 sm:flex">
+          {/* Logo and Copyright */}
+          <div className="flex items-center gap-x-3 sm:gap-x-4">
             <Image
               alt="hermes footer logo"
               src="/brand/hermes-icon-light-32x32.png"
@@ -18,12 +18,12 @@ export function AppFooter() {
             />
 
             <p className="text-body text-[10px] uppercase tracking-wider text-muted-foreground">
-              © 2025
+              © {new Date().getFullYear()}
             </p>
           </div>
 
           {/* Divider */}
-          <div className="hidden w-px h-4 bg-border sm:block" />
+          <div className="w-px h-4 bg-border" />
 
           {/* Links */}
           <div className="flex items-center gap-4">
