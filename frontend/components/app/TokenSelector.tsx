@@ -66,6 +66,9 @@ export function TokenSelector({ tokens, selectedToken, onSelect }: TokenSelector
 
   useEffect(() => setMounted(true), [])
 
+  // With one token there is nothing to pick, so the trigger is a plain label
+  const canSwitch = tokens.length > 1
+
   const filteredTokens = tokens.filter(
     (token) =>
       token.symbol.toLowerCase().includes(search.toLowerCase()) ||
@@ -78,12 +81,14 @@ export function TokenSelector({ tokens, selectedToken, onSelect }: TokenSelector
     <div className="relative">
       {/* Trigger button - blends with card */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => canSwitch && setIsOpen(!isOpen)}
+        disabled={!canSwitch}
         className={cn(
           "relative flex items-center gap-2 p-[11px] px-3",
           "border border-l-0 bg-secondary/10 text-primary border-primary/5 hover:border-primary/5 transition-all",
           "font-mono text-sm font-medium",
           "text-primary rounded-r-xl transition-all",
+          !canSwitch && "cursor-default",
           isOpen && "bg-secondary/50 border-primary/30"
         )}
       >
@@ -97,7 +102,9 @@ export function TokenSelector({ tokens, selectedToken, onSelect }: TokenSelector
 
         <TokenIcon token={selectedToken} size="md" />
         <span className="text-foreground">{selectedToken.symbol}</span>
-        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+        {canSwitch && (
+          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+        )}
       </button>
 
 
