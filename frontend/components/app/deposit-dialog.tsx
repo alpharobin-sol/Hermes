@@ -8,6 +8,7 @@ import { AlertCircle, ArrowDown, CheckCircle2, ExternalLink, Loader2 } from "luc
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DepositAPI, type DepositQuote } from "@/lib/api/deposit-api"
+import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 
@@ -16,9 +17,7 @@ type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" 
 interface DepositDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  protocol: string
-  apy: number
-  inputToken: string
+  route: YieldRoute
   amount: number
   onDeposited?: () => void
 }
@@ -44,9 +43,7 @@ function getErrorMessage(err: unknown): string {
 export function DepositDialog({
   open,
   onOpenChange,
-  protocol,
-  apy,
-  inputToken,
+  route,
   amount,
   onDeposited,
 }: DepositDialogProps) {
@@ -70,7 +67,7 @@ export function DepositDialog({
     setSignature(null)
     setProgress(null)
 
-    DepositAPI.getQuote({ protocol, inputToken, amount }, { signal: controller.signal })
+    DepositAPI.getQuote({ routeId: route.id, amount }, { signal: controller.signal })
       .then((q) => {
         setQuote(q)
         setStatus("ready")
@@ -82,7 +79,7 @@ export function DepositDialog({
       })
 
     return () => controller.abort()
-  }, [open, protocol, inputToken, amount])
+  }, [open, route.id, amount])
 
   const handleConfirm = async () => {
     if (!publicKey) return
@@ -92,8 +89,7 @@ export function DepositDialog({
       setError(null)
 
       const built = await DepositAPI.buildTransaction({
-        protocol,
-        inputToken,
+        routeId: route.id,
         amount,
         userPublicKey: publicKey.toBase58(),
       })
@@ -166,7 +162,7 @@ export function DepositDialog({
       <DialogContent className="border-border/50 bg-card p-0 gap-0 max-w-sm">
         <DialogHeader className="border-b border-border/50 p-4">
           <DialogTitle className="font-mono text-sm uppercase tracking-wider text-foreground">
-            Deposit into <span className="capitalize">{protocol}</span>
+            Deposit into {route.name}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Hermes builds the transaction. You sign it in your wallet. Funds never touch Hermes.
@@ -178,7 +174,7 @@ export function DepositDialog({
           <div className="border border-border/50 bg-secondary/30 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">You deposit</div>
             <div className="font-mono text-lg text-foreground">
-              {formatTokenAmount(amount)} {inputToken}
+              {formatTokenAmount(amount)} {route.token}
             </div>
           </div>
 
@@ -207,7 +203,7 @@ export function DepositDialog({
             <div className="space-y-1.5 font-mono text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">APY</span>
-                <span className="text-foreground">{formatPercent(apy * 100)}</span>
+                <span className="text-foreground">{formatPercent(route.apy * 100)}</span>
               </div>
               {quote.method === "jupiter-swap" ? (
                 <>
@@ -245,6 +241,12 @@ export function DepositDialog({
                 </div>
               )}
             </div>
+          )}
+
+          {!IS_DEVNET && route.deposit === "beta" && status !== "success" && (
+            <p className="text-[11px] leading-relaxed text-warning">
+              Beta: this deposit route is new in Hermes and uses real funds. Start with a small amount.
+            </p>
           )}
 
           {IS_DEVNET && status !== "success" && (

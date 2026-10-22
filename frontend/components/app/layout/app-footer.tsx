@@ -1,4 +1,3 @@
-import { Activity } from "lucide-react"
 import Image from "next/image"
 
 export function AppFooter() {
@@ -6,7 +5,7 @@ export function AppFooter() {
     <footer className="w-full">
       <div className="container max-w-7xl mx-auto flex items-center justify-between gap-3 py-4 px-4 sm:px-6">
         
-        {/* Left side - Logo, Copyright, Links */}
+        {/* Left side - Logo, Copyright */}
         <div className="flex items-center gap-4">
           {/* Logo and Copyright */}
           <div className="flex items-center gap-x-3 sm:gap-x-4">
@@ -20,29 +19,6 @@ export function AppFooter() {
             <p className="text-body text-[10px] uppercase tracking-wider text-muted-foreground">
               © {new Date().getFullYear()}
             </p>
-          </div>
-
-          {/* Divider */}
-          <div className="w-px h-4 bg-border" />
-
-          {/* Links */}
-          <div className="flex items-center gap-4">
-            <a
-              href="/api"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-body text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-            >
-              API
-            </a>
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-body text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Docs
-            </a>
           </div>
         </div>
 

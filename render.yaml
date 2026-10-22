@@ -6,17 +6,14 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    # NODE_OPTIONS is cleared for the build: tsc needs ~500 MB, more than the runtime heap cap below
+    # NODE_OPTIONS is cleared for the build so the runtime heap cap below never applies to tsc
     buildCommand: NODE_OPTIONS= npm install --include=dev && NODE_OPTIONS= npm run build
-    # Free plan has 512 MB RAM. With this heap cap the API peaks around 350 MB.
+    # Free plan has 512 MB RAM. The API runs around 150 MB.
     startCommand: node --max-old-space-size=300 dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # API only: the background workers need Postgres and Redis
-      - key: ENABLE_WORKERS
-        value: "false"
       - key: CORS_ORIGIN
         value: https://www.hermesagg.xyz,https://hermesagg.xyz,https://hermes-three-beta.vercel.app
       - key: LOG_LEVEL
@@ -27,6 +24,4 @@ services:
         value: devnet
       # Secrets: Render asks for these when you create the blueprint
       - key: JUPITER_API_KEY
-        sync: false
-      - key: SOLANA_RPC_URL
         sync: false

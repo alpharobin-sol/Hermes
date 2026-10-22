@@ -4,7 +4,6 @@ import axios from 'axios';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import depositService, { DepositError } from '../services/deposit';
-import { solanaNetwork } from '../config/runtime';
 
 const router = Router();
 
@@ -12,8 +11,7 @@ const amountSchema = z.union([z.string(), z.number()])
   .refine((value) => /^\d+(\.\d+)?$/.test(String(value)) && Number(value) > 0, 'Amount must be a positive number');
 
 const quoteSchema = z.object({
-  protocol: z.string().min(1),
-  inputToken: z.string().min(1),
+  routeId: z.string().min(1),
   amount: amountSchema,
   slippageBps: z.number().int().min(1).max(300).optional(),
 });
@@ -46,22 +44,6 @@ function handleError(res: Response, error: unknown, action: string) {
   logger.error(`Failed to ${action}:`, error);
   return res.status(500).json({ success: false, error: `Failed to ${action}` });
 }
-
-/**
- * GET /api/deposit/supported?inputToken=SOL
- * Protocols that Hermes can deposit into directly from the given token
- */
-router.get('/supported', (req: Request, res: Response) => {
-  const inputToken = String(req.query.inputToken || 'SOL');
-  const data = depositService.getSupportedProtocols(inputToken);
-
-  return res.json({
-    success: true,
-    network: solanaNetwork(),
-    count: data.length,
-    data,
-  });
-});
 
 /**
  * POST /api/deposit/quote
