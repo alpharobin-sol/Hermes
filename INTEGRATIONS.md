@@ -23,7 +23,7 @@ Rates show on the site. The button opens the protocol's own app.
 Deposits run in Hermes with real funds. The site labels the route Beta.
 
 - [ ] The API builds the deposit as an unsigned transaction. Hermes never signs.
-- [ ] Mainnet simulation passes at three sizes, e.g. 0.01, 1 and 100 SOL
+- [ ] Mainnet simulation passes at three sizes, e.g. 0.01, 1 and the beta cap
 - [ ] The quote shows what lands in the wallet: expected amount, minimum, price impact
 - [ ] Errors read plainly: low balance, price impact over the cap, protocol paused or full
 - [ ] The deposit dialog shows the Beta label and the token the user receives
@@ -39,7 +39,7 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 
 | Route | Stage | Rate check vs app | Mainnet simulation | Owner deposit | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Jito (JitoSOL) | beta, devnet beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap on mainnet, stake pool on devnet. Phase 1: direct stake pool on mainnet. |
+| Jito (JitoSOL) | beta, devnet beta | 22 Oct: Hermes 4.85% / $1,077M, Jito API 4.848% / 10.42M SOL ($1,077M) | Stake pool 0.01 / 1 / 100 SOL pass, Jupiter 0.01 / 1 / 10 SOL pass, 22 Oct | pending | Quotes the stake pool against Jupiter and builds the better one. Jupiter has led by about 0.1% so far. A stale pool (between epochs) falls back to Jupiter. Exit: unstake at jito.network/staking or swap JitoSOL to SOL on Jupiter. |
 | Marinade (mSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap. Phase 1: direct Marinade deposit. |
 | Binance (BNSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap, price impact 0.2 to 0.3% |
 | Jupiter (jupSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |

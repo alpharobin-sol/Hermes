@@ -41,6 +41,7 @@ export interface YieldRoute {
   source: string; // where apy and tvl come from
   updatedAt: string;
   deposit: DepositStatus | null; // null: view only, deposit in the protocol's app
+  depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
 }
 
 export class YieldAPI {

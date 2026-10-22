@@ -1,4 +1,5 @@
 import {
+  ComputeBudgetProgram,
   Connection,
   PublicKey,
   TransactionInstruction,
@@ -11,11 +12,13 @@ import Decimal from 'decimal.js';
 import { logger } from '../utils/logger';
 
 /**
- * Direct SOL deposits into SPL stake pools (used on devnet, where Jupiter has no routes).
+ * Direct SOL deposits into SPL stake pools.
  *
- * Stake pools reject deposits until someone runs their once-per-epoch update. Nobody cranks the
- * devnet pools, so when a pool is stale we prepend the update instructions. They don't fit in one
- * transaction, so the result can be several transactions that must be sent in order.
+ * Stake pools reject deposits until someone runs their once-per-epoch update.
+ * - Devnet: nobody cranks the pools, so when a pool is stale we prepend the update instructions.
+ *   They don't fit in one transaction, so the result can be several transactions sent in order.
+ * - Mainnet: the pool operator cranks it early each epoch. A stale pool is skipped
+ *   (allowPoolUpdate: false) and the deposit goes through Jupiter instead.
  */
 
 export interface StakePoolTarget {
@@ -33,6 +36,17 @@ export interface StakePoolDepositPlan {
 
 const MAX_TX_BYTES = 1232;
 const LAMPORTS_DECIMALS = 9;
+
+// Measured on mainnet (Jito): token account creation plus depositSol uses about 31k compute units
+const DEPOSIT_COMPUTE_UNITS = 100_000;
+// Priority fee bounds in micro-lamports per compute unit. At 100k units the cap is 0.0001 SOL.
+const MIN_PRIORITY_MICRO_LAMPORTS = 20_000;
+const MAX_PRIORITY_MICRO_LAMPORTS = 1_000_000;
+
+export interface StakePoolBuildOptions {
+  allowPoolUpdate: boolean; // prepend the pool's epoch update when it is stale
+  priorityFee: boolean; // add a compute budget and priority fee (mainnet)
+}
 
 function toUi(raw: Decimal): string {
   return raw.div(new Decimal(10).pow(LAMPORTS_DECIMALS)).toFixed();
@@ -89,16 +103,44 @@ function packTransactions(
   return groups.map(compile);
 }
 
-export async function quoteStakePoolDeposit(connection: Connection, target: StakePoolTarget, lamports: Decimal): Promise<string> {
-  const pool = await getStakePoolAccount(connection, new PublicKey(target.pool));
-  return toUi(estimatePoolTokens(lamports, pool.account.data));
+/**
+ * Priority fee from what recent transactions touching the pool paid, within fixed bounds
+ */
+async function priorityFeeMicroLamports(connection: Connection, accounts: PublicKey[]): Promise<number> {
+  try {
+    const fees = (await connection.getRecentPrioritizationFees({ lockedWritableAccounts: accounts }))
+      .map((fee) => fee.prioritizationFee)
+      .sort((a, b) => a - b);
+    const p75 = fees.length > 0 ? fees[Math.floor(fees.length * 0.75)] : 0;
+    return Math.min(Math.max(p75, MIN_PRIORITY_MICRO_LAMPORTS), MAX_PRIORITY_MICRO_LAMPORTS);
+  } catch (error) {
+    logger.warn('Could not read recent priority fees, using the minimum:', error);
+    return MIN_PRIORITY_MICRO_LAMPORTS;
+  }
+}
+
+export async function quoteStakePoolDeposit(
+  connection: Connection,
+  target: StakePoolTarget,
+  lamports: Decimal
+): Promise<{ outAmount: string; poolUpdateNeeded: boolean }> {
+  const [pool, { epoch }] = await Promise.all([
+    getStakePoolAccount(connection, new PublicKey(target.pool)),
+    connection.getEpochInfo(),
+  ]);
+  const data = pool.account.data;
+  return {
+    outAmount: toUi(estimatePoolTokens(lamports, data)),
+    poolUpdateNeeded: data.lastUpdateEpoch.toNumber() < epoch,
+  };
 }
 
 export async function buildStakePoolDeposit(
   connection: Connection,
   target: StakePoolTarget,
   lamports: Decimal,
-  user: PublicKey
+  user: PublicKey,
+  options: StakePoolBuildOptions
 ): Promise<StakePoolDepositPlan> {
   const poolAddress = new PublicKey(target.pool);
   const pool = await getStakePoolAccount(connection, poolAddress);
@@ -109,6 +151,10 @@ export async function buildStakePoolDeposit(
 
   const { epoch } = await connection.getEpochInfo();
   const poolUpdateNeeded = data.lastUpdateEpoch.toNumber() < epoch;
+
+  if (poolUpdateNeeded && !options.allowPoolUpdate) {
+    throw new Error(`The ${target.symbol} pool has not been updated for this epoch yet`);
+  }
 
   const updateInstructions: TransactionInstruction[] = [];
   if (poolUpdateNeeded) {
@@ -123,7 +169,17 @@ export async function buildStakePoolDeposit(
   );
   const userPoolTokenAccount = getAssociatedTokenAddressSync(data.poolMint, user);
 
+  const budgetInstructions = options.priorityFee
+    ? [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: DEPOSIT_COMPUTE_UNITS }),
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: await priorityFeeMicroLamports(connection, [poolAddress, data.reserveStake, data.poolMint]),
+        }),
+      ]
+    : [];
+
   const depositInstructions = [
+    ...budgetInstructions,
     createAssociatedTokenAccountIdempotentInstruction(user, userPoolTokenAccount, user, data.poolMint),
     StakePoolInstruction.depositSol({
       stakePool: poolAddress,
