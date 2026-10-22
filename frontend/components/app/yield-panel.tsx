@@ -5,6 +5,7 @@ import { TokenSelector, type Token } from "./TokenSelector";
 import { YieldRoutes } from "./yield-routes";
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances";
 import { IS_DEVNET } from "@/lib/network";
+import type { BalanceIssue } from "./yield-routes";
 
 // Balances are filled in from the connected wallet
 const baseTokens: Token[] = [
@@ -17,6 +18,12 @@ const baseTokens: Token[] = [
 
 type RiskProfile = "low" | "moderate" | "high";
 
+// Round down so a quick amount or a shown limit never exceeds what the wallet can spend
+function floorTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.floor(value * factor) / factor;
+}
+
 function formatNumber(num: number): string {
   return num.toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -25,7 +32,7 @@ function formatNumber(num: number): string {
 }
 
 export function YieldPanel() {
-  const { balances, refresh: refreshBalances } = useTokenBalances();
+  const { balances, isConnected, refresh: refreshBalances } = useTokenBalances();
   const tokens = useMemo(
     () => baseTokens.map((token) => ({ ...token, balance: balances[token.symbol] ?? 0 })),
     [balances]
@@ -61,22 +68,27 @@ export function YieldPanel() {
       ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE)
       : selectedToken.balance;
 
-  const handleQuickAmount = (pct: string) => {
-    const balance = spendableBalance;
-    if (pct === "MAX") {
-      setAmount(balance.toFixed(2));
-      return;
-    }
-    const percentage = Number.parseInt(pct.replace("%", ""));
-    setAmount(((balance * percentage) / 100).toFixed(2));
+  // Only judge the amount once the wallet's balance for this token has loaded
+  const balanceKnown = isConnected && balances[selectedToken.symbol] !== undefined;
+  const balanceIssue: BalanceIssue =
+    !balanceKnown || numericAmount <= 0
+      ? null
+      : numericAmount > selectedToken.balance
+        ? "insufficient"
+        : numericAmount > spendableBalance
+          ? "fee-reserve"
+          : null;
+
+  const quickAmount = (pct: string) => {
+    const percentage = pct === "MAX" ? 100 : Number.parseInt(pct.replace("%", ""));
+    return floorTo((spendableBalance * percentage) / 100, 4);
   };
 
-  const getActiveQuickAmount = (pct: string) => {
-    const balance = spendableBalance;
-    if (pct === "MAX") return numericAmount === balance;
-    const percentage = Number.parseInt(pct.replace("%", ""));
-    return numericAmount === +((balance * percentage) / 100).toFixed(2);
+  const handleQuickAmount = (pct: string) => {
+    setAmount(String(quickAmount(pct)));
   };
+
+  const getActiveQuickAmount = (pct: string) => numericAmount > 0 && numericAmount === quickAmount(pct);
 
   return (
     <div className="flex flex-col gap-4 mx-auto max-w-2xl">
@@ -167,6 +179,14 @@ export function YieldPanel() {
 
             />
           </div>
+
+          {balanceIssue && (
+            <p className="mt-2 font-mono text-[11px] text-destructive">
+              {balanceIssue === "insufficient"
+                ? `Insufficient ${selectedToken.symbol} balance. You have ${formatNumber(selectedToken.balance)} ${selectedToken.symbol}.`
+                : `Keep ${SOL_FEE_RESERVE} SOL for network fees. You can deposit up to ${floorTo(spendableBalance, 4)} SOL.`}
+            </p>
+          )}
         </div>
       </div>
 
@@ -176,6 +196,7 @@ export function YieldPanel() {
           token={selectedToken}
           amount={numericAmount}
           riskProfile={riskProfile}
+          balanceIssue={balanceIssue}
           onDeposited={refreshBalances}
         />
       )}

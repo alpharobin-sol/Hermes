@@ -58,15 +58,16 @@ export function useTokenBalances() {
     } else {
       console.warn("Failed to load SOL balance", solResult.reason)
     }
-    if (tokenResult.status === "rejected") {
+    if (tokenResult.status === "fulfilled") {
+      symbols.forEach((symbol, i) => {
+        const data = tokenResult.value.value[i]?.data
+        // A missing token account just means a zero balance
+        next[symbol] = data && "parsed" in data ? (data.parsed?.info?.tokenAmount?.uiAmount ?? 0) : 0
+      })
+    } else {
+      // Left unset rather than 0, so the app never claims a balance it could not read
       console.warn("Failed to load token balances", tokenResult.reason)
     }
-    symbols.forEach((symbol, i) => {
-      const account = tokenResult.status === "fulfilled" ? tokenResult.value.value[i] : null
-      const data = account?.data
-      // A missing token account just means a zero balance
-      next[symbol] = data && "parsed" in data ? (data.parsed?.info?.tokenAmount?.uiAmount ?? 0) : 0
-    })
 
     setBalances(next)
     setIsLoading(false)
