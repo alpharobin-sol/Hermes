@@ -20,8 +20,11 @@ src/
 ├── services/
 │   ├── rates.ts                # live rates from DefiLlama, Kamino and Jupiter Lend
 │   ├── yields.ts               # joins the registry with live rates
-│   ├── deposit.ts              # quotes and builds deposits (Jupiter swap on mainnet)
-│   └── stake-pool-deposit.ts   # direct stake pool deposits (devnet)
+│   ├── deposit.ts              # quotes every path for a deposit and builds the best one
+│   ├── stake-pool-deposit.ts   # direct SPL stake pool deposits (Jito)
+│   ├── marinade-deposit.ts     # direct Marinade deposits (mainnet)
+│   ├── compute-budget.ts       # priority fee for direct deposits
+│   └── errors.ts               # errors written for users
 ├── config/runtime.ts           # SOLANA_NETWORK switch
 └── utils/logger.ts
 ```
@@ -48,7 +51,7 @@ Add `all=true` to include view-only routes (`deposit: null`). They link out to t
 
 `POST /api/deposit/quote` with `{ routeId, amount, slippageBps? }`
 
-Quotes a deposit. `amount` is in UI units, e.g. `"1.5"` SOL.
+Quotes a deposit. `amount` is in UI units, e.g. `"1.5"` SOL. Routes with a direct deposit (Jito, Marinade) are quoted directly and through Jupiter. The quote is the one that returns more, and `compared` lists the other.
 
 `POST /api/deposit/build` with `{ routeId, amount, userPublicKey, slippageBps? }`
 

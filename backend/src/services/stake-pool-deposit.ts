@@ -1,5 +1,4 @@
 import {
-  ComputeBudgetProgram,
   Connection,
   PublicKey,
   TransactionInstruction,
@@ -10,6 +9,8 @@ import { getStakePoolAccount, updateStakePool, StakePoolInstruction } from '@sol
 import { getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import Decimal from 'decimal.js';
 import { logger } from '../utils/logger';
+import { depositBudgetInstructions } from './compute-budget';
+import { DepositError } from './errors';
 
 /**
  * Direct SOL deposits into SPL stake pools.
@@ -36,12 +37,6 @@ export interface StakePoolDepositPlan {
 
 const MAX_TX_BYTES = 1232;
 const LAMPORTS_DECIMALS = 9;
-
-// Measured on mainnet (Jito): token account creation plus depositSol uses about 31k compute units
-const DEPOSIT_COMPUTE_UNITS = 100_000;
-// Priority fee bounds in micro-lamports per compute unit. At 100k units the cap is 0.0001 SOL.
-const MIN_PRIORITY_MICRO_LAMPORTS = 20_000;
-const MAX_PRIORITY_MICRO_LAMPORTS = 1_000_000;
 
 export interface StakePoolBuildOptions {
   allowPoolUpdate: boolean; // prepend the pool's epoch update when it is stale
@@ -103,22 +98,6 @@ function packTransactions(
   return groups.map(compile);
 }
 
-/**
- * Priority fee from what recent transactions touching the pool paid, within fixed bounds
- */
-async function priorityFeeMicroLamports(connection: Connection, accounts: PublicKey[]): Promise<number> {
-  try {
-    const fees = (await connection.getRecentPrioritizationFees({ lockedWritableAccounts: accounts }))
-      .map((fee) => fee.prioritizationFee)
-      .sort((a, b) => a - b);
-    const p75 = fees.length > 0 ? fees[Math.floor(fees.length * 0.75)] : 0;
-    return Math.min(Math.max(p75, MIN_PRIORITY_MICRO_LAMPORTS), MAX_PRIORITY_MICRO_LAMPORTS);
-  } catch (error) {
-    logger.warn('Could not read recent priority fees, using the minimum:', error);
-    return MIN_PRIORITY_MICRO_LAMPORTS;
-  }
-}
-
 export async function quoteStakePoolDeposit(
   connection: Connection,
   target: StakePoolTarget,
@@ -146,14 +125,14 @@ export async function buildStakePoolDeposit(
   const pool = await getStakePoolAccount(connection, poolAddress);
   const data = pool.account.data;
   if (data.solDepositAuthority) {
-    throw new Error(`The ${target.symbol} pool only accepts SOL deposits signed by its deposit authority`);
+    throw new DepositError(`The ${target.symbol} pool only accepts SOL deposits signed by its deposit authority`, 422);
   }
 
   const { epoch } = await connection.getEpochInfo();
   const poolUpdateNeeded = data.lastUpdateEpoch.toNumber() < epoch;
 
   if (poolUpdateNeeded && !options.allowPoolUpdate) {
-    throw new Error(`The ${target.symbol} pool has not been updated for this epoch yet`);
+    throw new DepositError(`The ${target.symbol} stake pool is between epochs. Try again in a few minutes.`, 503);
   }
 
   const updateInstructions: TransactionInstruction[] = [];
@@ -170,12 +149,7 @@ export async function buildStakePoolDeposit(
   const userPoolTokenAccount = getAssociatedTokenAddressSync(data.poolMint, user);
 
   const budgetInstructions = options.priorityFee
-    ? [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: DEPOSIT_COMPUTE_UNITS }),
-        ComputeBudgetProgram.setComputeUnitPrice({
-          microLamports: await priorityFeeMicroLamports(connection, [poolAddress, data.reserveStake, data.poolMint]),
-        }),
-      ]
+    ? await depositBudgetInstructions(connection, [poolAddress, data.reserveStake, data.poolMint])
     : [];
 
   const depositInstructions = [

@@ -9,7 +9,8 @@ export interface DepositToken {
   decimals: number;
 }
 
-export type DepositMethod = "jupiter-swap" | "stake-pool";
+// direct: straight into the protocol (Jito's stake pool, Marinade) at its own rate
+export type DepositMethod = "jupiter-swap" | "direct";
 
 export interface DepositQuote {
   network: SolanaNetwork;
@@ -23,7 +24,7 @@ export interface DepositQuote {
   priceImpactPct: number;
   slippageBps: number;
   routeLabels: string[];
-  compared?: { method: DepositMethod; outAmount: string }[]; // other paths the API quoted and passed over
+  compared?: { method: DepositMethod; label?: string; outAmount: string }[]; // other paths the API quoted and passed over
 }
 
 export interface DepositTransaction {
