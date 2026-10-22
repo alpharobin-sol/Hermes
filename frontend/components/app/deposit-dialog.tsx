@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DepositAPI, type DepositQuote } from "@/lib/api/deposit-api"
 import { formatPercent } from "@/lib/helpers/formatters"
+import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -50,12 +51,13 @@ export function DepositDialog({
   onDeposited,
 }: DepositDialogProps) {
   const { connection } = useConnection()
-  const { publicKey, sendTransaction } = useWallet()
+  const { publicKey, sendTransaction, signAllTransactions } = useWallet()
 
   const [status, setStatus] = useState<DepositStatus>("quoting")
   const [quote, setQuote] = useState<DepositQuote | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
   // Fresh quote every time the dialog opens
   useEffect(() => {
@@ -66,6 +68,7 @@ export function DepositDialog({
     setQuote(null)
     setError(null)
     setSignature(null)
+    setProgress(null)
 
     DepositAPI.getQuote({ protocol, inputToken, amount }, { signal: controller.signal })
       .then((q) => {
@@ -96,30 +99,56 @@ export function DepositDialog({
       })
       setQuote(built.quote)
 
-      const transaction = VersionedTransaction.deserialize(base64ToBytes(built.transaction))
-      const sig = await sendTransaction(transaction, connection)
-      setSignature(sig)
-      setStatus("confirming")
+      const transactions = (built.transactions?.length ? built.transactions : [built.transaction]).map((tx) =>
+        VersionedTransaction.deserialize(base64ToBytes(tx))
+      )
 
-      let result
-      try {
-        result = await connection.confirmTransaction(
-          {
-            signature: sig,
-            blockhash: transaction.message.recentBlockhash,
-            lastValidBlockHeight: built.lastValidBlockHeight,
-          },
-          "confirmed"
-        )
-      } catch (confirmErr) {
-        // The transaction was sent but we could not check it. Never offer a retry here: it could deposit twice.
-        console.warn("Could not confirm deposit", confirmErr)
-        setStatus("unconfirmed")
-        onDeposited?.()
-        return
+      let signed: VersionedTransaction[] | null = null
+      if (IS_DEVNET || transactions.length > 1) {
+        // Sign everything up front, then send through the app's own connection. That keeps multi-step
+        // deposits in order and lands devnet transactions on devnet whatever network the wallet is set to.
+        if (!signAllTransactions) throw new Error("Your wallet can't sign this deposit. Try Phantom, Solflare or Backpack.")
+        signed = await signAllTransactions(transactions)
       }
-      if (result.value.err) {
-        throw new Error("Transaction failed on-chain. Your funds were not moved.")
+
+      for (let i = 0; i < transactions.length; i++) {
+        const isDeposit = i === transactions.length - 1
+        if (transactions.length > 1) setProgress({ current: i + 1, total: transactions.length })
+
+        const sig = signed
+          ? await connection.sendRawTransaction(signed[i].serialize())
+          : await sendTransaction(transactions[i], connection)
+        setSignature(sig)
+        setStatus("confirming")
+
+        let result
+        try {
+          result = await connection.confirmTransaction(
+            {
+              signature: sig,
+              blockhash: transactions[i].message.recentBlockhash,
+              lastValidBlockHeight: built.lastValidBlockHeight,
+            },
+            "confirmed"
+          )
+        } catch (confirmErr) {
+          console.warn("Could not confirm transaction", confirmErr)
+          if (!isDeposit) {
+            // Only a pool update was in flight, the deposit itself was never sent
+            throw new Error("A pool update step could not be confirmed. Your SOL was not deposited. Try again.")
+          }
+          // The deposit was sent but we could not check it. Never offer a retry here: it could deposit twice.
+          setStatus("unconfirmed")
+          onDeposited?.()
+          return
+        }
+        if (result.value.err) {
+          throw new Error(
+            isDeposit
+              ? "Transaction failed on-chain. Your funds were not moved."
+              : "A pool update step failed on-chain. Your SOL was not deposited."
+          )
+        }
       }
 
       setStatus("success")
@@ -180,29 +209,49 @@ export function DepositDialog({
                 <span className="text-muted-foreground">APY</span>
                 <span className="text-foreground">{formatPercent(apy * 100)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Minimum received</span>
-                <span className="text-foreground">
-                  {formatTokenAmount(quote.minOutAmount)} {quote.outputToken.symbol}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Price impact</span>
-                <span className={cn(quote.priceImpactPct > 0.5 ? "text-warning" : "text-foreground")}>
-                  {quote.priceImpactPct < 0.01 ? "<0.01%" : formatPercent(quote.priceImpactPct)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Slippage</span>
-                <span className="text-foreground">{formatPercent(quote.slippageBps / 100)}</span>
-              </div>
+              {quote.method === "jupiter-swap" ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Minimum received</span>
+                    <span className="text-foreground">
+                      {formatTokenAmount(quote.minOutAmount)} {quote.outputToken.symbol}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Price impact</span>
+                    <span className={cn(quote.priceImpactPct > 0.5 ? "text-warning" : "text-foreground")}>
+                      {quote.priceImpactPct < 0.01 ? "<0.01%" : formatPercent(quote.priceImpactPct)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Slippage</span>
+                    <span className="text-foreground">{formatPercent(quote.slippageBps / 100)}</span>
+                  </div>
+                </>
+              ) : (
+                // Stake pools mint at the pool's rate. It can shift slightly if the pool's epoch update runs first.
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Rate</span>
+                  <span className="text-foreground">Stake pool rate, no slippage</span>
+                </div>
+              )}
               {quote.routeLabels.length > 0 && (
                 <div className="flex justify-between gap-4">
                   <span className="text-muted-foreground">Route</span>
-                  <span className="text-foreground text-right">Jupiter via {quote.routeLabels.join(" → ")}</span>
+                  <span className="text-foreground text-right">
+                    {quote.method === "jupiter-swap" ? "Jupiter via " : ""}
+                    {quote.routeLabels.join(" → ")}
+                  </span>
                 </div>
               )}
             </div>
+          )}
+
+          {IS_DEVNET && status !== "success" && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Devnet: uses test SOL only. If your wallet warns about this transaction, switch it to Devnet (Phantom:
+              Settings → Developer Settings → Testnet Mode).
+            </p>
           )}
 
           {/* Status */}
@@ -229,7 +278,7 @@ export function DepositDialog({
 
           {signature && (
             <a
-              href={`https://solscan.io/tx/${signature}`}
+              href={explorerTxUrl(signature)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-primary"
@@ -256,7 +305,9 @@ export function DepositDialog({
               {status === "signing"
                 ? "Approve in wallet..."
                 : status === "confirming"
-                  ? "Confirming..."
+                  ? progress
+                    ? `Sending ${progress.current} of ${progress.total}...`
+                    : "Confirming..."
                   : status === "error" && quote
                     ? "Try again"
                     : "Confirm deposit"}

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import depositService, { DepositError } from '../services/deposit';
+import { solanaNetwork } from '../config/runtime';
 
 const router = Router();
 
@@ -56,6 +57,7 @@ router.get('/supported', (req: Request, res: Response) => {
 
   return res.json({
     success: true,
+    network: solanaNetwork(),
     count: data.length,
     data,
   });

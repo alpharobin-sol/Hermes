@@ -4,6 +4,7 @@ import { RiskMeter } from "./RiskMeter";
 import { TokenSelector, type Token } from "./TokenSelector";
 import { YieldRoutes } from "./yield-routes";
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances";
+import { IS_DEVNET } from "@/lib/network";
 
 // Balances are filled in from the connected wallet
 const baseTokens: Token[] = [
@@ -109,7 +110,11 @@ export function YieldPanel() {
           </div> 
         </div>
 
-        
+        {IS_DEVNET && (
+          <div className="border-b border-warning/20 bg-warning/5 px-4 py-2 font-mono text-[11px] leading-relaxed text-warning">
+            DEVNET · Deposits use test SOL (get some at faucet.solana.com). APYs shown are mainnet rates for reference.
+          </div>
+        )}
 
         {/* Input Section */}
         <div className="card-body">

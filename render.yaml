@@ -21,6 +21,10 @@ services:
         value: https://www.hermesagg.xyz,https://hermesagg.xyz,https://hermes-three-beta.vercel.app
       - key: LOG_LEVEL
         value: info
+      # Test deposits on devnet first. Switch to mainnet-beta (and the frontend's
+      # NEXT_PUBLIC_SOLANA_NETWORK) when ready for real funds.
+      - key: SOLANA_NETWORK
+        value: devnet
       # Secrets: Render asks for these when you create the blueprint
       - key: JUPITER_API_KEY
         sync: false

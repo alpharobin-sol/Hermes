@@ -23,6 +23,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { DepositAPI } from "@/lib/api/deposit-api";
 import { getProtocolAppUrl } from "@/lib/protocol-links";
+import { IS_DEVNET } from "@/lib/network";
 import { DepositDialog } from "./deposit-dialog";
 
 
@@ -77,7 +78,8 @@ export function YieldRoutes({
       return;
     }
 
-    const appUrl = getProtocolAppUrl(protocol);
+    // Protocol apps run on mainnet, so there is nothing to link to in devnet mode
+    const appUrl = IS_DEVNET ? undefined : getProtocolAppUrl(protocol);
     if (appUrl) window.open(appUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -489,12 +491,20 @@ export function YieldRoutes({
                 <div className="flex justify-end sm:justify-normal">
                   {(() => {
                     const canDeposit = depositableProtocols.has(route.protocol.toLowerCase());
-                    const appUrl = getProtocolAppUrl(route.protocol);
+                    const appUrl = IS_DEVNET ? undefined : getProtocolAppUrl(route.protocol);
                     return (
                       <button
                         onClick={() => handleDepositClick(route)}
                         disabled={!canDeposit && !appUrl}
-                        title={canDeposit ? undefined : appUrl ? `Opens ${route.protocol} in a new tab` : "In-app deposits coming soon"}
+                        title={
+                          canDeposit
+                            ? undefined
+                            : appUrl
+                              ? `Opens ${route.protocol} in a new tab`
+                              : IS_DEVNET
+                                ? "This route has no devnet deployment"
+                                : "In-app deposits coming soon"
+                        }
                         className={cn(
                           "flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-medium transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
                           index === 0 && canDeposit
@@ -512,6 +522,8 @@ export function YieldRoutes({
                             Open app
                             <ExternalLink className="w-3 h-3" />
                           </>
+                        ) : IS_DEVNET ? (
+                          "Mainnet only"
                         ) : (
                           "Soon"
                         )}
