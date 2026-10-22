@@ -32,6 +32,11 @@ export type RateSource =
   | { kind: 'kamino'; mint: string } // Kamino Lend main market reserve
   | { kind: 'jupiter-lend'; mint: string }; // Jupiter Lend earn token
 
+// A deposit straight into the protocol, minting the receipt at its own rate. Quoted against Jupiter on mainnet.
+export type DirectDeposit =
+  | { kind: 'spl-stake-pool'; pool: string } // SPL stake pool that mints the receipt
+  | { kind: 'marinade' }; // Marinade liquid staking program, mainnet only
+
 export interface RouteConfig {
   id: string; // unique, used by the deposit API
   protocol: string; // shared by every route of one protocol
@@ -39,7 +44,7 @@ export interface RouteConfig {
   category: Category;
   token: InputToken; // what the user deposits
   receipt?: TokenInfo; // what lands in the user's wallet, when it is a token
-  stakePool?: string; // SPL stake pool that mints the receipt directly. Quoted against Jupiter on mainnet.
+  direct?: DirectDeposit;
   website: string;
   source: RateSource;
   deposit: Partial<Record<SolanaNetwork, DepositStatus>>;
@@ -56,7 +61,7 @@ export const ROUTES: RouteConfig[] = [
     category: 'liquid-staking',
     token: 'SOL',
     receipt: lst('JitoSOL', 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'),
-    stakePool: 'Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb', // same address on devnet
+    direct: { kind: 'spl-stake-pool', pool: 'Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb' }, // same address on devnet
     website: 'https://www.jito.network/staking',
     source: { kind: 'defillama', project: 'jito-liquid-staking', symbol: 'JITOSOL' },
     deposit: { 'mainnet-beta': 'beta', devnet: 'beta' },
@@ -68,6 +73,7 @@ export const ROUTES: RouteConfig[] = [
     category: 'liquid-staking',
     token: 'SOL',
     receipt: lst('mSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'),
+    direct: { kind: 'marinade' },
     website: 'https://marinade.finance',
     source: { kind: 'defillama', project: 'marinade-liquid-staking', symbol: 'MSOL' },
     deposit: { 'mainnet-beta': 'beta' },

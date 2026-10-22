@@ -225,10 +225,10 @@ export function DepositDialog({
                   </div>
                 </>
               ) : (
-                // Stake pools mint at the pool's rate. It can shift slightly if the pool's epoch update runs first.
-                <div className="flex justify-between">
+                // Direct deposits mint at the protocol's rate. It can shift slightly if an epoch update runs first.
+                <div className="flex justify-between gap-4">
                   <span className="text-muted-foreground">Rate</span>
-                  <span className="text-foreground">Stake pool rate, no slippage</span>
+                  <span className="text-foreground text-right">{route.name} rate, no slippage</span>
                 </div>
               )}
               {quote.routeLabels.length > 0 && (
@@ -246,7 +246,7 @@ export function DepositDialog({
                   <span className="text-muted-foreground">Also checked</span>
                   <span className="text-muted-foreground text-right">
                     {formatTokenAmount(other.outAmount)} {quote.outputToken.symbol} via{" "}
-                    {other.method === "stake-pool" ? `${route.name} stake pool` : "Jupiter"}
+                    {other.label ?? (other.method === "jupiter-swap" ? "Jupiter" : route.name)}
                   </span>
                 </div>
               ))}

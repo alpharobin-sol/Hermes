@@ -28,14 +28,14 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
   - Jupiter Lend SOL, USDC, USDT (Jupiter Lend API)
 - The token picker lists only tokens that have a route, so it shows SOL alone for now. USDC and USDT return on their own once a lending route for them is added.
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
-  - JitoSOL: Hermes quotes the Jito stake pool and Jupiter, and builds whichever gives more JitoSOL. The dialog shows both.
-  - mSOL, BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
+  - JitoSOL and mSOL: Hermes quotes the protocol directly (Jito's stake pool, Marinade's liquid staking program) and Jupiter, and builds whichever gives more of the token. The dialog shows both.
+  - BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 
 ## Roadmap, in order
 
-1. Liquid staking: Jito direct (built, waiting on the owner's deposit), Marinade direct, then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
+1. Liquid staking: Jito direct and Marinade direct (built, waiting on the owner's deposits), then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
 2. Kamino Lend
 3. Jupiter Lend
 4. MarginFi
@@ -60,6 +60,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.
 - 22 Oct 2026: view-only routes hidden from the site, kept in the registry. Insufficient balance state before deposits (PR #10).
 - 22 Oct 2026, Jito direct: mainnet Jito deposits compare the stake pool with Jupiter and build the better one. Site switched to mainnet beta with a 10 SOL cap per deposit.
 - 22 Oct 2026, Phase 0 cleanup: removed the database engine, workers, fake-data pages, the waitlist app and about 1,500 unused packages. Replaced estimated rates with live sources. Added the route registry and this gate.

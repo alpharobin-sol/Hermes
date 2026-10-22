@@ -4,8 +4,10 @@ import Decimal from 'decimal.js';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { solanaNetwork, SolanaNetwork } from '../config/runtime';
-import { getRoute, depositCap, depositStatus, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
+import { getRoute, depositCap, depositStatus, DirectDeposit, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
 import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from './stake-pool-deposit';
+import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
+import { DepositError } from './errors';
 
 /**
  * HERMES DEPOSIT ROUTER
@@ -13,12 +15,13 @@ import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from '.
  * Hermes never holds funds: it quotes a route, returns the transaction, and the user signs it.
  * Only routes with a deposit status for the current network in the registry can be built.
  *
- * Mainnet: SOL -> liquid staking tokens. Routes with a stake pool quote it against the Jupiter
- * swap API and build whichever gives more of the token. Other routes go through Jupiter.
+ * Mainnet: SOL -> liquid staking tokens. Routes with a direct deposit (Jito's stake pool, Marinade)
+ * quote it against the Jupiter swap API and build whichever gives more of the token.
+ * Other routes go through Jupiter.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
  */
 
-export type DepositMethod = 'jupiter-swap' | 'stake-pool';
+export type DepositMethod = 'jupiter-swap' | 'direct';
 
 const MAX_PRICE_IMPACT_PCT = Number(process.env.DEPOSIT_MAX_PRICE_IMPACT_PCT || 1);
 
@@ -43,7 +46,7 @@ export interface DepositQuote {
   priceImpactPct: number;
   slippageBps: number;
   routeLabels: string[];
-  compared: { method: DepositMethod; outAmount: string }[]; // other paths quoted for this deposit
+  compared: { method: DepositMethod; label: string; outAmount: string }[]; // other paths quoted for this deposit
 }
 
 export interface DepositTransaction {
@@ -54,11 +57,7 @@ export interface DepositTransaction {
   prioritizationFeeLamports: number;
 }
 
-export class DepositError extends Error {
-  constructor(message: string, public readonly status: number = 400) {
-    super(message);
-  }
-}
+export { DepositError };
 
 interface Candidate {
   quote: DepositQuote;
@@ -103,8 +102,8 @@ export class DepositService {
     const route = this.resolveRoute(request);
     const best = await this.bestCandidate(route, request);
 
-    if (best.quote.method === 'stake-pool') {
-      return this.buildStakePoolTransaction(route, best.quote, userPublicKey);
+    if (best.quote.method === 'direct') {
+      return this.buildDirectTransaction(route, best.quote, userPublicKey);
     }
     return this.buildSwapTransaction(best, userPublicKey);
   }
@@ -141,7 +140,9 @@ export class DepositService {
     const network = solanaNetwork();
     const paths: Promise<Candidate>[] = [];
 
-    if (route.stakePool && route.receipt) paths.push(this.quoteStakePool(route, request, network));
+    if (route.direct && route.receipt && directAvailable(route.direct, network)) {
+      paths.push(this.quoteDirect(route, request, network));
+    }
     // Jupiter has no devnet routes
     if (network === 'mainnet-beta' && route.receipt) paths.push(this.quoteSwap(route, request));
 
@@ -165,34 +166,45 @@ export class DepositService {
 
     candidates.sort((a, b) => new Decimal(b.quote.outAmount).cmp(a.quote.outAmount));
     const [best, ...others] = candidates;
-    best.quote.compared = others.map((other) => ({ method: other.quote.method, outAmount: other.quote.outAmount }));
+    best.quote.compared = others.map((other) => ({
+      method: other.quote.method,
+      label: other.quote.method === 'jupiter-swap' ? 'Jupiter' : other.quote.routeLabels[0],
+      outAmount: other.quote.outAmount,
+    }));
     return best;
   }
 
-  private async quoteStakePool(route: RouteConfig, request: DepositRequest, network: SolanaNetwork): Promise<Candidate> {
-    const target = stakePoolTarget(route);
+  private async quoteDirect(route: RouteConfig, request: DepositRequest, network: SolanaNetwork): Promise<Candidate> {
+    const direct = route.direct!;
     const lamports = toLamports(request.amount);
-    const { outAmount, poolUpdateNeeded } = await quoteStakePoolDeposit(this.getConnection(network), target, lamports);
+    const connection = this.getConnection(network);
 
-    // Mainnet pools are updated by their operator early each epoch. Until then, use Jupiter.
-    if (poolUpdateNeeded && network === 'mainnet-beta') {
-      throw new DepositError(`The ${target.symbol} stake pool is between epochs. Try again in a few minutes.`, 503);
+    let outAmount: string;
+    if (direct.kind === 'spl-stake-pool') {
+      const quote = await quoteStakePoolDeposit(connection, stakePoolTarget(route, direct.pool), lamports);
+      // Mainnet pools are updated by their operator early each epoch. Until then, use Jupiter.
+      if (quote.poolUpdateNeeded && network === 'mainnet-beta') {
+        throw new DepositError(`The ${route.receipt!.symbol} stake pool is between epochs. Try again in a few minutes.`, 503);
+      }
+      outAmount = quote.outAmount;
+    } else {
+      outAmount = await quoteMarinadeDeposit(connection, lamports);
     }
 
     return {
       quote: {
         network,
         routeId: route.id,
-        method: 'stake-pool',
+        method: 'direct',
         inputToken: TOKENS.SOL,
         outputToken: route.receipt!,
         inAmount: lamports.div(1e9).toFixed(),
         outAmount,
-        // Stake pool deposits mint at the pool's exchange rate, there is no slippage
+        // Direct deposits mint at the protocol's own rate, there is no slippage
         minOutAmount: outAmount,
         priceImpactPct: 0,
         slippageBps: 0,
-        routeLabels: [`${route.name} stake pool${network === 'devnet' ? ' (devnet)' : ''}`],
+        routeLabels: [`${directLabel(route)}${network === 'devnet' ? ' (devnet)' : ''}`],
         compared: [],
       },
     };
@@ -277,9 +289,9 @@ export class DepositService {
     };
   }
 
-  private async buildStakePoolTransaction(route: RouteConfig, quote: DepositQuote, userPublicKey: string): Promise<DepositTransaction> {
+  private async buildDirectTransaction(route: RouteConfig, quote: DepositQuote, userPublicKey: string): Promise<DepositTransaction> {
+    const direct = route.direct!;
     const network = quote.network;
-    const target = stakePoolTarget(route);
     const lamports = toLamports(quote.inAmount);
     const connection = this.getConnection(network);
     const user = new PublicKey(userPublicKey);
@@ -290,29 +302,29 @@ export class DepositService {
       throw new DepositError(`Insufficient balance: you have ${balance / 1e9} SOL. Keep 0.01 SOL for fees${hint}.`, 422);
     }
 
-    let plan;
-    try {
-      plan = await buildStakePoolDeposit(connection, target, lamports, user, {
-        allowPoolUpdate: network === 'devnet',
-        priorityFee: network === 'mainnet-beta',
-      });
-    } catch (error) {
-      throw new DepositError(error instanceof Error ? error.message : 'Failed to build stake pool deposit', 422);
-    }
+    const plan = direct.kind === 'spl-stake-pool'
+      ? await buildStakePoolDeposit(connection, stakePoolTarget(route, direct.pool), lamports, user, {
+          allowPoolUpdate: network === 'devnet',
+          priorityFee: network === 'mainnet-beta',
+        })
+      : await buildMarinadeDeposit(connection, lamports, user).then((marinade) => ({
+          ...marinade,
+          transactions: [marinade.transaction],
+        }));
 
     // Later transactions depend on earlier ones landing first, so only the first can be simulated now
     const simulation = await connection.simulateTransaction(plan.transactions[0], { sigVerify: false });
     if (simulation.value.err) {
       const details = JSON.stringify({ err: simulation.value.err, logs: simulation.value.logs?.slice(-4) });
-      logger.warn(`Stake pool deposit failed simulation (${target.symbol}, ${network}): ${details}`);
+      logger.warn(`Direct deposit failed simulation (${route.id}, ${network}): ${details}`);
       throw new DepositError(describeSimulationError(details), 422);
     }
 
     const transactions = plan.transactions.map((tx) => Buffer.from(tx.serialize()).toString('base64'));
-    logger.info(`Built stake pool deposit on ${network}: ${quote.inAmount} SOL -> ${target.symbol} in ${transactions.length} transaction(s)`);
+    logger.info(`Built direct deposit on ${network}: ${quote.inAmount} SOL -> ${route.receipt!.symbol} in ${transactions.length} transaction(s)`);
 
     return {
-      // The pool's rate when the transaction was built
+      // The protocol's rate when the transaction was built
       quote: { ...quote, outAmount: plan.outAmount, minOutAmount: plan.outAmount },
       transaction: transactions[transactions.length - 1],
       transactions,
@@ -332,8 +344,17 @@ export class DepositService {
   }
 }
 
-function stakePoolTarget(route: RouteConfig): StakePoolTarget {
-  return { symbol: route.receipt!.symbol, pool: route.stakePool!, mint: route.receipt!.mint };
+function stakePoolTarget(route: RouteConfig, pool: string): StakePoolTarget {
+  return { symbol: route.receipt!.symbol, pool, mint: route.receipt!.mint };
+}
+
+// SPL stake pools exist on devnet at the same address (Jito). Marinade's deposit is mainnet only.
+function directAvailable(direct: DirectDeposit, network: SolanaNetwork): boolean {
+  return direct.kind === 'spl-stake-pool' || network === 'mainnet-beta';
+}
+
+function directLabel(route: RouteConfig): string {
+  return route.direct?.kind === 'marinade' ? 'Marinade liquid staking' : `${route.name} stake pool`;
 }
 
 function toLamports(amount: string | number): Decimal {
