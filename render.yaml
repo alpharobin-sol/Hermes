@@ -6,15 +6,14 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: npm start
+    # NODE_OPTIONS is cleared for the build: tsc needs ~500 MB, more than the runtime heap cap below
+    buildCommand: NODE_OPTIONS= npm install --include=dev && NODE_OPTIONS= npm run build
+    # Free plan has 512 MB RAM. With this heap cap the API peaks around 350 MB.
+    startCommand: node --max-old-space-size=300 dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # Free plan has 512 MB RAM. With this heap cap the API peaks around 350 MB.
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=300
       # API only: the background workers need Postgres and Redis
       - key: ENABLE_WORKERS
         value: "false"
