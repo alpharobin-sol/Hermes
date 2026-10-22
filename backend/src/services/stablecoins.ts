@@ -3,6 +3,7 @@ import axiosRetry from 'axios-retry';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 import marginfiService from './marginfi';
+import kaminoService from './kamino';
 import { withCache } from '../utils/cache';
 
 /**
@@ -131,109 +132,33 @@ export class StablecoinService {
    * Fetch USDC/USDT lending yields from Kamino vaults
    */
   private async fetchKaminoLending(): Promise<StablecoinYieldData[]> {
-    try {
-      logger.info('Fetching Kamino stablecoin lending yields...');
-      
-      // Try Kamino API - note: API may not be available or may have different structure
-      const response = await this.client.get('https://api.kamino.finance/vaults').catch(() => null);
-      
-      if (!response || !response.data) {
-        // Fallback to hardcoded estimate if API unavailable
-        logger.warn('Kamino API unavailable, using fallback data');
-        return [{
-          protocol: 'kamino',
-          protocolType: 'lending',
-          asset: 'USDC',
-          category: 'stablecoin-lending',
-          apy: 0.08, // 8% estimate
-          apr: 0.077,
-          baseAPY: 0.05,
-          rewardAPY: 0.03,
-          tvl: 125000000, // ~$125M estimate
-          utilizationRate: 0.75,
-          riskScore: this.calculateRiskScore('kamino', 125000000, 'lending'),
-          liquidityDepth: 125000000,
-          metadata: {
-            protocol: 'Kamino Finance',
-            fees: {
-              deposit: 0,
-              withdrawal: 0,
-            },
-            emissions: [{
-              token: 'KMNO',
-              dailyRate: 50000,
-              apr: 0.03,
-            }],
-          },
-        }];
-      }
-      
-      const vaults = response.data;
-      
-      const stableVaults = vaults.filter((vault: any) => {
-        const symbols = vault.tokenMint?.symbol?.toLowerCase() || '';
-        return symbols.includes('usdc') || symbols.includes('usdt');
-      });
+    // Same live reserve data the Kamino service serves. Empty when Kamino's API is down: no estimates.
+    const reserves = await kaminoService.fetchYieldData();
 
-      const yields: StablecoinYieldData[] = [];
-
-      for (const vault of stableVaults) {
-        const baseAPY = vault.apy?.base || 0;
-        const rewardAPY = vault.apy?.rewards || 0;
-        const totalAPY = baseAPY + rewardAPY;
-
-        yields.push({
-          protocol: 'kamino',
-          protocolType: 'lending',
-          asset: vault.tokenMint?.symbol || 'USDC',
-          category: 'stablecoin-lending',
-          apy: totalAPY,
-          apr: totalAPY / 1.01, // Approximate
-          baseAPY: baseAPY,
-          rewardAPY: rewardAPY,
-          tvl: parseFloat(vault.tvl || 0),
-          utilizationRate: vault.utilizationRate || 0,
-          riskScore: this.calculateRiskScore('kamino', parseFloat(vault.tvl || 0), 'lending'),
-          liquidityDepth: parseFloat(vault.tvl || 0),
-          metadata: {
-            protocol: 'Kamino Finance',
-            pool: vault.address,
-            fees: {
-              deposit: 0,
-              withdrawal: 0,
-            },
-            emissions: vault.emissions ? [{
-              token: 'KMNO',
-              dailyRate: vault.emissions.dailyRate || 0,
-              apr: rewardAPY,
-            }] : undefined,
-          },
-        });
-      }
-
-      logger.info(`Found ${yields.length} Kamino stablecoin vaults`);
-      return yields;
-    } catch (error) {
-      logger.error('Error fetching Kamino stablecoin yields:', error);
-      // Fallback data with estimated TVL
-      return [{
+    return reserves
+      .filter((reserve) => reserve.asset === 'USDC' || reserve.asset === 'USDT')
+      .map((reserve): StablecoinYieldData => ({
         protocol: 'kamino',
         protocolType: 'lending',
-        asset: 'USDC',
+        asset: reserve.asset,
         category: 'stablecoin-lending',
-        apy: 0.08, // 8% estimate
-        apr: 0.077,
-        baseAPY: 0.05,
-        rewardAPY: 0.03,
-        tvl: 125000000, // $125M estimate from DeFiLlama
-        riskScore: 75,
-        liquidityDepth: 125000000,
+        apy: reserve.supplyAPY,
+        apr: reserve.supplyAPY, // Kamino reports APY; close enough at these rates
+        baseAPY: reserve.supplyAPY,
+        rewardAPY: 0,
+        tvl: reserve.tvl,
+        utilizationRate: reserve.utilizationRate,
+        riskScore: this.calculateRiskScore('kamino', reserve.tvl, 'lending'),
+        liquidityDepth: reserve.tvl * (1 - reserve.utilizationRate),
         metadata: {
           protocol: 'Kamino Finance',
-          fees: { deposit: 0, withdrawal: 0 },
+          pool: reserve.reserve,
+          fees: {
+            deposit: 0,
+            withdrawal: 0,
+          },
         },
-      }];
-    }
+      }));
   }
 
   /**

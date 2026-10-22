@@ -175,7 +175,8 @@ async function collectYields(): Promise<void> {
           tvl: reserve.tvl,
           riskScore: kaminoService.calculateRiskScore(reserve),
           volatility: 0,
-          liquidationRisk: reserve.metadata.liquidationThreshold < 0.85 ? 0.5 : 0.2,
+          // Kamino's API has no liquidation threshold; lenders are not liquidated, so unknown counts as low risk
+          liquidationRisk: (reserve.metadata.liquidationThreshold ?? 1) < 0.85 ? 0.5 : 0.2,
           metadata: reserve.metadata,
         },
       });

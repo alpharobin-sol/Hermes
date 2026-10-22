@@ -12,8 +12,8 @@ export function AppFooter() {
           <div className="hidden items-center gap-x-4 sm:flex">
             <Image
               alt="hermes footer logo"
-              src="/brand/hermes_icon.png"
-              width={20}
+              src="/brand/hermes-icon-light-32x32.png"
+              width={15}
               height={20}
             />
 

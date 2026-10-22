@@ -119,7 +119,7 @@ router.get('/', async (req: Request, res: Response) => {
         riskScore: stable.riskScore,
         timestamp: new Date(),
       })),
-      // Kamino Lend/LP reserves (fallback-backed until SDK integration)
+      // Kamino Lend reserves (live from Kamino's API)
       ...kaminoReserves.map(reserve => ({
         protocol: 'kamino',
         asset: reserve.asset,
@@ -130,6 +130,15 @@ router.get('/', async (req: Request, res: Response) => {
         timestamp: new Date(),
       })),
     ];
+    
+    // Stablecoin and Kamino services can both report the same reserve (e.g. Kamino USDC), keep the first
+    const seen = new Set<string>();
+    allYields = allYields.filter(y => {
+      const key = `${y.protocol}:${y.asset}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     
     // Apply filters
     if (protocol) {
