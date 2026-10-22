@@ -21,20 +21,20 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 
 ## Live (22 October 2026)
 
-- Rates for 16 routes, all from live sources:
-  - Liquid staking (10 LSTs): DefiLlama yields API
-  - Kamino Lend SOL, USDC, USDT: Kamino API, main market
-  - Jupiter Lend SOL, USDC, USDT: Jupiter Lend API
+- The site shows only routes Hermes deposits into in-app: the six LSTs below.
+- Hidden for now, not removed: routes that send users to another app. They stay in the registry with live rates (`/api/yields?all=true` lists them) and come back one at a time as each gets an in-app deposit:
+  - Sanctum Infinity, Bybit, JPool, BlazeStake (liquid staking, DefiLlama rates)
+  - Kamino Lend SOL, USDC, USDT (Kamino API, main market)
+  - Jupiter Lend SOL, USDC, USDT (Jupiter Lend API)
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
   - JitoSOL: Hermes quotes the Jito stake pool and Jupiter, and builds whichever gives more JitoSOL. The dialog shows both.
   - mSOL, BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
-- Every other route is view only and links to the protocol's app.
 
 ## Roadmap, in order
 
-1. Liquid staking: Jito direct (built, waiting on the owner's deposit), Marinade direct, other LSTs through Jupiter
+1. Liquid staking: Jito direct (built, waiting on the owner's deposit), Marinade direct, then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
 2. Kamino Lend
 3. Jupiter Lend
 4. MarginFi
@@ -53,11 +53,13 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 - Show where every number comes from. The risk tier says it reflects TVL only.
 - If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
 - One page: the yield panel and the FAQ.
+- Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
 - Commit to a branch and merge through a PR. Run `npm run build` in `backend` and `frontend` before pushing.
 
 ## Shipped
 
+- 22 Oct 2026: view-only routes hidden from the site, kept in the registry. Insufficient balance state before deposits (PR #10).
 - 22 Oct 2026, Jito direct: mainnet Jito deposits compare the stake pool with Jupiter and build the better one. Site switched to mainnet beta with a 10 SOL cap per deposit.
 - 22 Oct 2026, Phase 0 cleanup: removed the database engine, workers, fake-data pages, the waitlist app and about 1,500 unused packages. Replaced estimated rates with live sources. Added the route registry and this gate.
 - PR #7: footer on mobile

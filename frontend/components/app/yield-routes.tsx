@@ -128,7 +128,7 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
       <div className="card-base p-8 text-center">
         <p className="text-muted-foreground">
           {routes.length === 0
-            ? `No live ${token.symbol} routes right now.`
+            ? `No ${token.symbol} routes in Hermes right now.`
             : `No ${token.symbol} routes at ${riskProfile} risk. Raise the risk level to see ${routes.length} more.`}
         </p>
       </div>
