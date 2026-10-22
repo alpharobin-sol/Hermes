@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import { solanaNetwork } from '../config/runtime';
-import { ROUTES, Category, DepositStatus, InputToken, depositStatus } from '../registry/routes';
+import { ROUTES, Category, DepositStatus, InputToken, depositCap, depositStatus } from '../registry/routes';
 import { getRate, refreshRates, SOURCE_LABELS } from './rates';
 
 export type RiskTier = 'low' | 'moderate' | 'high';
@@ -19,6 +19,7 @@ export interface YieldRoute {
   source: string; // where apy and tvl come from
   updatedAt: string;
   deposit: DepositStatus | null; // in-app deposit on the network the API runs on
+  depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
 }
 
 /**
@@ -58,6 +59,7 @@ export async function getYieldRoutes(token?: InputToken): Promise<YieldRoute[]> 
         source: SOURCE_LABELS[route.source.kind],
         updatedAt: new Date(rate.updatedAt).toISOString(),
         deposit: depositStatus(route, network),
+        depositCap: depositCap(route, network),
       };
     })
   );

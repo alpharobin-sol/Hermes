@@ -9,10 +9,12 @@ export interface DepositToken {
   decimals: number;
 }
 
+export type DepositMethod = "jupiter-swap" | "stake-pool";
+
 export interface DepositQuote {
   network: SolanaNetwork;
   routeId: string;
-  method: "jupiter-swap" | "stake-pool";
+  method: DepositMethod;
   inputToken: DepositToken;
   outputToken: DepositToken;
   inAmount: string;
@@ -21,6 +23,7 @@ export interface DepositQuote {
   priceImpactPct: number;
   slippageBps: number;
   routeLabels: string[];
+  compared?: { method: DepositMethod; outAmount: string }[]; // other paths the API quoted and passed over
 }
 
 export interface DepositTransaction {

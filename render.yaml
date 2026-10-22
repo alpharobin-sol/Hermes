@@ -18,10 +18,16 @@ services:
         value: https://www.hermesagg.xyz,https://hermesagg.xyz,https://hermes-three-beta.vercel.app
       - key: LOG_LEVEL
         value: info
-      # Test deposits on devnet first. Switch to mainnet-beta (and the frontend's
-      # NEXT_PUBLIC_SOLANA_NETWORK) when ready for real funds.
+      # Real funds. Must match the frontend's NEXT_PUBLIC_SOLANA_NETWORK on Vercel.
+      # Set both to devnet to test with test SOL.
       - key: SOLANA_NETWORK
-        value: devnet
+        value: mainnet-beta
+      # Largest single SOL deposit into a route that is still in beta
+      - key: BETA_DEPOSIT_CAP_SOL
+        value: "10"
       # Secrets: Render asks for these when you create the blueprint
       - key: JUPITER_API_KEY
+        sync: false
+      # Optional: a private mainnet RPC (Helius, Triton). Defaults to solana-rpc.publicnode.com
+      - key: SOLANA_RPC_URL
         sync: false

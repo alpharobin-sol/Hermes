@@ -4,7 +4,7 @@ Compare live Solana yields and deposit from your own wallet.
 
 Hermes pulls current APY and TVL from liquid staking and lending protocols, ranks the routes for your token, and builds the deposit for the one you pick. Your wallet signs it. Hermes never holds funds.
 
-Live at [hermesagg.xyz](https://www.hermesagg.xyz), in devnet mode for now.
+Live at [hermesagg.xyz](https://www.hermesagg.xyz) as a mainnet beta: real funds, 10 SOL per deposit while routes are in beta.
 
 ## Repo
 

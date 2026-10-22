@@ -240,12 +240,24 @@ export function DepositDialog({
                   </span>
                 </div>
               )}
+              {/* The paths Hermes quoted and passed over, so the choice can be checked */}
+              {quote.compared?.map((other) => (
+                <div key={other.method} className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Also checked</span>
+                  <span className="text-muted-foreground text-right">
+                    {formatTokenAmount(other.outAmount)} {quote.outputToken.symbol} via{" "}
+                    {other.method === "stake-pool" ? `${route.name} stake pool` : "Jupiter"}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
-          {!IS_DEVNET && route.deposit === "beta" && status !== "success" && (
+          {!IS_DEVNET && route.deposit === "beta" && status !== "success" && status !== "error" && (
             <p className="text-[11px] leading-relaxed text-warning">
-              Beta: this deposit route is new in Hermes and uses real funds. Start with a small amount.
+              Beta: this deposit route is new in Hermes and uses real funds.
+              {typeof route.depositCap === "number" && ` Deposits are limited to ${route.depositCap} ${route.token} each for now.`} Start
+              with a small amount.
             </p>
           )}
 

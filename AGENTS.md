@@ -14,7 +14,8 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`)
 - API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`)
 - Repo: `alpharobin-sol/Hermes`
-- Network: devnet mode today. `SOLANA_NETWORK=devnet` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=devnet` on Vercel. Both must match, or the app turns deposits off.
+- Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
+- Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
 
@@ -24,18 +25,21 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
   - Liquid staking (10 LSTs): DefiLlama yields API
   - Kamino Lend SOL, USDC, USDT: Kamino API, main market
   - Jupiter Lend SOL, USDC, USDT: Jupiter Lend API
-- Devnet deposits (test SOL): Jito stake pool, beta
-- Mainnet deposits (real funds): JitoSOL, mSOL, BNSOL, jupSOL, dSOL and hSOL through the Jupiter swap API, beta. Built and simulated, no real deposit by the owner yet. Not reachable on the site while it runs on devnet.
+- Mainnet deposits (real funds), all beta, capped at 10 SOL each:
+  - JitoSOL: Hermes quotes the Jito stake pool and Jupiter, and builds whichever gives more JitoSOL. The dialog shows both.
+  - mSOL, BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
+  - Built and simulated, no real deposit by the owner yet
+- Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 - Every other route is view only and links to the protocol's app.
 
 ## Roadmap, in order
 
-1. Liquid staking: Jito and Marinade direct, other LSTs through Jupiter
+1. Liquid staking: Jito direct (built, waiting on the owner's deposit), Marinade direct, other LSTs through Jupiter
 2. Kamino Lend
 3. Jupiter Lend
 4. MarginFi
 5. LP vaults
-6. Then: in-app withdrawals, the Hermes fee, mainnet switch
+6. Then: in-app withdrawals, the Hermes fee, lifting the beta cap
 
 Each route goes through `INTEGRATIONS.md`, one at a time.
 
@@ -54,6 +58,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 22 Oct 2026, Jito direct: mainnet Jito deposits compare the stake pool with Jupiter and build the better one. Site switched to mainnet beta with a 10 SOL cap per deposit.
 - 22 Oct 2026, Phase 0 cleanup: removed the database engine, workers, fake-data pages, the waitlist app and about 1,500 unused packages. Replaced estimated rates with live sources. Added the route registry and this gate.
 - PR #7: footer on mobile
 - PR #6: live Kamino rates, footer logo

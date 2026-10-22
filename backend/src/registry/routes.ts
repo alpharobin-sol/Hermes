@@ -39,6 +39,7 @@ export interface RouteConfig {
   category: Category;
   token: InputToken; // what the user deposits
   receipt?: TokenInfo; // what lands in the user's wallet, when it is a token
+  stakePool?: string; // SPL stake pool that mints the receipt directly. Quoted against Jupiter on mainnet.
   website: string;
   source: RateSource;
   deposit: Partial<Record<SolanaNetwork, DepositStatus>>;
@@ -55,6 +56,7 @@ export const ROUTES: RouteConfig[] = [
     category: 'liquid-staking',
     token: 'SOL',
     receipt: lst('JitoSOL', 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'),
+    stakePool: 'Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb', // same address on devnet
     website: 'https://www.jito.network/staking',
     source: { kind: 'defillama', project: 'jito-liquid-staking', symbol: 'JITOSOL' },
     deposit: { 'mainnet-beta': 'beta', devnet: 'beta' },
@@ -190,4 +192,15 @@ export function getRoute(id: string): RouteConfig | undefined {
 
 export function depositStatus(route: RouteConfig, network: SolanaNetwork): DepositStatus | null {
   return route.deposit[network] ?? null;
+}
+
+// Largest single deposit into a mainnet route while it is in beta, in the deposit token
+const BETA_DEPOSIT_CAPS: Record<InputToken, number> = {
+  SOL: Number(process.env.BETA_DEPOSIT_CAP_SOL || 10),
+  USDC: 1_000,
+  USDT: 1_000,
+};
+
+export function depositCap(route: RouteConfig, network: SolanaNetwork): number | null {
+  return network === 'mainnet-beta' && route.deposit[network] === 'beta' ? BETA_DEPOSIT_CAPS[route.token] : null;
 }

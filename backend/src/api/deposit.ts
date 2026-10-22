@@ -40,6 +40,10 @@ function handleError(res: Response, error: unknown, action: string) {
     const message = error.response.data?.error || 'Swap provider is unavailable. Try again shortly.';
     return res.status(status).json({ success: false, error: message });
   }
+  if (axios.isAxiosError(error)) {
+    logger.warn(`Swap provider unreachable while trying to ${action}: ${error.message}`);
+    return res.status(503).json({ success: false, error: 'Swap provider is unavailable. Try again shortly.' });
+  }
 
   logger.error(`Failed to ${action}:`, error);
   return res.status(500).json({ success: false, error: `Failed to ${action}` });
