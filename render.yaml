@@ -1,0 +1,29 @@
+# Render blueprint for the Hermes API (backend/)
+# Render → New → Blueprint → pick this repo. Fill in the secrets it asks for.
+services:
+  - type: web
+    name: hermes-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Free plan has 512 MB RAM. With this heap cap the API peaks around 350 MB.
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=300
+      # API only: the background workers need Postgres and Redis
+      - key: ENABLE_WORKERS
+        value: "false"
+      - key: CORS_ORIGIN
+        value: https://www.hermesagg.xyz,https://hermesagg.xyz,https://hermes-three-beta.vercel.app
+      - key: LOG_LEVEL
+        value: info
+      # Secrets: Render asks for these when you create the blueprint
+      - key: JUPITER_API_KEY
+        sync: false
+      - key: SOLANA_RPC_URL
+        sync: false

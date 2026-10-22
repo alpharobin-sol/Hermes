@@ -16,7 +16,8 @@ export function createApp(): Express {
   
   // CORS
   app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    // Comma-separated list, e.g. "https://www.hermesagg.xyz,https://hermes-three-beta.vercel.app"
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : '*',
     credentials: true,
   }));
   
