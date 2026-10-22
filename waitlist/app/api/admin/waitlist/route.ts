@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { isAdminPanelEnabled } from "@/lib/admin"
 
 const ADMIN_PASSCODE = process.env.ADMIN_PASSCODE || "180476"
 
 export async function GET(req: NextRequest) {
+  if (!isAdminPanelEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
   const passcode = req.headers.get("x-admin-passcode") || req.nextUrl.searchParams.get("passcode")
 
   if (passcode !== ADMIN_PASSCODE) {
