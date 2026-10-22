@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 import coinGeckoService from './coingecko';
@@ -26,13 +25,8 @@ export interface BinanceYieldData {
 
 export class BinanceService {
   private client: AxiosInstance;
-  private connection: Connection;
-  private readonly mintAddress = new PublicKey('BNso1VUJnh4zcfpZa6986Ea66P6TCp59hNn5WSntKz2');
 
   constructor() {
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    this.connection = new Connection(rpcUrl, 'confirmed');
-
     this.client = axios.create({
       baseURL: 'https://api.binance.com',
       timeout: 10000,

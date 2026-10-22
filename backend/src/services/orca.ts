@@ -597,7 +597,7 @@ export class OrcaService {
 
     try {
       // Get position PDA
-      const positionPda = this.getPositionAddress(positionMint);
+      const positionPda = await this.getPositionAddress(positionMint);
       
       // Fetch position account data
       const positionData = await this.whirlpoolCtx.fetcher.getPosition(positionPda);

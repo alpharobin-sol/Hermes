@@ -1,7 +1,7 @@
 "use client"
 
-import { useWalletContext } from '@/components/app/providers/WalletProvider'
+import { useWallet as useSolanaWallet } from '@solana/wallet-adapter-react'
 
 export function useWallet() {
-  return useWalletContext()
+  return useSolanaWallet()
 }

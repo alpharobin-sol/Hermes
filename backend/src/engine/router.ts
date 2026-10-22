@@ -7,8 +7,6 @@ import jitoService from '../services/jito';
 import marginfiService from '../services/marginfi';
 import kaminoService from '../services/kamino';
 import orcaService from '../services/orca';
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
-import { getConnection } from '../utils/solana';
 
 export interface RouteOption {
   protocol: string;

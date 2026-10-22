@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import type { Token } from "./TokenSelector"
-import { TrendingUp, Shield, Users, Clock, Zap, ExternalLink } from "lucide-react"
+import { TrendingUp, Shield, Users, Clock, Zap, ExternalLink, ArrowRight } from "lucide-react"
 
 import {
   CheckCircle2,
@@ -17,8 +17,13 @@ import { YieldAPI, type YieldItem, type BestRouteResponse } from "@/lib/api/yiel
 
 import { useLoading } from "./layout/loading-context";
 import { formatFees, formatNumber, formatPercent, formatUSD } from "@/lib/helpers/formatters";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { calculateReturns } from "@/lib/helpers/calculators";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { DepositAPI } from "@/lib/api/deposit-api";
+import { getProtocolAppUrl } from "@/lib/protocol-links";
+import { DepositDialog } from "./deposit-dialog";
 
 
 
@@ -26,6 +31,7 @@ interface YieldRoutesProps {
   token: Token;
   amount: number;
   riskProfile: "low" | "moderate" | "high";
+  onDeposited?: () => void;
 }
 
 
@@ -33,6 +39,7 @@ export function YieldRoutes({
   token,
   amount,
   riskProfile,
+  onDeposited,
 }: YieldRoutesProps) {
   const [bestResponse, setBestResponse] = useState<BestRouteResponse | null>(null);
 
@@ -41,6 +48,38 @@ export function YieldRoutes({
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { setIsLoading } = useLoading();
+  const usedFallbackRef = useRef(false);
+
+  const { publicKey } = useWallet();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const [depositableProtocols, setDepositableProtocols] = useState<Set<string>>(new Set());
+  const [depositRoute, setDepositRoute] = useState<YieldItem | null>(null);
+
+  // Which routes Hermes can execute in-app for this token
+  useEffect(() => {
+    const controller = new AbortController();
+    DepositAPI.getSupportedProtocols(token.symbol, { signal: controller.signal })
+      .then((protocols) => setDepositableProtocols(new Set(protocols)))
+      .catch((err) => {
+        if (err?.name !== "AbortError") setDepositableProtocols(new Set());
+      });
+    return () => controller.abort();
+  }, [token.symbol]);
+
+  const handleDepositClick = (route: YieldItem) => {
+    const protocol = route.protocol.toLowerCase();
+    if (depositableProtocols.has(protocol)) {
+      if (!publicKey) {
+        setWalletModalVisible(true);
+        return;
+      }
+      setDepositRoute(route);
+      return;
+    }
+
+    const appUrl = getProtocolAppUrl(protocol);
+    if (appUrl) window.open(appUrl, "_blank", "noopener,noreferrer");
+  };
 
   // Fetch best route first
   useEffect(() => {
@@ -54,6 +93,7 @@ export function YieldRoutes({
           setIsLoadingBest(true);
           setIsLoading(true);
           setError(null);
+          usedFallbackRef.current = false;
 
           const best = await YieldAPI.getBestRoute(
             {
@@ -68,6 +108,23 @@ export function YieldRoutes({
           }
         } catch (err: any) {
           if (err?.name === "AbortError") return;
+
+          // /best ranks from the yield collector's database. Fall back to live yields when it is empty.
+          try {
+            const all = await YieldAPI.getAllYields(
+              { asset: token.symbol, amount, limit: 50 },
+              { signal: controller.signal }
+            );
+            if (!controller.signal.aborted && all.length > 0) {
+              usedFallbackRef.current = true;
+              setAllYields(all.slice(1));
+              setBestResponse({ data: { bestRoute: all[0], alternativeRoutes: [] } });
+              return;
+            }
+          } catch (fallbackErr: any) {
+            if (fallbackErr?.name === "AbortError") return;
+          }
+
           const message = err instanceof Error ? err.message : "Failed to load best route";
           setError(message);
           console.error(err);
@@ -89,7 +146,7 @@ export function YieldRoutes({
 
   // Fetch all yields in background
   useEffect(() => {
-    if (!bestResponse) return;
+    if (!bestResponse || usedFallbackRef.current) return;
     const connection: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
     const isMetered = !!(connection?.saveData) || ["slow-2g", "2g"].includes(connection?.effectiveType);
     if (isMetered) {
@@ -381,11 +438,12 @@ export function YieldRoutes({
                   <div className="flex items-center gap-6 text-left justify-center mx-auto">
                     <div className="stat-group">
                       <span className="stat-label">Monthly</span>
-                      <span className="stat-value">{formatUSD(route.estimatedMonthlyReturn)}</span>
+                      {/* Returns are in the deposit token, not USD */}
+                      <span className="stat-value">{formatNumber(route.estimatedMonthlyReturn)} {token.symbol}</span>
                     </div>
                     <div className="stat-group">
                       <span className="stat-label">Yearly</span>
-                      <span className="stat-value text-primary">{formatUSD(route.estimatedYearlyReturn)}</span>
+                      <span className="stat-value text-primary">{formatNumber(route.estimatedYearlyReturn)} {token.symbol}</span>
                     </div>
                   </div>
 
@@ -429,17 +487,37 @@ export function YieldRoutes({
 
                 {/* Right: Action Button */}
                 <div className="flex justify-end sm:justify-normal">
-                  <button
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-medium transition-all whitespace-nowrap",
-                      index === 0
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "border border-border/50 text-foreground hover:border-primary/50 hover:text-primary"
-                    )}
-                  >
-                    Deposit
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
+                  {(() => {
+                    const canDeposit = depositableProtocols.has(route.protocol.toLowerCase());
+                    const appUrl = getProtocolAppUrl(route.protocol);
+                    return (
+                      <button
+                        onClick={() => handleDepositClick(route)}
+                        disabled={!canDeposit && !appUrl}
+                        title={canDeposit ? undefined : appUrl ? `Opens ${route.protocol} in a new tab` : "In-app deposits coming soon"}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 font-mono text-xs font-medium transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+                          index === 0 && canDeposit
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "border border-border/50 text-foreground hover:border-primary/50 hover:text-primary"
+                        )}
+                      >
+                        {canDeposit ? (
+                          <>
+                            Deposit
+                            <ArrowRight className="w-3 h-3" />
+                          </>
+                        ) : appUrl ? (
+                          <>
+                            Open app
+                            <ExternalLink className="w-3 h-3" />
+                          </>
+                        ) : (
+                          "Soon"
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
 
               </div>
@@ -448,6 +526,18 @@ export function YieldRoutes({
           </div>
         ))}
       </div>
+
+      {depositRoute && (
+        <DepositDialog
+          open={!!depositRoute}
+          onOpenChange={(open) => !open && setDepositRoute(null)}
+          protocol={depositRoute.protocol}
+          apy={depositRoute.apy}
+          inputToken={token.symbol}
+          amount={amount}
+          onDeposited={onDeposited}
+        />
+      )}
     </div>
   )
 }

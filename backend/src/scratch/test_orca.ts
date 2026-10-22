@@ -1,5 +1,4 @@
 import { PublicKey } from '@solana/web3.js';
-import Decimal from 'decimal.js';
 import orcaService from '../services/orca';
 
 async function testOrca() {
@@ -7,9 +6,6 @@ async function testOrca() {
 
   // SOL/USDC Whirlpool (64 tick spacing, 0.3% fee)
   const SOL_USDC_POOL = new PublicKey('HJPjoWUrhoZzkNfRpHuieeFk9WcZWjwy6PBjZ81ngndJ');
-  
-  // USDC mint
-  const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
   try {
     // Test 1: Check SDK availability
@@ -34,7 +30,7 @@ async function testOrca() {
     // Test 4: Get position PDA (example)
     console.log('\n4. Testing position PDA calculation...');
     const exampleMint = new PublicKey('11111111111111111111111111111111');
-    const positionPda = orcaService.getPositionAddress(exampleMint);
+    const positionPda = await orcaService.getPositionAddress(exampleMint);
     console.log('   Position PDA:', positionPda.toBase58());
     
     console.log('\nNote: Swap quotes require more complex fetcher setup and will be added later.');

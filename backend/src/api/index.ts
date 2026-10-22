@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import yieldsRouter from './yields';
 import emissionsRouter from './emissions';
 import signalsRouter from './signals';
+import depositRouter from './deposit';
 
 export function createApp(): Express {
   const app = express();
@@ -57,6 +58,10 @@ export function createApp(): Express {
   logger.info(`Mounting signals router on /api/signals`);
   app.use('/api/signals', signalsRouter);
   logger.info(`Signals router mounted successfully`);
+  
+  logger.info(`Mounting deposit router on /api/deposit`);
+  app.use('/api/deposit', depositRouter);
+  logger.info(`Deposit router mounted successfully`);
   
   // Debug: List all registered routes
   app._router.stack.forEach((middleware: any) => {

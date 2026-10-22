@@ -7,7 +7,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:3000";
 
-function getFullUrl(path: string): string {
+export function getFullUrl(path: string): string {
   if (
     typeof window !== "undefined" &&
     API_BASE_URL.includes(window.location.origin)

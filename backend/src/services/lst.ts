@@ -56,7 +56,7 @@ const LST_PROVIDERS: Record<string, LSTProviderConfig> = {
     name: 'bybit',
     symbol: 'bbSOL',
     displayName: 'Bybit Staked SOL',
-    mintAddress: 'BYBiT5BhVLdxEZhbBREQJTL3pRZZVBgAF5YjdVQVqJKz',
+    mintAddress: 'Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B',
     defaultAPY: 0.072, // 7.2% estimate
     fees: {
       depositFee: 0,
@@ -80,7 +80,7 @@ const LST_PROVIDERS: Record<string, LSTProviderConfig> = {
     name: 'jpool',
     symbol: 'JSOL',
     displayName: 'JPool Staked SOL',
-    mintAddress: 'J9JY3fPWUHPUcCwqFy4JUmjEw3xPpUJeJZQmMBvdz5gz',
+    mintAddress: '7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn',
     defaultAPY: 0.071,
     fees: {
       depositFee: 0,
@@ -90,8 +90,8 @@ const LST_PROVIDERS: Record<string, LSTProviderConfig> = {
   },
   STSOL: {
     name: 'socean',
-    symbol: 'stSOL',
-    displayName: 'Socean Staked SOL',
+    symbol: 'INF', // Sanctum migrated Socean's scnSOL mint to Infinity (INF)
+    displayName: 'Sanctum Infinity (formerly Socean)',
     mintAddress: '5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm',
     defaultAPY: 0.072,
     fees: {

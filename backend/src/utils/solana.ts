@@ -2,14 +2,12 @@ import {
   Connection,
   PublicKey,
   Transaction,
-  SystemProgram,
   Keypair,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
   ParsedAccountData,
 } from '@solana/web3.js';
 import {
-  TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   getAccount,
@@ -172,7 +170,7 @@ export async function getTransaction(connection: Connection, signature: string) 
 export async function estimateTransactionFee(
   connection: Connection,
   transaction: Transaction,
-  payer: PublicKey
+  _payer: PublicKey
 ): Promise<number> {
   try {
     const { feeCalculator } = await connection.getRecentBlockhash();

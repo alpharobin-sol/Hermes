@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 import coinGeckoService from './coingecko';
@@ -25,14 +24,8 @@ export interface DriftYieldData {
 
 export class DriftService {
   private client: AxiosInstance;
-  private connection: Connection;
-  private readonly mintAddress = new PublicKey('Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ');
-  private readonly stakingProgramId = new PublicKey('DRiFT1McxkzRvR7bRZQdKyJZNKjNxLRJjEqrFgKxEqJF');
 
   constructor() {
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    this.connection = new Connection(rpcUrl, 'confirmed');
-
     this.client = axios.create({
       timeout: 10000,
     });

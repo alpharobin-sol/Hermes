@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
@@ -16,9 +16,6 @@ const connection = new Redis(REDIS_URL, {
 
 // Create queue
 export const dpoQueue = new Queue('dpo-worker', { connection });
-
-// Queue events for monitoring
-const queueEvents = new QueueEvents('dpo-worker', { connection });
 
 /**
  * Evaluate all active portfolios
