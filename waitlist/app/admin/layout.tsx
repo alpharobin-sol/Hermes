@@ -1,4 +1,6 @@
 import type { Metadata } from "next"
+import { notFound } from "next/navigation"
+import { isAdminPanelEnabled } from "@/lib/admin"
 
 export const metadata: Metadata = {
   title: "Admin - Hermes Waitlist",
@@ -6,5 +8,6 @@ export const metadata: Metadata = {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (!isAdminPanelEnabled()) notFound()
   return children
 }
