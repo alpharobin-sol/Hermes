@@ -2,7 +2,6 @@ import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import routerEngine, { RoutingCriteria } from './router';
 import riskEngine from './risk';
-import { percentageDifference, isWithinThreshold } from '../utils/math';
 
 export interface DPOAction {
   action: 'rebalance' | 'allocate' | 'exit' | 'chase_yield' | 'reduce_exposure';

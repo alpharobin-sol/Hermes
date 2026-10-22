@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 import coinGeckoService from './coingecko';
@@ -26,13 +25,8 @@ export interface HeliusYieldData {
 
 export class HeliusService {
   private client: AxiosInstance;
-  private connection: Connection;
-  private readonly mintAddress = new PublicKey('he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A');
 
   constructor() {
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    this.connection = new Connection(rpcUrl, 'confirmed');
-
     this.client = axios.create({
       baseURL: 'https://api.helius.xyz',
       timeout: 10000,

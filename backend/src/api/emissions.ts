@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
-import { prisma } from '../db/prisma';
 import { 
   getProtocolEmissions, 
   calculateTotalAPRBoost,
@@ -91,7 +90,7 @@ router.get('/:protocol', async (req: Request, res: Response) => {
  * GET /api/emissions/summary/active
  * Get summary of all active emission programs
  */
-router.get('/summary/active', async (req: Request, res: Response) => {
+router.get('/summary/active', async (_req: Request, res: Response) => {
   try {
     const activeProtocols = Object.keys(PROTOCOL_EMISSIONS)
       .filter(p => hasActiveEmissions(p))
@@ -126,7 +125,7 @@ router.get('/summary/active', async (req: Request, res: Response) => {
  * GET /api/emissions/incentives/all
  * Get all active incentive programs across protocols
  */
-router.get('/incentives/all', async (req: Request, res: Response) => {
+router.get('/incentives/all', async (_req: Request, res: Response) => {
   try {
     const allIncentives: any[] = [];
 

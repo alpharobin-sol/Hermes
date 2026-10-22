@@ -1,6 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 import coinGeckoService from './coingecko';
@@ -26,13 +25,8 @@ export interface JupiterYieldData {
 
 export class JupiterService {
   private client: AxiosInstance;
-  private connection: Connection;
-  private readonly mintAddress = new PublicKey('jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v');
 
   constructor() {
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    this.connection = new Connection(rpcUrl, 'confirmed');
-
     this.client = axios.create({
       baseURL: 'https://stake.jup.ag',
       timeout: 10000,

@@ -39,7 +39,7 @@ if (process.env.NODE_ENV !== 'production') {
           return false;
         })(),
         winston.format.colorize(),
-        winston.format.printf(({ level, message, timestamp, service }) => {
+        winston.format.printf(({ level, message, timestamp }) => {
           return `[HERMES] ${timestamp} ${level}: ${message}`;
         })
       ),

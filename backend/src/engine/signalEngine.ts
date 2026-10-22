@@ -8,7 +8,6 @@ import { prisma } from '../db/prisma';
 import { logger } from '../utils/logger';
 import marinadeService from '../services/marinade';
 import jitoService from '../services/jito';
-import defiLlamaService from '../services/defillama';
 import lstService from '../services/lst';
 import stablecoinService from '../services/stablecoins';
 
@@ -74,7 +73,6 @@ const SAFETY_THRESHOLDS = {
 
 export class SignalEngine {
   private signals: Signal[] = [];
-  private lastCheck: Map<SignalType, Date> = new Map();
   
   /**
    * Run all signal checks
@@ -285,7 +283,7 @@ export class SignalEngine {
         yieldsByProtocol.get(key)!.push(record);
       }
       
-      for (const [key, records] of yieldsByProtocol) {
+      for (const records of yieldsByProtocol.values()) {
         if (records.length < 2) continue;
         
         const latest = records[0];

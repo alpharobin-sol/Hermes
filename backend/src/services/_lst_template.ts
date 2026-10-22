@@ -10,7 +10,6 @@
 
 import axios, { AxiosInstance } from 'axios';
 import axiosRetry from 'axios-retry';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { aprToApy } from '../utils/math';
 
@@ -35,13 +34,8 @@ export interface TEMPLATEYieldData {
 
 export class TEMPLATEService {
   private client: AxiosInstance;
-  private connection: Connection;
-  private readonly mintAddress = new PublicKey('REPLACE_WITH_ACTUAL_MINT_ADDRESS');
 
   constructor() {
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-    this.connection = new Connection(rpcUrl, 'confirmed');
-
     // If your provider has a REST API, set the baseURL here
     this.client = axios.create({
       baseURL: 'https://api.yourprovider.com', // Replace or remove if no API
