@@ -26,6 +26,7 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
   - Sanctum Infinity, Bybit, JPool, BlazeStake (liquid staking, DefiLlama rates)
   - Kamino Lend SOL, USDC, USDT (Kamino API, main market)
   - Jupiter Lend SOL, USDC, USDT (Jupiter Lend API)
+- The token picker lists only tokens that have a route, so it shows SOL alone for now. USDC and USDT return on their own once a lending route for them is added.
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
   - JitoSOL: Hermes quotes the Jito stake pool and Jupiter, and builds whichever gives more JitoSOL. The dialog shows both.
   - mSOL, BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API

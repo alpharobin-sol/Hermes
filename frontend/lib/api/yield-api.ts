@@ -45,8 +45,10 @@ export interface YieldRoute {
 }
 
 export class YieldAPI {
-  static async getRoutes(token: string, opts?: { signal?: AbortSignal }): Promise<YieldRoute[]> {
-    const res = await fetch(getFullUrl(`/api/yields?token=${encodeURIComponent(token)}`), {
+  // Routes for one deposit token, or for every token when `token` is left out
+  static async getRoutes(token?: string, opts?: { signal?: AbortSignal }): Promise<YieldRoute[]> {
+    const query = token ? `?token=${encodeURIComponent(token)}` : "";
+    const res = await fetch(getFullUrl(`/api/yields${query}`), {
       cache: "no-cache",
       signal: opts?.signal,
     });

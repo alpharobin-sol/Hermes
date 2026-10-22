@@ -5,15 +5,14 @@ import { TokenSelector, type Token } from "./TokenSelector";
 import { YieldRoutes } from "./yield-routes";
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances";
 import { IS_DEVNET } from "@/lib/network";
+import { YieldAPI } from "@/lib/api/yield-api";
 import type { BalanceIssue } from "./yield-routes";
 
-// Balances are filled in from the connected wallet
+// Tokens the panel can offer. Only those with at least one route show up. Balances come from the connected wallet.
 const baseTokens: Token[] = [
   { symbol: "SOL", name: "Solana", icon: "/brand-logos/solanaLogoMark.svg", balance: 0 },
   { symbol: "USDC", name: "USD Coin", icon: "/brand-logos/usdcLogoMark.svg", balance: 0 },
   { symbol: "USDT", name: "Tether", icon: "/brand-logos/tetherLogoMark.svg", balance: 0 },
-  // { symbol: "jitoSOL", name: "Jito Staked SOL", icon: "/brand-logos/usdcLogoMark.svg", balance: 5.2 },
-  // { symbol: "mSOL", name: "Marinade SOL", icon: "/brand-logos/usdcLogoMark.svg", balance: 3.1 },
 ];
 
 type RiskProfile = "low" | "moderate" | "high";
@@ -33,9 +32,29 @@ function formatNumber(num: number): string {
 
 export function YieldPanel() {
   const { balances, isConnected, refresh: refreshBalances } = useTokenBalances();
+
+  // SOL until the API says which tokens have routes. USDC and USDT return once a lending route is added.
+  const [routeTokens, setRouteTokens] = useState<string[]>([baseTokens[0].symbol]);
+  useEffect(() => {
+    const controller = new AbortController();
+    YieldAPI.getRoutes(undefined, { signal: controller.signal })
+      .then((routes) => {
+        const symbols = new Set(routes.map((route) => route.token));
+        const available = baseTokens.map((token) => token.symbol).filter((symbol) => symbols.has(symbol));
+        if (available.length > 0) setRouteTokens(available);
+      })
+      .catch(() => {
+        // Keep the SOL default. The route list shows its own error.
+      });
+    return () => controller.abort();
+  }, []);
+
   const tokens = useMemo(
-    () => baseTokens.map((token) => ({ ...token, balance: balances[token.symbol] ?? 0 })),
-    [balances]
+    () =>
+      baseTokens
+        .filter((token) => routeTokens.includes(token.symbol))
+        .map((token) => ({ ...token, balance: balances[token.symbol] ?? 0 })),
+    [balances, routeTokens]
   );
   const [selectedSymbol, setSelectedSymbol] = useState(baseTokens[0].symbol);
   const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0];
