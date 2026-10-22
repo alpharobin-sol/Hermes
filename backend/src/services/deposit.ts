@@ -4,50 +4,25 @@ import Decimal from 'decimal.js';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { solanaNetwork, SolanaNetwork } from '../config/runtime';
-import lstService from './lst';
+import { getRoute, depositStatus, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
 import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from './stake-pool-deposit';
 
 /**
  * HERMES DEPOSIT ROUTER
  * Builds unsigned deposit transactions for the user's wallet to sign.
  * Hermes never holds funds: it quotes a route, returns the transaction, and the user signs it.
+ * Only routes with a deposit status for the current network in the registry can be built.
  *
  * Mainnet: SOL -> liquid staking tokens, routed through the Jupiter swap API.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
- * Lending and LP routes are not executable yet and should be opened in the protocol's own app.
  */
-
-export const SOL_MINT = 'So11111111111111111111111111111111111111112';
 
 const MAX_PRICE_IMPACT_PCT = Number(process.env.DEPOSIT_MAX_PRICE_IMPACT_PCT || 1);
 
 // SOL kept back on devnet for the token account rent and fees
 const DEVNET_FEE_BUFFER_LAMPORTS = 10_000_000;
 
-interface TokenInfo {
-  symbol: string;
-  mint: string;
-  decimals: number;
-}
-
-// Tokens a user can deposit from
-const INPUT_TOKENS: Record<string, TokenInfo> = {
-  SOL: { symbol: 'SOL', mint: SOL_MINT, decimals: 9 },
-  USDC: { symbol: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', decimals: 6 },
-  USDT: { symbol: 'USDT', mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', decimals: 6 },
-};
-
-// LSTs served by dedicated services (marinade.ts, jito.ts, ...). Keyed by the protocol name the yield APIs return.
-const DEDICATED_LSTS: Record<string, TokenInfo> = {
-  marinade: { symbol: 'mSOL', mint: 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', decimals: 9 },
-  jito: { symbol: 'JitoSOL', mint: 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn', decimals: 9 },
-  binance: { symbol: 'BNSOL', mint: 'BNso1VUJnh4zcfpZa6986Ea66P6TCp59hvtNJ8b1X85', decimals: 9 },
-  jupiter: { symbol: 'jupSOL', mint: 'jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v', decimals: 9 },
-  drift: { symbol: 'dSOL', mint: 'Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ', decimals: 9 },
-  helius: { symbol: 'hSOL', mint: 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A', decimals: 9 },
-};
-
-// Stake pools deployed on devnet at the same addresses as mainnet. Keyed by protocol name.
+// Stake pools deployed on devnet at the same addresses as mainnet. Keyed by route id.
 const DEVNET_STAKE_POOLS: Record<string, StakePoolTarget> = {
   jito: {
     symbol: 'JitoSOL',
@@ -57,15 +32,14 @@ const DEVNET_STAKE_POOLS: Record<string, StakePoolTarget> = {
 };
 
 export interface DepositRequest {
-  protocol: string;
-  inputToken: string;
+  routeId: string;
   amount: string | number; // UI units, e.g. 1.5 SOL
   slippageBps?: number;
 }
 
 export interface DepositQuote {
   network: SolanaNetwork;
-  protocol: string;
+  routeId: string;
   method: 'jupiter-swap' | 'stake-pool';
   inputToken: TokenInfo;
   outputToken: TokenInfo;
@@ -115,32 +89,18 @@ export class DepositService {
   }
 
   /**
-   * Protocols that can be deposited into from the given input token
-   */
-  getSupportedProtocols(inputToken: string): { protocol: string; outputToken: string }[] {
-    if (inputToken.toUpperCase() !== 'SOL') return [];
-
-    if (solanaNetwork() === 'devnet') {
-      return Object.entries(DEVNET_STAKE_POOLS).map(([protocol, target]) => ({ protocol, outputToken: target.symbol }));
-    }
-
-    return Object.entries(this.getLSTTargets()).map(([protocol, token]) => ({
-      protocol,
-      outputToken: token.symbol,
-    }));
-  }
-
-  /**
    * Quote a deposit without building a transaction
    */
   async getQuote(request: DepositRequest): Promise<DepositQuote> {
+    const route = this.resolveRoute(request.routeId);
+
     if (solanaNetwork() === 'devnet') {
-      const { target, lamports } = this.resolveDevnetDeposit(request);
+      const { target, lamports } = this.resolveDevnetDeposit(route, request);
       const outAmount = await quoteStakePoolDeposit(this.getDevnetConnection(), target, lamports);
-      return this.devnetQuote(request, target, lamports, outAmount);
+      return this.devnetQuote(route, target, lamports, outAmount);
     }
 
-    const { quote } = await this.fetchQuote(request);
+    const { quote } = await this.fetchQuote(route, request);
     return quote;
   }
 
@@ -148,11 +108,13 @@ export class DepositService {
    * Quote a deposit and build the unsigned transaction for the user's wallet
    */
   async buildTransaction(request: DepositRequest, userPublicKey: string): Promise<DepositTransaction> {
+    const route = this.resolveRoute(request.routeId);
+
     if (solanaNetwork() === 'devnet') {
-      return this.buildDevnetTransaction(request, userPublicKey);
+      return this.buildDevnetTransaction(route, request, userPublicKey);
     }
 
-    const { quote, rawQuote } = await this.fetchQuote(request);
+    const { quote, rawQuote } = await this.fetchQuote(route, request);
 
     const response = await this.client.post('/swap', {
       quoteResponse: rawQuote,
@@ -170,7 +132,7 @@ export class DepositService {
     const { swapTransaction, lastValidBlockHeight, prioritizationFeeLamports, simulationError } = response.data;
 
     if (simulationError) {
-      logger.warn(`Deposit transaction failed simulation (${quote.protocol}): ${JSON.stringify(simulationError)}`);
+      logger.warn(`Deposit transaction failed simulation (${quote.routeId}): ${JSON.stringify(simulationError)}`);
       throw new DepositError(this.describeSimulationError(simulationError), 422);
     }
 
@@ -185,8 +147,8 @@ export class DepositService {
     };
   }
 
-  private async buildDevnetTransaction(request: DepositRequest, userPublicKey: string): Promise<DepositTransaction> {
-    const { target, lamports } = this.resolveDevnetDeposit(request);
+  private async buildDevnetTransaction(route: RouteConfig, request: DepositRequest, userPublicKey: string): Promise<DepositTransaction> {
+    const { target, lamports } = this.resolveDevnetDeposit(route, request);
     const connection = this.getDevnetConnection();
     const user = new PublicKey(userPublicKey);
 
@@ -217,7 +179,7 @@ export class DepositService {
     logger.info(`Built devnet deposit: ${toUiSol(lamports)} SOL -> ${target.symbol} in ${transactions.length} transaction(s)`);
 
     return {
-      quote: this.devnetQuote(request, target, lamports, plan.outAmount),
+      quote: this.devnetQuote(route, target, lamports, plan.outAmount),
       transaction: transactions[transactions.length - 1],
       transactions,
       lastValidBlockHeight: plan.lastValidBlockHeight,
@@ -225,13 +187,24 @@ export class DepositService {
     };
   }
 
-  private resolveDevnetDeposit(request: DepositRequest): { target: StakePoolTarget; lamports: Decimal } {
-    if (request.inputToken.toUpperCase() !== 'SOL') {
-      throw new DepositError(`Only SOL deposits are supported on devnet`, 422);
+  /**
+   * The registry route, if Hermes can deposit into it on the current network
+   */
+  private resolveRoute(routeId: string): RouteConfig {
+    const route = getRoute(routeId);
+    if (!route) {
+      throw new DepositError(`Unknown route: ${routeId}`, 404);
     }
-    const target = DEVNET_STAKE_POOLS[request.protocol.toLowerCase()];
+    if (!depositStatus(route, solanaNetwork())) {
+      throw new DepositError(`${route.name} deposits are not available in Hermes on ${solanaNetwork()} yet`, 422);
+    }
+    return route;
+  }
+
+  private resolveDevnetDeposit(route: RouteConfig, request: DepositRequest): { target: StakePoolTarget; lamports: Decimal } {
+    const target = DEVNET_STAKE_POOLS[route.id];
     if (!target) {
-      throw new DepositError(`${request.protocol} has no devnet deposit route`, 422);
+      throw new DepositError(`${route.name} has no devnet deposit route`, 422);
     }
     const lamports = new Decimal(request.amount).mul(1e9).floor();
     if (lamports.lte(0)) {
@@ -240,12 +213,12 @@ export class DepositService {
     return { target, lamports };
   }
 
-  private devnetQuote(request: DepositRequest, target: StakePoolTarget, lamports: Decimal, outAmount: string): DepositQuote {
+  private devnetQuote(route: RouteConfig, target: StakePoolTarget, lamports: Decimal, outAmount: string): DepositQuote {
     return {
       network: 'devnet',
-      protocol: request.protocol.toLowerCase(),
+      routeId: route.id,
       method: 'stake-pool',
-      inputToken: INPUT_TOKENS.SOL,
+      inputToken: TOKENS.SOL,
       outputToken: { symbol: target.symbol, mint: target.mint, decimals: 9 },
       inAmount: toUiSol(lamports),
       outAmount,
@@ -264,16 +237,12 @@ export class DepositService {
     return this.devnetConnection;
   }
 
-  private async fetchQuote(request: DepositRequest): Promise<{ quote: DepositQuote; rawQuote: any }> {
-    const inputToken = INPUT_TOKENS[request.inputToken.toUpperCase()];
-    if (!inputToken) {
-      throw new DepositError(`Unsupported input token: ${request.inputToken}`);
-    }
-
-    const protocol = request.protocol.toLowerCase();
-    const outputToken = inputToken.symbol === 'SOL' ? this.getLSTTargets()[protocol] : undefined;
+  private async fetchQuote(route: RouteConfig, request: DepositRequest): Promise<{ quote: DepositQuote; rawQuote: any }> {
+    const inputToken: TokenInfo = TOKENS[route.token];
+    // Mainnet deposits swap into the route's receipt token, so only token-receipt routes qualify
+    const outputToken = route.receipt;
     if (!outputToken) {
-      throw new DepositError(`Deposits from ${inputToken.symbol} into ${request.protocol} are not supported yet`, 422);
+      throw new DepositError(`${route.name} deposits are not available in Hermes yet`, 422);
     }
 
     const amount = new Decimal(request.amount);
@@ -309,7 +278,7 @@ export class DepositService {
       rawQuote,
       quote: {
         network: 'mainnet-beta',
-        protocol,
+        routeId: route.id,
         method: 'jupiter-swap',
         inputToken,
         outputToken,
@@ -321,22 +290,6 @@ export class DepositService {
         routeLabels: (rawQuote.routePlan || []).map((step: any) => step.swapInfo?.label).filter(Boolean),
       },
     };
-  }
-
-  /**
-   * Dedicated LSTs plus the generic LST registry, keyed by protocol name
-   */
-  private getLSTTargets(): Record<string, TokenInfo> {
-    const targets: Record<string, TokenInfo> = { ...DEDICATED_LSTS };
-
-    for (const symbol of lstService.getSupportedLSTs()) {
-      const provider = lstService.getLSTProvider(symbol);
-      if (provider && !targets[provider.name]) {
-        targets[provider.name] = { symbol: provider.symbol, mint: provider.mintAddress, decimals: 9 };
-      }
-    }
-
-    return targets;
   }
 
   private describeSimulationError(simulationError: any): string {

@@ -1,97 +1,68 @@
 'use client';
 
-import { MarketAnalytics } from "@/components/app/MarketAnalytics";
 import { YieldPanel } from "@/components/app/yield-panel";
-import Image from "next/image";
-import Head from 'next/head';
-
-export default function Home() {
-  return (
-    <>
-      <Head>
-        <title>Hermes - Solana Yield Aggregator | Best DeFi Yields & APYs on Solana</title>
-        <meta name="description" content="Hermes is the leading yield aggregator on Solana. Deposit your SOL, LSTs, or stablecoins into smart vaults that automatically optimize for the highest real-time APYs across top DeFi protocols." />
-        <meta name="keywords" content="hermes solana, solana yield aggregator, best solana yields, solana defi apy, solana yield farming, solana auto compounding, solana vaults, highest solana apy" />
-        <meta property="og:title" content="Hermes: Solana Yield Aggregator - Earn the Highest DeFi Yields Automatically" />
-        <meta property="og:description" content="Like Yearn on Ethereum, Hermes auto-optimizes your deposits across Solana protocols for maximum yields on staking, lending, and farming." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://yourdomain.com/" /> {/* Replace with your actual domain */}
-        <meta property="og:image" content="https://yourdomain.com/og-image-hermes-aggregator.jpg" /> {/* OG image with vault/yield theme */}
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://yourdomain.com/" /> {/* Replace with your actual URL */}
-      </Head>
-
-      <div className="mx-auto max-w-7xl transition-opacity duration-300 flex flex-col items-center justify-start w-full flex-1 h-full mt-0 md:pt-[3vh]">
-
-
-        {/* Main Yield Panel - Users see vaults/opportunities first */}
-        <div className="w-full flex-1 flex flex-col pb-6 px-3 min-sm:px-1 md:px-8 3xl:px-20">
-          <YieldPanel />
-        </div>
-
-        {/* Powerful H1 and Description */}
-        <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 px-3 min-sm:px-1 md:px-8 3xl:px-20">
-          <div className="text-start md:text-center max-w-2xl mx-auto">
-            <h1 className="text-lg fint-bold text-foreground sm:text-xl">
-              Earn the Best Yields on Solana
-            </h1>
-            <p className="mt-2 text-caption">
-              Discover yields – Deposit once into Hermes auto-optimizing vaults.
-            </p>
-          </div>
-        </section>
-
-
-        <MarketStats />
-
-
-        {/* FAQ Section */}
-        <FaqSection />
-      </div>
-    </>
-  );
-}
-
-
-
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { MarketStats } from "@/components/app/MarketStats";
+
+export default function Home() {
+  return (
+    <div className="mx-auto max-w-7xl transition-opacity duration-300 flex flex-col items-center justify-start w-full flex-1 h-full mt-0 md:pt-[3vh]">
+
+      {/* Yield explorer first: pick a token and amount, compare routes */}
+      <div className="w-full flex-1 flex flex-col pb-6 px-3 min-sm:px-1 md:px-8 3xl:px-20">
+        <YieldPanel />
+      </div>
+
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 px-3 min-sm:px-1 md:px-8 3xl:px-20">
+        <div className="text-start md:text-center max-w-2xl mx-auto">
+          <h1 className="text-lg font-bold text-foreground sm:text-xl">
+            Compare Solana yields, deposit from your own wallet
+          </h1>
+          <p className="mt-2 text-caption">
+            Hermes checks live rates across Solana protocols and builds the deposit for the route you pick. You sign it. Funds never touch Hermes.
+          </p>
+        </div>
+      </section>
+
+      <FaqSection />
+    </div>
+  );
+}
 
 const faqs = [
   {
     question: "What is Hermes?",
-    answer: "Hermes is a yield aggregator on Solana — think Yearn Finance but optimized for Solana's speed and low fees. It automatically maximizes your returns by deploying deposits into the best DeFi strategies."
+    answer: "A yield aggregator for Solana. It pulls live APY and TVL from liquid staking, lending and liquidity protocols, ranks the routes for your token and amount, and builds the deposit for the one you choose.",
   },
   {
-    question: "How does yield aggregation work?",
-    answer: "You deposit assets into Hermes vaults. Smart contracts then auto-compound and rebalance across top protocols (like Kamino, Marginfi, Jito) to chase the highest real-time APYs."
+    question: "Does Hermes hold my funds?",
+    answer: "No. Each deposit goes straight from your wallet to the protocol in a transaction you sign. What you receive back (for example JitoSOL) sits in your own wallet. Hermes has no vaults and no contracts holding money.",
   },
   {
-    question: "Is my money safe?",
-    answer: "Hermes is non-custodial — you always control your funds via your wallet. Vaults are audited, but DeFi carries risks like smart contract bugs. DYOR and start small."
+    question: "Which routes can I deposit into from Hermes?",
+    answer: "Routes marked Deposit run inside Hermes. Others show their live rates and link to the protocol's own app while their in-app deposits are being integrated, one protocol at a time.",
   },
   {
-    question: "What assets and strategies are supported?",
-    answer: "SOL, jitoSOL, mSOL, stablecoins (USDC, USDT), and more. Strategies include lending, liquid staking, leveraged loops, and liquidity provision."
+    question: "What are the risks?",
+    answer: "Every route carries the risks of its protocol: smart contract bugs, depegs and market moves. Hermes shows a risk level per route, but it cannot remove those risks. Start small.",
   },
   {
-    question: "Why choose Hermes on Solana?",
-    answer: "Solana's fast, cheap transactions enable frequent rebalancing and compounding — delivering higher net yields than on other chains."
-  }
+    question: "Does Hermes charge a fee?",
+    answer: "Not today. You pay the protocol's own fees and Solana network fees, and swap routes can include price impact, which Hermes shows before you sign.",
+  },
 ]
 
-export function FaqSection() {
+function FaqSection() {
   return (
     <section className="w-full py-14 px-3 min-sm:px-1 md:px-8 3xl:px-20">
       <div className="mx-auto max-w-2xl">
 
         <div className="mb-8">
-          <h2 className="text-lg fint-bold text-foreground sm:text-xl mb-1">
+          <h2 className="text-lg font-bold text-foreground sm:text-xl mb-1">
             FAQs
           </h2>
           <div className="flex items-center gap-2">
@@ -119,4 +90,3 @@ export function FaqSection() {
     </section>
   )
 }
-

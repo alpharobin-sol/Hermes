@@ -27,8 +27,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Hermes - Yield Aggregator for Solana",
-  description: "Find the best DeFi yield strategies across Solana protocols. Simplified, optimized, yours.",
-  generator: "v0.app",
+  description: "Compare live Solana yields across liquid staking and lending, then deposit from your own wallet.",
   icons: {
     icon: [
       {

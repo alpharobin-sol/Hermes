@@ -57,8 +57,6 @@ export function AppHeader({ isLoading = false }: AppHeaderProps) {
 
   const navItems = [
     { label: "Yield", href: "/" },
-    { label: "Portfolio", href: "/portfolio" },
-    { label: "Analytics", href: "/analytics" },
   ]
 
   return (
