@@ -26,16 +26,25 @@ export const TOKENS: Record<InputToken, TokenInfo> = {
   USDT: { symbol: 'USDT', mint: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', decimals: 6 },
 };
 
-// Where a route's APY and TVL come from. Each kind has one fetcher in services/sources.
+// Kamino Lend main market, and the reserve Hermes uses for each token (the largest one for that token)
+export const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
+const KAMINO_RESERVES: Record<InputToken, string> = {
+  SOL: 'd4A2prbA2whesmvHaL88BH6Ewn5N4bTSU2Ze8P6Bc4Q',
+  USDC: 'D6q6wuQSrifJKZYpR1M8R4YawnLDtDsMmWM1NbBmgJ59',
+  USDT: 'H3t6qZ1JkguCNTi9uzVKqQ7dvt2cum4XiXWom6Gn5e5S',
+};
+
+// Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana
-  | { kind: 'kamino'; mint: string } // Kamino Lend main market reserve
+  | { kind: 'kamino'; reserve: string } // Kamino Lend main market reserve
   | { kind: 'jupiter-lend'; mint: string }; // Jupiter Lend earn token
 
-// A deposit straight into the protocol, minting the receipt at its own rate. Quoted against Jupiter on mainnet.
+// A deposit straight into the protocol. LST deposits are quoted against Jupiter on mainnet.
 export type DirectDeposit =
   | { kind: 'spl-stake-pool'; pool: string } // SPL stake pool that mints the receipt
-  | { kind: 'marinade' }; // Marinade liquid staking program, mainnet only
+  | { kind: 'marinade' } // Marinade liquid staking program, mainnet only
+  | { kind: 'kamino-lend'; market: string; reserve: string }; // supply to a Kamino Lend reserve, mainnet only
 
 export interface RouteConfig {
   id: string; // unique, used by the deposit API
@@ -175,9 +184,11 @@ export const ROUTES: RouteConfig[] = [
       name: 'Kamino Lend',
       category: 'lending',
       token,
+      // The deposit is a position in the user's Kamino account, not a token in the wallet
+      direct: { kind: 'kamino-lend', market: KAMINO_MAIN_MARKET, reserve: KAMINO_RESERVES[token] },
       website: 'https://app.kamino.finance',
-      source: { kind: 'kamino', mint: TOKENS[token].mint },
-      deposit: {},
+      source: { kind: 'kamino', reserve: KAMINO_RESERVES[token] },
+      deposit: { 'mainnet-beta': 'beta' },
     },
     {
       id: `jupiter-lend-${token.toLowerCase()}`,

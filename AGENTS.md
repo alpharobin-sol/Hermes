@@ -19,24 +19,24 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
 
-## Live (22 October 2026)
+## Live (23 October 2026)
 
-- The site shows only routes Hermes deposits into in-app: the six LSTs below.
+- The site shows only routes Hermes deposits into in-app: the six LSTs and Kamino Lend (SOL, USDC, USDT) below.
 - Hidden for now, not removed: routes that send users to another app. They stay in the registry with live rates (`/api/yields?all=true` lists them) and come back one at a time as each gets an in-app deposit:
   - Sanctum Infinity, Bybit, JPool, BlazeStake (liquid staking, DefiLlama rates)
-  - Kamino Lend SOL, USDC, USDT (Kamino API, main market)
   - Jupiter Lend SOL, USDC, USDT (Jupiter Lend API)
-- The token picker lists only tokens that have a route, so it shows SOL alone for now. USDC and USDT return on their own once a lending route for them is added.
+- The token picker lists only tokens that have a route: SOL, USDC and USDT since Kamino Lend.
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
   - JitoSOL and mSOL: Hermes quotes the protocol directly (Jito's stake pool, Marinade's liquid staking program) and Jupiter, and builds whichever gives more of the token. The dialog shows both.
   - BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
+  - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Cards show how much of each reserve is borrowed, and the dialog warns at 95% or more.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 
 ## Roadmap, in order
 
 1. Liquid staking: Jito direct and Marinade direct (built, waiting on the owner's deposits), then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
-2. Kamino Lend
+2. Kamino Lend (built, waiting on the owner's deposit)
 3. Jupiter Lend
 4. MarginFi
 5. LP vaults
@@ -60,6 +60,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.
 - 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.
 - 22 Oct 2026: view-only routes hidden from the site, kept in the registry. Insufficient balance state before deposits (PR #10).
 - 22 Oct 2026, Jito direct: mainnet Jito deposits compare the stake pool with Jupiter and build the better one. Site switched to mainnet beta with a 10 SOL cap per deposit.

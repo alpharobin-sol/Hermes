@@ -49,7 +49,7 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 | Bybit (bbSOL) | view only, hidden | pending | | | |
 | JPool (JSOL) | view only, hidden | pending | | | |
 | BlazeStake (bSOL) | view only, hidden | pending | | | |
-| Kamino Lend SOL, USDC, USDT | view only, hidden | pending | | | Phase 1, step 2 |
+| Kamino Lend SOL, USDC, USDT | beta | 23 Oct: rates come from Kamino's own reserve API (SOL 5.50% / $247M / 92% borrowed, USDC 31.3% / $120M / 99% borrowed, USDT 4.0% / $12.4M / 87% borrowed). Check against app.kamino.finance pending. | SOL 0.01 / 1 / 4 (first deposit, new Kamino account), USDC and USDT 1 / 1,000 pass, 23 Oct | pending | Kamino's transaction API builds it; Hermes swaps in a priority fee and simulates. First deposit pays one-time account rent (0.0241 SOL for SOL, 0.0298 SOL for USDC/USDT, measured by simulation). USDC was 99 to 100% borrowed at integration, so USDC withdrawals may have to wait. Exit: withdraw at app.kamino.finance when the reserve has liquidity. |
 | Jupiter Lend SOL, USDC, USDT | view only, hidden | pending | | | Phase 1, step 3 |
 | MarginFi | not listed | | | | Phase 1, step 4. Needs a live rate source first. |
 

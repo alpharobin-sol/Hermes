@@ -40,6 +40,7 @@ export interface YieldRoute {
   website: string;
   source: string; // where apy and tvl come from
   updatedAt: string;
+  utilization?: number | null; // lending only: share of the supply that is borrowed, 1 = all of it
   deposit: DepositStatus | null; // null: view only, deposit in the protocol's app
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
 }

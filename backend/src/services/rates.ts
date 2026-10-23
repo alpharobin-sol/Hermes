@@ -1,7 +1,7 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import { logger } from '../utils/logger';
-import { RateSource } from '../registry/routes';
+import { KAMINO_MAIN_MARKET, RateSource } from '../registry/routes';
 
 /**
  * Live APY and TVL for every route in the registry, from three sources:
@@ -12,6 +12,7 @@ import { RateSource } from '../registry/routes';
 export interface Rate {
   apy: number; // decimal, 0.05 = 5%
   tvl: number; // USD
+  utilization?: number; // lending only: share of the supply that is borrowed, 1 = all of it
   updatedAt: number; // ms timestamp of the fetch
 }
 
@@ -22,8 +23,6 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const RETRY_AFTER_MS = 60 * 1000;
 // After a failed fetch the last good rates keep serving, but never older than this
 const MAX_STALE_MS = 60 * 60 * 1000;
-
-const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 const http = axios.create({ timeout: 30000 });
 axiosRetry(http, {
@@ -87,9 +86,10 @@ const defillamaRates = cachedSource('DefiLlama', async () => {
   return rates;
 });
 
-// Keyed by token mint
+// Keyed by reserve address
 const kaminoRates = cachedSource('Kamino', async () => {
-  const response = await http.get(`https://api.kamino.finance/kamino-market/${KAMINO_MAIN_MARKET}/reserves/metrics`, {
+  const kaminoApi = process.env.KAMINO_API_URL || 'https://api.kamino.finance';
+  const response = await http.get(`${kaminoApi}/kamino-market/${KAMINO_MAIN_MARKET}/reserves/metrics`, {
     params: { env: 'mainnet-beta' },
   });
   const reserves: any[] = Array.isArray(response.data) ? response.data : [];
@@ -100,10 +100,10 @@ const kaminoRates = cachedSource('Kamino', async () => {
     const apy = Number(reserve.supplyApy);
     const tvl = Number(reserve.totalSupplyUsd) || 0;
     if (!Number.isFinite(apy)) continue;
-    // A market can hold several reserves for one token, some of them empty. Keep the largest.
-    const current = rates.get(reserve.liquidityTokenMint);
-    if (current && current.tvl >= tvl) continue;
-    rates.set(reserve.liquidityTokenMint, { apy, tvl, updatedAt: now });
+    const supply = Number(reserve.totalSupply);
+    const borrow = Number(reserve.totalBorrow);
+    const utilization = supply > 0 && Number.isFinite(borrow) ? borrow / supply : undefined;
+    rates.set(reserve.reserve, { apy, tvl, utilization, updatedAt: now });
   }
   return rates;
 });
@@ -140,7 +140,7 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
     case 'defillama':
       return (await defillamaRates()).get(`${source.project}:${source.symbol}`);
     case 'kamino':
-      return (await kaminoRates()).get(source.mint);
+      return (await kaminoRates()).get(source.reserve);
     case 'jupiter-lend':
       return (await jupiterLendRates()).get(source.mint);
   }
