@@ -6,13 +6,23 @@ import { Check, ChevronDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { IS_DEVNET } from "@/lib/network"
-import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
+import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy, withdrawablePercent } from "./rate-board"
 import { AmountMessages, PrimaryAction, QUICK_AMOUNTS, RouteNotes, isOverCap, type BalanceIssue } from "./deposit-panel"
 import { formatTokenAmount, type Token } from "./tokens"
-import { SafetyBreakdown, SortToggle, bestApyRoute, safetyText, type SortBy } from "./safety"
+import {
+  TOP_ROUTES,
+  SafetyBreakdown,
+  SortToggle,
+  ViewToggle,
+  bestApyRoute,
+  listedRoutes,
+  safetyText,
+  type SortBy,
+  type View,
+} from "./safety"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -27,10 +37,12 @@ interface MobileDepositProps {
   balanceIssue: BalanceIssue
   onQuickAmount: (pct: string) => void
   isQuickActive: (pct: string) => boolean
-  routes: YieldRoute[] // for the token, within the risk level, in sortBy order
+  routes: YieldRoute[] // for the token, in the view, in sortBy order
   totalForToken: number
-  risk: RiskTier
-  onRisk: (risk: RiskTier) => void
+  view: View
+  onView: (view: View) => void
+  expanded: boolean // all routes in the view, not just the top three
+  onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
   route: YieldRoute | null
@@ -63,8 +75,10 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     isQuickActive,
     routes,
     totalForToken,
-    risk,
-    onRisk,
+    view,
+    onView,
+    expanded,
+    onExpandedChange,
     sortBy,
     onSort,
     route,
@@ -156,13 +170,15 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             amount={numericAmount}
             selectedId={route?.id ?? null}
             onSelect={onSelectRoute}
-            risk={risk}
-            onRisk={onRisk}
+            view={view}
+            onView={onView}
+            expanded={expanded}
+            onExpandedChange={onExpandedChange}
             sortBy={sortBy}
             onSort={onSort}
           />
         ) : (
-          <BestRoute route={route} routes={routes} token={token.symbol} ratesStatus={ratesStatus} />
+          <BestRoute route={route} routes={routes} token={token.symbol} ratesStatus={ratesStatus} onView={onView} />
         )}
 
         {/* Where the numbers come from, like a swap app's rate line */}
@@ -225,11 +241,13 @@ function BestRoute({
   routes,
   token,
   ratesStatus,
+  onView,
 }: {
   route: YieldRoute | null
   routes: YieldRoute[]
   token: string
   ratesStatus: "loading" | "error" | "ready"
+  onView: (view: View) => void
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-[4px] border border-gilt bg-accent px-3.5 py-3">
@@ -261,11 +279,18 @@ function BestRoute({
         </>
       ) : (
         <span className="text-sm text-muted-foreground">
-          {ratesStatus === "loading"
-            ? "Checking live rates..."
-            : ratesStatus === "error"
-              ? "Rates unavailable"
-              : `No ${token} route at this risk level`}
+          {ratesStatus === "loading" ? (
+            "Checking live rates..."
+          ) : ratesStatus === "error" ? (
+            "Rates unavailable"
+          ) : (
+            <>
+              No {token} route makes Sleep Well right now.{" "}
+              <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                Switch to All routes
+              </button>
+            </>
+          )}
         </span>
       )}
     </div>
@@ -280,8 +305,10 @@ function RouteChoices({
   amount,
   selectedId,
   onSelect,
-  risk,
-  onRisk,
+  view,
+  onView,
+  expanded,
+  onExpandedChange,
   sortBy,
   onSort,
 }: {
@@ -291,12 +318,15 @@ function RouteChoices({
   amount: number
   selectedId: string | null
   onSelect: (id: string) => void
-  risk: RiskTier
-  onRisk: (risk: RiskTier) => void
+  view: View
+  onView: (view: View) => void
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
 }) {
   const best = bestApyRoute(routes)
+  const listed = listedRoutes(routes, expanded, selectedId)
   const bestYearly = best ? amount * best.apy : 0
   const hidden = totalForToken - routes.length
 
@@ -307,32 +337,19 @@ function RouteChoices({
           {routes.length} {routes.length === 1 ? "route" : "routes"}
         </span>
         <SortToggle value={sortBy} onChange={onSort} compact />
-        <div role="group" aria-label="Risk up to" className="flex gap-0.5 rounded-[4px] border border-frame p-0.5">
-          {RISK_LEVELS.map((level) => (
-            <button
-              key={level.value}
-              type="button"
-              aria-pressed={level.value === risk}
-              onClick={() => onRisk(level.value)}
-              className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-[2px] px-1.5 text-xs font-medium",
-                level.value === risk ? "bg-card text-foreground" : "text-muted-foreground"
-              )}
-            >
-              <span className={cn("size-1.5 rotate-45", level.color)} aria-hidden="true" />
-              {level.label}
-            </button>
-          ))}
-        </div>
+        <ViewToggle value={view} onChange={onView} compact />
       </div>
 
       <div role="radiogroup" aria-label={`${token} routes`}>
         {routes.length === 0 && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No {token} routes at {risk} risk. Raise the risk level to see {totalForToken} more.
+            No {token} route makes Sleep Well right now.{" "}
+            <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+              Switch to All routes
+            </button>
           </p>
         )}
-        {routes.map((r) => {
+        {listed.map((r) => {
           const selected = r.id === selectedId
           const isBest = r === best
           const yearly = amount * r.apy
@@ -375,9 +392,22 @@ function RouteChoices({
             </button>
           )
         })}
+        {routes.length > TOP_ROUTES && (
+          <button
+            type="button"
+            onClick={() => onExpandedChange(!expanded)}
+            aria-expanded={expanded}
+            className="flex w-full items-center justify-center border-t border-row-line bg-card px-3 py-2.5 text-[13px] font-medium text-ink"
+          >
+            {expanded ? `Show top ${TOP_ROUTES}` : `Show all ${routes.length} routes`}
+          </button>
+        )}
         {hidden > 0 && routes.length > 0 && (
           <p className="border-t border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
-            {hidden} more above {risk} risk.
+            {hidden} more outside Sleep Well.{" "}
+            <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+              Switch to All routes
+            </button>
           </p>
         )}
       </div>

@@ -12,6 +12,7 @@ import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, exitTight, formatApy, withdrawablePercent } from "./rate-board"
+import { whatCanGoWrong } from "./safety"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -312,6 +313,12 @@ export function DepositDialog({
               <Notice tone="warning">
                 Only {withdrawablePercent(route)}% of this {route.token} reserve can be withdrawn right now. Withdrawals may
                 have to wait until borrowers repay or {route.name}&apos;s withdrawal limit widens.
+              </Notice>
+            )}
+
+            {status !== "success" && (
+              <Notice tone="plain">
+                <span className="font-medium text-foreground">What can go wrong:</span> {whatCanGoWrong(route)}
               </Notice>
             )}
 
