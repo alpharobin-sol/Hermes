@@ -78,7 +78,7 @@ const steps = [
   {
     numeral: "II",
     title: "Compare routes side by side",
-    body: "Hermes opens on Sleep Well: routes with a Safety Score of 80 or more. Each row shows the rate, where it comes from and the pool size. Pick a route to see why it scores what it does and what can go wrong.",
+    body: "Hermes opens on Top rated: routes with a Safety Score of 80 or more. Each row shows the rate, where it comes from and the pool size. Pick a route to see why it scores what it does and what can go wrong.",
   },
   {
     numeral: "III",
@@ -132,8 +132,8 @@ const faqs = [
     answer: "Four parts from live data, up to 25 points each. Size: how much is deposited, full points at $1B. Track record: how long DefiLlama has tracked the protocol's deposits, full points at 4 years. Outflows: the largest fall in deposits in the last 30 days, counted in tokens so price moves don't count. Exit: for lending, how much of the reserve is borrowed or can't be withdrawn right now, and for liquid staking, the price impact of selling 10,000 tokens for SOL on Jupiter. Pick a route to see each part. The score does not cover smart contract bugs or depegs.",
   },
   {
-    question: "What is Sleep Well?",
-    answer: "The view Hermes opens with. It shows only routes with a Safety Score of 80 or more, and leaves out lending reserves where almost nothing can be withdrawn right now. Each route says plainly what can go wrong before you sign. Sleep Well means fewer surprises, not no risk. Tap All routes to compare everything.",
+    question: "What does Top rated mean?",
+    answer: "The view Hermes opens with. It shows only routes with a Safety Score of 80 or more, and leaves out lending reserves where almost nothing can be withdrawn right now. Each route says plainly what can go wrong before you sign. Top rated means fewer surprises, not no risk. Tap All routes to compare everything.",
   },
   {
     question: "Does Hermes charge a fee?",

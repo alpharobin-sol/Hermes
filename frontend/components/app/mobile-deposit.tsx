@@ -285,7 +285,7 @@ function BestRoute({
             "Rates unavailable"
           ) : (
             <>
-              No {token} route makes Sleep Well right now.{" "}
+              No {token} route is top rated right now.{" "}
               <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
                 Switch to All routes
               </button>
@@ -343,7 +343,7 @@ function RouteChoices({
       <div role="radiogroup" aria-label={`${token} routes`}>
         {routes.length === 0 && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No {token} route makes Sleep Well right now.{" "}
+            No {token} route is top rated right now.{" "}
             <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
               Switch to All routes
             </button>
@@ -404,7 +404,7 @@ function RouteChoices({
         )}
         {hidden > 0 && routes.length > 0 && (
           <p className="border-t border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
-            {hidden} more outside Sleep Well.{" "}
+            {hidden} more aren&apos;t top rated.{" "}
             <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
               Switch to All routes
             </button>

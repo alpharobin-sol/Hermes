@@ -13,19 +13,19 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "apy", label: "APY" },
 ]
 
-// Sleep Well: the first screen. Routes that score 80 or more and whose reserve isn't nearly all borrowed or held
-// back (risk level low). "All routes" shows the rest.
-export type View = "sleep-well" | "all"
+// Top rated: the first screen (the capstone's "Sleep Well"). Routes that score 80 or more and whose reserve isn't
+// nearly all borrowed or held back (risk level low). "All routes" shows the rest.
+export type View = "top-rated" | "all"
 
-export const SLEEP_WELL_MIN_SCORE = 80
+export const TOP_RATED_MIN_SCORE = 80
 
 const VIEW_OPTIONS: { value: View; label: string }[] = [
-  { value: "sleep-well", label: "Sleep Well" },
+  { value: "top-rated", label: "Top rated" },
   { value: "all", label: "All routes" },
 ]
 
-export function inSleepWell(route: YieldRoute): boolean {
-  return !!route.safety && route.safety.score >= SLEEP_WELL_MIN_SCORE && route.risk === "low"
+export function isTopRated(route: YieldRoute): boolean {
+  return !!route.safety && route.safety.score >= TOP_RATED_MIN_SCORE && route.risk === "low"
 }
 
 export function ViewToggle({ value, onChange, compact = false }: { value: View; onChange: (view: View) => void; compact?: boolean }) {
@@ -41,7 +41,7 @@ export function ViewToggle({ value, onChange, compact = false }: { value: View; 
           type="button"
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
-          title={option.value === "sleep-well" ? `Only routes with a Safety Score of ${SLEEP_WELL_MIN_SCORE} or more` : undefined}
+          title={option.value === "top-rated" ? `Only routes with a Safety Score of ${TOP_RATED_MIN_SCORE} or more` : undefined}
           className={cn(
             "inline-flex items-center whitespace-nowrap rounded-[2px] font-medium transition-colors",
             compact ? "h-8 px-2 text-xs" : "h-9 px-2.5 text-[13px] md:px-3",
