@@ -44,7 +44,7 @@ function Hero() {
         {/* Phones get the headline only, so the deposit card comes right after it */}
         <div className="plaque-inner px-4 pb-4 pt-4 text-center sm:px-6 sm:pb-7 sm:pt-6 md:px-10 md:pb-10 md:pt-9">
           {/* The header has no room for the network on phones and tablets, so it shows here */}
-          <NetworkPill detail className="mb-2.5 h-7 px-2.5 text-[11px] md:mb-3.5 lg:hidden" />
+          <NetworkPill className="mb-2.5 h-7 px-2.5 text-[11px] md:mb-3.5 lg:hidden" />
           <p className="eyebrow mb-2.5 hidden md:mb-3.5 lg:block">Live Solana yields</p>
           <h1 className="font-display text-[28px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
             Compare Solana yields.
