@@ -5,10 +5,10 @@ import Image from "next/image"
 import { Menu, Settings, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { IS_DEVNET } from "@/lib/network"
 import { SettingsModal } from "../settings-modal"
 import { CustomConnectButton } from "../wallet-connect/CustomConnectKit"
 import { useLoading } from "./loading-context"
+import { NetworkPill } from "./network-pill"
 import wordmarkLight from "@/public/brand/hermes-wordmark-light.png"
 import wordmarkDark from "@/public/brand/hermes-wordmark-dark.png"
 
@@ -25,18 +25,6 @@ function Wordmark({ className }: { className?: string }) {
       <Image src={wordmarkLight} alt="Hermes" className={cn("w-auto dark:hidden", className)} preload />
       <Image src={wordmarkDark} alt="Hermes" className={cn("hidden w-auto dark:block", className)} />
     </>
-  )
-}
-
-function NetworkPill() {
-  return (
-    <span
-      title={IS_DEVNET ? "Devnet uses test SOL." : "Real funds. Start small."}
-      className="inline-flex h-8 items-center gap-2 rounded-full border border-frame px-3 text-xs font-medium text-muted-foreground"
-    >
-      <span className="size-2 rounded-full bg-beta-dot" />
-      {IS_DEVNET ? "Devnet · test SOL" : "Mainnet beta"}
-    </span>
   )
 }
 
@@ -158,9 +146,6 @@ export function AppHeader() {
             Settings
           </button>
         </nav>
-        <div className="mt-auto border-t border-border p-4">
-          <NetworkPill />
-        </div>
       </div>
 
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
