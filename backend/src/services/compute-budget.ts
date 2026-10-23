@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 
 // Measured on mainnet, including token account creation: Jito depositSol about 31k, Marinade deposit about 47k
 const DEPOSIT_COMPUTE_UNITS = 100_000;
-// Priority fee bounds in micro-lamports per compute unit. At 100k units the cap is 0.0001 SOL.
+// Priority fee bounds in micro-lamports per compute unit. At 100k units the cap is 0.0001 SOL, at 300k 0.0003 SOL.
 const MIN_PRIORITY_MICRO_LAMPORTS = 20_000;
 const MAX_PRIORITY_MICRO_LAMPORTS = 1_000_000;
 
@@ -32,10 +32,11 @@ async function priorityFeeMicroLamports(connection: Connection, accounts: Public
  */
 export async function depositBudgetInstructions(
   connection: Connection,
-  writableAccounts: PublicKey[]
+  writableAccounts: PublicKey[],
+  units: number = DEPOSIT_COMPUTE_UNITS
 ): Promise<TransactionInstruction[]> {
   return [
-    ComputeBudgetProgram.setComputeUnitLimit({ units: DEPOSIT_COMPUTE_UNITS }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units }),
     ComputeBudgetProgram.setComputeUnitPrice({ microLamports: await priorityFeeMicroLamports(connection, writableAccounts) }),
   ];
 }

@@ -23,6 +23,7 @@ src/
 │   ├── deposit.ts              # quotes every path for a deposit and builds the best one
 │   ├── stake-pool-deposit.ts   # direct SPL stake pool deposits (Jito)
 │   ├── marinade-deposit.ts     # direct Marinade deposits (mainnet)
+│   ├── kamino-deposit.ts       # Kamino Lend deposits via Kamino's transaction API (mainnet)
 │   ├── compute-budget.ts       # priority fee for direct deposits
 │   └── errors.ts               # errors written for users
 ├── config/runtime.ts           # SOLANA_NETWORK switch
@@ -49,9 +50,11 @@ Routes Hermes can deposit into for one token (SOL, USDC or USDT), highest APY fi
 
 Add `all=true` to include view-only routes (`deposit: null`). They link out to the protocol's app and are hidden on the site for now. `SHOW_VIEW_ONLY_ROUTES=true` includes them by default.
 
-`POST /api/deposit/quote` with `{ routeId, amount, slippageBps? }`
+`POST /api/deposit/quote` with `{ routeId, amount, slippageBps?, userPublicKey? }`
 
 Quotes a deposit. `amount` is in UI units, e.g. `"1.5"` SOL. Routes with a direct deposit (Jito, Marinade) are quoted directly and through Jupiter. The quote is the one that returns more, and `compared` lists the other.
+
+Lending quotes (Kamino Lend) set `position` (the deposit is held there, not as a wallet token). With `userPublicKey`, they also build and simulate the deposit and return `setupCostSol`: the one-time account rent of a first deposit.
 
 `POST /api/deposit/build` with `{ routeId, amount, userPublicKey, slippageBps? }`
 

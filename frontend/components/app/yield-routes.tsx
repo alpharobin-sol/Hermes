@@ -213,7 +213,7 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
 
               {/* Bottom row */}
               <div className="flex flex-row items-center justify-between gap-3 border-t border-border/30 p-3 pt-2">
-                <div className="flex items-center gap-5 text-left">
+                <div className="flex items-center gap-4 sm:gap-5 text-left">
                   <div className="flex flex-col">
                     <span className="font-mono text-[10px] uppercase text-muted-foreground">TVL</span>
                     <span className="font-mono text-xs text-foreground">{formatUSD(route.tvl)}</span>
@@ -222,6 +222,20 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
                     <span className="font-mono text-[10px] uppercase text-muted-foreground">Source</span>
                     <span className="font-mono text-xs text-foreground">{route.source}</span>
                   </div>
+                  {/* Lending: how much of the supply is lent out. Near 100%, withdrawals may have to wait. */}
+                  {typeof route.utilization === "number" && (
+                    <div className="flex flex-col" title="Share of the reserve that is borrowed">
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">Borrowed</span>
+                      <span
+                        className={cn(
+                          "font-mono text-xs",
+                          route.utilization >= 0.95 ? "text-warning" : "text-foreground"
+                        )}
+                      >
+                        {Math.min(100, Math.round(route.utilization * 100))}%
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <RouteAction

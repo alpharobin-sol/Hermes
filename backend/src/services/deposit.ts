@@ -7,6 +7,7 @@ import { solanaNetwork, SolanaNetwork } from '../config/runtime';
 import { getRoute, depositCap, depositStatus, DirectDeposit, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
 import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from './stake-pool-deposit';
 import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
+import { buildKaminoDeposit, KaminoDepositPlan } from './kamino-deposit';
 import { DepositError } from './errors';
 
 /**
@@ -15,9 +16,11 @@ import { DepositError } from './errors';
  * Hermes never holds funds: it quotes a route, returns the transaction, and the user signs it.
  * Only routes with a deposit status for the current network in the registry can be built.
  *
- * Mainnet: SOL -> liquid staking tokens. Routes with a direct deposit (Jito's stake pool, Marinade)
- * quote it against the Jupiter swap API and build whichever gives more of the token.
- * Other routes go through Jupiter.
+ * Mainnet:
+ * - SOL -> liquid staking tokens. Routes with a direct deposit (Jito's stake pool, Marinade) quote it
+ *   against the Jupiter swap API and build whichever gives more of the token. Other LSTs go through Jupiter.
+ * - SOL, USDC, USDT -> Kamino Lend: supplied through Kamino's transaction API, held as a position in the
+ *   user's Kamino account rather than a token in the wallet.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
  */
 
@@ -32,6 +35,7 @@ export interface DepositRequest {
   routeId: string;
   amount: string | number; // UI units, e.g. 1.5 SOL
   slippageBps?: number;
+  userPublicKey?: string; // optional on quotes: lets lending quotes include one-time account rent
 }
 
 export interface DepositQuote {
@@ -47,6 +51,8 @@ export interface DepositQuote {
   slippageBps: number;
   routeLabels: string[];
   compared: { method: DepositMethod; label: string; outAmount: string }[]; // other paths quoted for this deposit
+  position: string | null; // where a lending deposit is held (e.g. "Kamino Lend") when no token reaches the wallet
+  setupCostSol: string | null; // one-time account rent in SOL, when known (lending quotes with a wallet)
 }
 
 export interface DepositTransaction {
@@ -140,7 +146,7 @@ export class DepositService {
     const network = solanaNetwork();
     const paths: Promise<Candidate>[] = [];
 
-    if (route.direct && route.receipt && directAvailable(route.direct, network)) {
+    if (route.direct && directAvailable(route.direct, network)) {
       paths.push(this.quoteDirect(route, request, network));
     }
     // Jupiter has no devnet routes
@@ -176,9 +182,24 @@ export class DepositService {
 
   private async quoteDirect(route: RouteConfig, request: DepositRequest, network: SolanaNetwork): Promise<Candidate> {
     const direct = route.direct!;
-    const lamports = toLamports(request.amount);
     const connection = this.getConnection(network);
 
+    if (direct.kind === 'kamino-lend') {
+      const token = TOKENS[route.token];
+      const amount = toUiAmount(request.amount, token.decimals);
+      // With a wallet, build the deposit now: it checks the balance and measures the one-time account rent
+      const plan = request.userPublicKey
+        ? await this.buildKaminoPlan(route, amount, new PublicKey(request.userPublicKey))
+        : null;
+      return {
+        quote: {
+          ...this.positionQuote(route, network, amount),
+          setupCostSol: plan?.setupCostSol ?? null,
+        },
+      };
+    }
+
+    const lamports = toLamports(request.amount);
     let outAmount: string;
     if (direct.kind === 'spl-stake-pool') {
       const quote = await quoteStakePoolDeposit(connection, stakePoolTarget(route, direct.pool), lamports);
@@ -206,8 +227,42 @@ export class DepositService {
         slippageBps: 0,
         routeLabels: [`${directLabel(route)}${network === 'devnet' ? ' (devnet)' : ''}`],
         compared: [],
+        position: null,
+        setupCostSol: null,
       },
     };
+  }
+
+  // A lending deposit: the amount goes into the protocol as is and stays the same token
+  private positionQuote(route: RouteConfig, network: SolanaNetwork, amount: string): DepositQuote {
+    const token = TOKENS[route.token];
+    return {
+      network,
+      routeId: route.id,
+      method: 'direct',
+      inputToken: token,
+      outputToken: token,
+      inAmount: amount,
+      outAmount: amount,
+      minOutAmount: amount,
+      priceImpactPct: 0,
+      slippageBps: 0,
+      routeLabels: [directLabel(route)],
+      compared: [],
+      position: route.name,
+      setupCostSol: null,
+    };
+  }
+
+  private buildKaminoPlan(route: RouteConfig, amount: string, user: PublicKey): Promise<KaminoDepositPlan> {
+    const direct = route.direct as Extract<DirectDeposit, { kind: 'kamino-lend' }>;
+    return buildKaminoDeposit(this.getConnection('mainnet-beta'), {
+      market: direct.market,
+      reserve: direct.reserve,
+      token: TOKENS[route.token],
+      amount,
+      user,
+    });
   }
 
   private async quoteSwap(route: RouteConfig, request: DepositRequest): Promise<Candidate> {
@@ -252,6 +307,8 @@ export class DepositService {
         slippageBps: rawQuote.slippageBps,
         routeLabels: (rawQuote.routePlan || []).map((step: any) => step.swapInfo?.label).filter(Boolean),
         compared: [],
+        position: null,
+        setupCostSol: null,
       },
     };
   }
@@ -292,9 +349,24 @@ export class DepositService {
   private async buildDirectTransaction(route: RouteConfig, quote: DepositQuote, userPublicKey: string): Promise<DepositTransaction> {
     const direct = route.direct!;
     const network = quote.network;
+    const user = new PublicKey(userPublicKey);
+
+    // Kamino's builder checks the balance and simulates itself
+    if (direct.kind === 'kamino-lend') {
+      const plan = await this.buildKaminoPlan(route, quote.inAmount, user);
+      const transaction = Buffer.from(plan.transaction.serialize()).toString('base64');
+      logger.info(`Built Kamino Lend deposit: ${quote.inAmount} ${route.token}, one-time rent ${plan.setupCostSol} SOL`);
+      return {
+        quote: { ...quote, setupCostSol: plan.setupCostSol },
+        transaction,
+        transactions: [transaction],
+        lastValidBlockHeight: plan.lastValidBlockHeight,
+        prioritizationFeeLamports: 0,
+      };
+    }
+
     const lamports = toLamports(quote.inAmount);
     const connection = this.getConnection(network);
-    const user = new PublicKey(userPublicKey);
 
     const balance = await connection.getBalance(user);
     if (lamports.plus(FEE_BUFFER_LAMPORTS).gt(balance)) {
@@ -348,17 +420,29 @@ function stakePoolTarget(route: RouteConfig, pool: string): StakePoolTarget {
   return { symbol: route.receipt!.symbol, pool, mint: route.receipt!.mint };
 }
 
-// SPL stake pools exist on devnet at the same address (Jito). Marinade's deposit is mainnet only.
+// SPL stake pools exist on devnet at the same address (Jito). Marinade and Kamino deposits are mainnet only.
 function directAvailable(direct: DirectDeposit, network: SolanaNetwork): boolean {
   return direct.kind === 'spl-stake-pool' || network === 'mainnet-beta';
 }
 
 function directLabel(route: RouteConfig): string {
-  return route.direct?.kind === 'marinade' ? 'Marinade liquid staking' : `${route.name} stake pool`;
+  switch (route.direct?.kind) {
+    case 'marinade':
+      return 'Marinade liquid staking';
+    case 'kamino-lend':
+      return 'Kamino Lend main market';
+    default:
+      return `${route.name} stake pool`;
+  }
 }
 
 function toLamports(amount: string | number): Decimal {
   return new Decimal(amount).mul(1e9).floor();
+}
+
+// The amount cut to the token's decimals, in UI units
+function toUiAmount(amount: string | number, decimals: number): string {
+  return new Decimal(amount).toDecimalPlaces(decimals, Decimal.ROUND_DOWN).toFixed();
 }
 
 function describeSimulationError(simulationError: any): string {

@@ -18,6 +18,7 @@ export interface YieldRoute {
   website: string;
   source: string; // where apy and tvl come from
   updatedAt: string;
+  utilization: number | null; // lending only: share of the supply that is borrowed, 1 = all of it
   deposit: DepositStatus | null; // in-app deposit on the network the API runs on
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
 }
@@ -68,6 +69,7 @@ export async function getYieldRoutes(
         website: route.website,
         source: SOURCE_LABELS[route.source.kind],
         updatedAt: new Date(rate.updatedAt).toISOString(),
+        utilization: rate.utilization ?? null,
         deposit: depositStatus(route, network),
         depositCap: depositCap(route, network),
       };

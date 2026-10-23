@@ -25,6 +25,8 @@ export interface DepositQuote {
   slippageBps: number;
   routeLabels: string[];
   compared?: { method: DepositMethod; label?: string; outAmount: string }[]; // other paths the API quoted and passed over
+  position?: string | null; // lending: where the deposit is held (e.g. "Kamino Lend"), no token reaches the wallet
+  setupCostSol?: string | null; // lending: one-time account rent in SOL, known when the quote had a wallet
 }
 
 export interface DepositTransaction {
@@ -38,6 +40,7 @@ export interface DepositTransaction {
 export interface DepositParams {
   routeId: string;
   amount: number;
+  userPublicKey?: string; // on quotes, lets lending routes check the balance and include one-time rent
   slippageBps?: number;
 }
 

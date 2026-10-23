@@ -34,6 +34,17 @@ function formatTokenAmount(value: string | number): string {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 6 })
 }
 
+// Above this share borrowed, a lending reserve may not have liquidity for withdrawals
+const HIGH_UTILIZATION = 0.95
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
+
 function getErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
   if (/user rejected|rejected the request/i.test(message)) return "You rejected the transaction in your wallet."
@@ -56,7 +67,9 @@ export function DepositDialog({
   const [signature, setSignature] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
 
-  // Fresh quote every time the dialog opens
+  const wallet = publicKey?.toBase58()
+
+  // Fresh quote every time the dialog opens. With a wallet, lending quotes include one-time account rent.
   useEffect(() => {
     if (!open) return
 
@@ -67,7 +80,7 @@ export function DepositDialog({
     setSignature(null)
     setProgress(null)
 
-    DepositAPI.getQuote({ routeId: route.id, amount }, { signal: controller.signal })
+    DepositAPI.getQuote({ routeId: route.id, amount, userPublicKey: wallet }, { signal: controller.signal })
       .then((q) => {
         setQuote(q)
         setStatus("ready")
@@ -79,7 +92,7 @@ export function DepositDialog({
       })
 
     return () => controller.abort()
-  }, [open, route.id, amount])
+  }, [open, route.id, amount, wallet])
 
   const handleConfirm = async () => {
     if (!publicKey) return
@@ -185,7 +198,17 @@ export function DepositDialog({
           {/* You receive */}
           <div className="border border-border/50 bg-secondary/30 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">You receive</div>
-            {quote ? (
+            {quote?.position ? (
+              <>
+                <div className="font-mono text-lg text-primary">
+                  {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol} in {quote.position}
+                </div>
+                <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  A position in your own {quote.position} account, not a token in your wallet. Manage or withdraw it at{" "}
+                  {hostOf(route.website)}.
+                </div>
+              </>
+            ) : quote ? (
               <div className="font-mono text-lg text-primary">
                 ~{formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol}
               </div>
@@ -224,6 +247,21 @@ export function DepositDialog({
                     <span className="text-foreground">{formatPercent(quote.slippageBps / 100)}</span>
                   </div>
                 </>
+              ) : quote.position ? (
+                <>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Rate</span>
+                    <span className="text-foreground text-right">Variable, set by borrowing demand</span>
+                  </div>
+                  {quote.setupCostSol && Number(quote.setupCostSol) > 0 && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">Account setup</span>
+                      <span className="text-warning text-right">
+                        {formatTokenAmount(quote.setupCostSol)} SOL one-time rent
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 // Direct deposits mint at the protocol's rate. It can shift slightly if an epoch update runs first.
                 <div className="flex justify-between gap-4">
@@ -253,6 +291,13 @@ export function DepositDialog({
             </div>
           )}
 
+          {typeof route.utilization === "number" && route.utilization >= HIGH_UTILIZATION && status !== "success" && (
+            <p className="text-[11px] leading-relaxed text-warning">
+              {Math.min(100, Math.round(route.utilization * 100))}% of this {route.token} reserve is borrowed. Withdrawals
+              may have to wait until borrowers repay or new deposits arrive.
+            </p>
+          )}
+
           {!IS_DEVNET && route.deposit === "beta" && status !== "success" && status !== "error" && (
             <p className="text-[11px] leading-relaxed text-warning">
               Beta: this deposit route is new in Hermes and uses real funds.
@@ -279,7 +324,11 @@ export function DepositDialog({
           {status === "success" && (
             <div className="flex items-start gap-2 border border-primary/30 bg-primary/5 p-3 text-xs text-primary">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>Deposit confirmed. Your {quote?.outputToken.symbol} is in your wallet and earning yield.</span>
+              <span>
+                {quote?.position
+                  ? `Deposit confirmed. Your ${quote.outputToken.symbol} is supplied to ${quote.position} and earning yield. Manage or withdraw it at ${hostOf(route.website)}.`
+                  : `Deposit confirmed. Your ${quote?.outputToken.symbol} is in your wallet and earning yield.`}
+              </span>
             </div>
           )}
 

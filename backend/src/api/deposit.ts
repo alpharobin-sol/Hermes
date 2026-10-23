@@ -10,21 +10,25 @@ const router = Router();
 const amountSchema = z.union([z.string(), z.number()])
   .refine((value) => /^\d+(\.\d+)?$/.test(String(value)) && Number(value) > 0, 'Amount must be a positive number');
 
+const publicKeySchema = z.string().refine((value) => {
+  try {
+    new PublicKey(value);
+    return true;
+  } catch {
+    return false;
+  }
+}, 'Invalid wallet address');
+
 const quoteSchema = z.object({
   routeId: z.string().min(1),
   amount: amountSchema,
   slippageBps: z.number().int().min(1).max(300).optional(),
+  // Optional: lets lending quotes check the balance and include one-time account rent
+  userPublicKey: publicKeySchema.optional(),
 });
 
 const buildSchema = quoteSchema.extend({
-  userPublicKey: z.string().refine((value) => {
-    try {
-      new PublicKey(value);
-      return true;
-    } catch {
-      return false;
-    }
-  }, 'Invalid wallet address'),
+  userPublicKey: publicKeySchema,
 });
 
 function handleError(res: Response, error: unknown, action: string) {
