@@ -27,6 +27,19 @@ export function borrowedPercent(route: YieldRoute): number | null {
   return typeof route.utilization === "number" ? Math.min(100, Math.round(route.utilization * 100)) : null
 }
 
+// Lending sources that report what can leave right now instead of what is borrowed (Jupiter Lend)
+export function withdrawablePercent(route: YieldRoute): number | null {
+  return typeof route.utilization !== "number" && typeof route.withdrawable === "number"
+    ? Math.round(route.withdrawable * 100)
+    : null
+}
+
+// Little can be withdrawn right now: 95% or more of the reserve is borrowed or held back
+export function exitTight(route: YieldRoute): boolean {
+  if (typeof route.utilization === "number") return route.utilization >= HIGH_UTILIZATION
+  return typeof route.withdrawable === "number" && route.withdrawable <= 1 - HIGH_UTILIZATION
+}
+
 export function formatApy(route: YieldRoute): string {
   return `${(route.apy * 100).toFixed(2)}%`
 }
@@ -237,6 +250,7 @@ function RouteRow({
 }) {
   const yearly = amount * route.apy
   const borrowed = borrowedPercent(route)
+  const withdrawable = withdrawablePercent(route)
 
   return (
     <div className={cn("border-t border-row-line transition-colors", selected ? "bg-accent" : "hover:bg-plate")}>
@@ -266,6 +280,9 @@ function RouteRow({
                 <span className={cn(route.utilization! >= HIGH_UTILIZATION && "font-medium text-warning")}>
                   {` · ${borrowed}% borrowed`}
                 </span>
+              )}
+              {withdrawable !== null && (
+                <span className={cn(exitTight(route) && "font-medium text-warning")}>{` · ${withdrawable}% withdrawable now`}</span>
               )}
               <span className="lg:hidden">{` · ${safetyText(route)}`}</span>
             </span>

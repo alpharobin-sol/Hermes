@@ -14,6 +14,13 @@ import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
 import { compareRoutes, type SortBy } from "./safety"
 
+const RATE_REFRESH_MS = 60 * 1000
+
+// "A", "A and B", "A, B and C"
+function listOf(items: string[]): string {
+  return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
+}
+
 // Routes at or below the chosen risk level
 function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
   const order = RISK_LEVELS.map((level) => level.value)
@@ -78,6 +85,25 @@ export function YieldPanel() {
     return () => controller.abort()
   }, [reloadKey, setIsLoading])
 
+  // Rates refresh every minute, like a live swap quote, without the loading state. A failed refresh keeps the
+  // last rates. Paused while the deposit dialog is open, so the route under review never changes or drops out.
+  const reviewOpenRef = useRef(false)
+  useEffect(() => {
+    reviewOpenRef.current = reviewOpen
+  }, [reviewOpen])
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (reviewOpenRef.current || document.hidden) return
+      YieldAPI.getRoutes()
+        .then((data) => {
+          setRoutes(data)
+          setError(null)
+        })
+        .catch(() => {})
+    }, RATE_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [])
+
   // The token picker lists only tokens with at least one route. SOL shows while rates load.
   const tokens = useMemo(() => {
     const withRoutes = BASE_TOKENS.filter((token) => routes.some((route) => route.token === token.symbol))
@@ -96,7 +122,7 @@ export function YieldPanel() {
   )
   const visibleRoutes = forToken.filter((route) => withinRisk(route, riskProfile))
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
-  const sources = [...new Set(forToken.map((route) => route.source))].join(" and ")
+  const sources = listOf([...new Set(forToken.map((route) => route.source))])
 
   const numericAmount = useMemo(() => {
     const parsed = Number.parseFloat(amount.replace(/,/g, ""))

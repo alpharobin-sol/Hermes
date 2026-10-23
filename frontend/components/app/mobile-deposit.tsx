@@ -9,7 +9,7 @@ import { IS_DEVNET } from "@/lib/network"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
-import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy } from "./rate-board"
+import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy, withdrawablePercent } from "./rate-board"
 import { AmountMessages, PrimaryAction, QUICK_AMOUNTS, RouteNotes, isOverCap, type BalanceIssue } from "./deposit-panel"
 import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown, SortToggle, bestApyRoute, safetyText, type SortBy } from "./safety"
@@ -79,6 +79,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
   const [tokenSheet, setTokenSheet] = useState(false)
   const overCap = isOverCap(route, numericAmount)
   const borrowed = route ? borrowedPercent(route) : null
+  const withdrawable = route ? withdrawablePercent(route) : null
   const showRoutes = numericAmount > 0 && ratesStatus === "ready"
 
   return (
@@ -169,7 +170,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           <p className="px-0.5 text-[11px] leading-relaxed text-muted-foreground">
             {showRoutes && `${route.name}: `}
             {safetyText(route)} · {riskLabel(route)} risk · TVL {formatUSD(route.tvl)}
-            {borrowed !== null && ` · ${borrowed}% borrowed`} · from {route.source}
+            {borrowed !== null && ` · ${borrowed}% borrowed`}
+            {withdrawable !== null && ` · ${withdrawable}% withdrawable now`} · from {route.source}
             {updatedLabel && `, ${updatedLabel}`}
           </p>
         )}

@@ -21,25 +21,26 @@ export interface YieldRoute {
   source: string; // where apy and tvl come from
   updatedAt: string;
   utilization: number | null; // lending only: share of the supply that is borrowed, 1 = all of it
+  withdrawable: number | null; // lending only: share of the supply that can be withdrawn right now
   deposit: DepositStatus | null; // in-app deposit on the network the API runs on
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
 }
 
-// A lending reserve this borrowed may not have liquidity for withdrawals
+// A lending reserve this borrowed or held back may not have liquidity for withdrawals
 const HIGH_UTILIZATION = 0.95;
 
 /**
  * Risk tier: low at a Safety Score of 80 or more, moderate from 60, high below.
  * Without a score it comes from TVL: low at $100M or more, moderate from $10M, high below.
- * A lending reserve 95% or more borrowed is at least moderate, since withdrawals may have to wait.
+ * A lending reserve with 95% or more borrowed or held back is at least moderate, since withdrawals may have to wait.
  * It does not measure contract or depeg risk.
  */
-export function riskTier(tvl: number, utilization?: number, score?: number): RiskTier {
+export function riskTier(tvl: number, locked?: number, score?: number): RiskTier {
   const tier: RiskTier =
     score !== undefined
       ? score >= 80 ? 'low' : score >= 60 ? 'moderate' : 'high'
       : tvl >= 100_000_000 ? 'low' : tvl >= 10_000_000 ? 'moderate' : 'high';
-  if (tier === 'low' && utilization !== undefined && utilization >= HIGH_UTILIZATION) return 'moderate';
+  if (tier === 'low' && locked !== undefined && locked >= HIGH_UTILIZATION) return 'moderate';
   return tier;
 }
 
@@ -75,6 +76,8 @@ export async function getYieldRoutes(
     // No rate, no row
     if (!rate) return null;
     const safety = safetyScore(route, rate);
+    // Share of deposits that can't leave right now: borrowed (Kamino) or not withdrawable (Jupiter Lend)
+    const locked = rate.utilization ?? (rate.withdrawable !== undefined ? 1 - rate.withdrawable : undefined);
 
     return {
       id: route.id,
@@ -85,12 +88,13 @@ export async function getYieldRoutes(
       receipt: route.receipt?.symbol ?? null,
       apy: rate.apy,
       tvl: rate.tvl,
-      risk: riskTier(rate.tvl, rate.utilization, safety?.score),
+      risk: riskTier(rate.tvl, locked, safety?.score),
       safety,
       website: route.website,
       source: SOURCE_LABELS[route.source.kind],
       updatedAt: new Date(rate.updatedAt).toISOString(),
       utilization: rate.utilization ?? null,
+      withdrawable: rate.withdrawable ?? null,
       deposit: depositStatus(route, network),
       depositCap: depositCap(route, network),
     };
@@ -102,7 +106,7 @@ export async function getYieldRoutes(
 /**
  * Keep the rate and Safety Score caches warm so user requests never wait on a cold fetch
  */
-export function startRateRefresh(intervalMs: number = 5 * 60 * 1000): NodeJS.Timeout {
+export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout {
   // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
   const refresh = () =>
     refreshRates()

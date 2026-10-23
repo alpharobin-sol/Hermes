@@ -1,5 +1,5 @@
 import { solanaNetwork } from '../config/runtime';
-import { depositStatus, KAMINO_MAIN_MARKET, RateSource, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
+import { depositStatus, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
 import { cached, Cached } from './cache';
 import { createJupiterClient } from './jupiter';
 import { getRate, http, Rate, SOURCE_LABELS } from './rates';
@@ -8,11 +8,13 @@ import { getRate, http, Rate, SOURCE_LABELS } from './rates';
  * SAFETY SCORE
  * 0 to 100 for each route: four parts worth 25 points each, all from live data.
  * - Size: money in the route now. $10M or less scores 0, $1B or more scores 25.
- * - Track record: how long DefiLlama has tracked the protocol's deposits. 4 years or more scores 25.
+ * - Track record: how long the protocol has held deposits, from the first day DefiLlama recorded them (a fixed date
+ *   in the registry). 4 years or more scores 25.
  * - Outflows: the largest fall in deposits within the last 30 days, counted in the deposit token so price
  *   moves don't count. 10% or less scores 25, 40% or more scores 0.
  * - Exit: how easily money gets out today.
- *   Lending: the share of the reserve that is borrowed. 90% or less scores 25, 100% scores 0.
+ *   Lending: the share of deposits that can't be withdrawn right now (borrowed, or held back by a withdrawal limit).
+ *   90% or less scores 25, 100% scores 0.
  *   Liquid staking: the price impact of selling 10,000 of the token for SOL on Jupiter. 1% or less scores 25, 5% or more 0.
  * It does not measure smart contract or depeg risk. A route with any part missing has no score.
  */
@@ -72,46 +74,11 @@ function largestFall(series: number[]): number {
   return fall;
 }
 
-// Track record: when DefiLlama first tracked the protocol's deposits, as a ms timestamp
-
-// The DefiLlama protocol behind a route's rate source
-function defillamaProtocol(source: RateSource): string {
-  switch (source.kind) {
-    case 'defillama':
-      return source.project;
-    case 'kamino':
-      return 'kamino-lend';
-    case 'jupiter-lend':
-      return 'jupiter-lend';
-  }
-}
-
-const trackRecords = new Map<string, Cached<number>>();
-
-function trackRecord(protocol: string): Cached<number> {
-  let entry = trackRecords.get(protocol);
-  if (!entry) {
-    entry = cached(
-      `DefiLlama track record for ${protocol}`,
-      async () => {
-        // The response holds the whole TVL history, up to several MB
-        const response = await http.get(`https://api.llama.fi/protocol/${protocol}`);
-        const history: any[] = Array.isArray(response.data?.tvl) ? response.data.tvl : [];
-        const dates = history.map((point) => Number(point?.date)).filter((date) => Number.isFinite(date) && date > 0);
-        if (dates.length === 0) throw new Error('no TVL history');
-        return Math.min(...dates) * 1000;
-      },
-      { ttlMs: DAY_MS, maxStaleMs: 7 * DAY_MS, retryAfterMs: 10 * 60 * 1000 }
-    );
-    trackRecords.set(protocol, entry);
-  }
-  return entry;
-}
-
 // Outflows: the largest fall in deposits within the window, in the deposit token
 
 interface Outflow {
   fall: number; // share of the peak
+  days: number; // daily points the window had
   source: string;
 }
 
@@ -142,11 +109,11 @@ function priceAt(prices: { at: number; price: number }[], at: number): number | 
   return best && Math.abs(best.at - at) <= 6 * HOUR_MS ? best.price : undefined;
 }
 
-// A daily series needs most of its days to say anything about the window
-const MIN_POINTS = 20;
+// A daily series needs at least two weeks of the window to say anything about it. Sources can have gaps.
+const MIN_POINTS = 14;
 
 async function defillamaOutflow(route: RouteConfig): Promise<Outflow> {
-  const pool = (await getRate(route.source))?.defillamaPool;
+  const pool = route.defillamaPool ?? (await getRate(route.source))?.defillamaPool;
   if (!pool) throw new Error('no DefiLlama pool');
 
   const response = await http.get(`https://yields.llama.fi/chart/${pool}`);
@@ -171,7 +138,7 @@ async function defillamaOutflow(route: RouteConfig): Promise<Outflow> {
   }
 
   if (series.length < MIN_POINTS) throw new Error(`only ${series.length} days of history`);
-  return { fall: largestFall(series), source: 'DefiLlama' };
+  return { fall: largestFall(series), days: series.length, source: 'DefiLlama' };
 }
 
 async function kaminoOutflow(reserve: string): Promise<Outflow> {
@@ -187,15 +154,15 @@ async function kaminoOutflow(reserve: string): Promise<Outflow> {
     .filter((value: number) => Number.isFinite(value) && value > 0);
 
   if (series.length < MIN_POINTS) throw new Error(`only ${series.length} days of history`);
-  return { fall: largestFall(series), source: 'Kamino' };
+  return { fall: largestFall(series), days: series.length, source: 'Kamino' };
 }
 
 const outflowCaches = new Map<string, Cached<Outflow>>();
 
-// Undefined for routes with no deposit history source yet (Jupiter Lend)
+// Undefined for routes with no deposit history source
 function outflows(route: RouteConfig): Cached<Outflow> | undefined {
   const source = route.source;
-  if (source.kind === 'jupiter-lend') return undefined;
+  if (source.kind === 'jupiter-lend' && !route.defillamaPool) return undefined;
 
   let entry = outflowCaches.get(route.id);
   if (!entry) {
@@ -247,12 +214,21 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
   const base = { key: 'exit' as const, label: 'Exit', max: PART_MAX };
 
   if (route.category === 'lending') {
-    if (rate.utilization === undefined) return undefined;
-    const borrowed = Math.min(1, rate.utilization);
+    if (rate.utilization !== undefined) {
+      const borrowed = Math.min(1, rate.utilization);
+      return {
+        ...base,
+        points: points(borrowed, 1, 0.9),
+        detail: `${formatPercent(borrowed)} of the reserve is borrowed. ${formatUsd(rate.tvl * (1 - borrowed))} can be withdrawn now.`,
+        source: SOURCE_LABELS[route.source.kind],
+      };
+    }
+    // Sources that report what can leave now rather than what is borrowed (Jupiter Lend)
+    if (rate.withdrawable === undefined) return undefined;
     return {
       ...base,
-      points: points(borrowed, 1, 0.9),
-      detail: `${formatPercent(borrowed)} of the reserve is borrowed. ${formatUsd(rate.tvl * (1 - borrowed))} can be withdrawn now.`,
+      points: points(1 - rate.withdrawable, 1, 0.9),
+      detail: `${formatPercent(rate.withdrawable)} of deposits (${formatUsd(rate.tvl * rate.withdrawable)}) can be withdrawn now. The rest is lent out or held back by ${route.name}'s withdrawal limit.`,
       source: SOURCE_LABELS[route.source.kind],
     };
   }
@@ -274,10 +250,10 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
  * Never fetches: refreshSafetyInputs keeps the history warm.
  */
 export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null {
-  const trackedSince = trackRecord(defillamaProtocol(route.source)).peek();
+  const trackedSince = Date.parse(route.trackedSince);
   const outflow = outflows(route)?.peek();
   const exit = exitPart(route, rate);
-  if (trackedSince === undefined || !outflow || !exit) return null;
+  if (!Number.isFinite(trackedSince) || !outflow || !exit) return null;
 
   const years = (Date.now() - trackedSince) / (365 * DAY_MS);
   const unit = route.token;
@@ -297,17 +273,16 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
       points: points(years, 0, 4),
       max: PART_MAX,
       detail: `Deposits tracked since ${monthYear(trackedSince)}.`,
-      source: 'DefiLlama',
+      source: "DefiLlama's first record",
     },
     {
       key: 'outflows',
       label: 'Outflows',
       points: points(outflow.fall, 0.4, 0.1),
       max: PART_MAX,
-      detail:
-        outflow.fall < 0.01
-          ? `Deposits fell less than 1% in the last 30 days, counted in ${unit}.`
-          : `Deposits fell at most ${formatPercent(outflow.fall)} in the last 30 days, counted in ${unit}.`,
+      detail: `${
+        outflow.fall < 0.01 ? 'Deposits fell less than 1%' : `Deposits fell at most ${formatPercent(outflow.fall)}`
+      } in the last 30 days${outflow.days < 28 ? ` (${outflow.days} days of data)` : ''}, counted in ${unit}.`,
       source: outflow.source,
     },
     exit,
@@ -320,7 +295,7 @@ let refreshing: Promise<void> | null = null;
 
 /**
  * Fetch the history behind the scores where it is due, so requests never wait on it.
- * Each kind of input runs one fetch at a time: the protocol histories are large.
+ * Each kind of input runs one fetch at a time.
  * Routes Hermes deposits into go first.
  */
 export function refreshSafetyInputs(): Promise<void> {
@@ -329,14 +304,12 @@ export function refreshSafetyInputs(): Promise<void> {
   const network = solanaNetwork();
   const hasDeposit = (route: RouteConfig) => Number(depositStatus(route, network) !== null);
   const routes = [...ROUTES].sort((a, b) => hasDeposit(b) - hasDeposit(a));
-  const protocols = [...new Set(routes.map((route) => defillamaProtocol(route.source)))];
 
   const inSequence = async <T>(items: T[], fetch: (item: T) => Promise<unknown> | undefined) => {
     for (const item of items) await fetch(item);
   };
 
   refreshing = Promise.all([
-    inSequence(protocols, (protocol) => trackRecord(protocol).get()),
     inSequence(routes, (route) => outflows(route)?.get()),
     inSequence(routes, (route) => swapExit(route)?.get()),
   ])
