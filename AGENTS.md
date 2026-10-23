@@ -32,7 +32,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
-- Phones and tablets (under 1024px): one deposit card comes first, the way a swap app works (Titan is the reference). Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists every route by what it earns, best first, with the gap to the best for the rest, and the list below steps aside. The token opens as a bottom sheet. The network (Mainnet beta, real funds) shows in the hero there, and in the header on desktop.
+- Phones and tablets (under 1024px): one deposit card comes first, the way a swap app works (Titan is the reference). Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists the routes in the current sort with what each earns and the gap to the best APY, and the list below steps aside. The token opens as a bottom sheet. The network (Mainnet beta, real funds) shows in the hero there, and in the header on desktop.
 - Hero art: `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
 ## Live (23 October 2026)
@@ -49,6 +49,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 - Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF reads Sanctum Infinity's pool on chain; its APY comes from Hermes's own history once that is a day old, DefiLlama until then.
+- Sleep Well is the first screen: only routes with a Safety Score of 80 or more and risk level low (so no lending reserve 95% or more borrowed or held back). A toggle shows All routes. The rate board and the phone card list the top 3 routes in the current sort (plus the selected route if it sits further down), and "Show all" opens the rest. Every route has a plain "What can go wrong" line in the panel, the phone card and the deposit dialog. On 23 Oct, 8 of 12 SOL routes make Sleep Well and no USDC or USDT route does. Code: `frontend/components/app/safety.tsx`.
 - Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Hermes's own history once it covers two weeks, Kamino or DefiLlama history until then) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
 ## Roadmap
@@ -58,7 +59,8 @@ From the vision deck, the Turbine tutor's feedback and the capstone research. Ti
 Trust and curation (the wedge)
 
 - [x] Safety Score on every route: 0 to 100 from live data, each part shown with its source
-- [ ] Sleep Well mode as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong. Later, one signed deposit split across two or three of them.
+- [x] Sleep Well mode as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong
+- [ ] Sleep Well split: one signed deposit spread across two or three Sleep Well routes
 - [ ] Plain labels for new users: staking, lending and LP, and what each can lose
 - [ ] More score inputs: depeg (LST market price vs fair value), validator concentration, incident history with links
 
@@ -84,6 +86,7 @@ Portfolio and signals
 
 Later
 
+- [ ] Keep the API awake (owner deferred, 23 Oct): an UptimeRobot ping on `/health` every 5 minutes, or Render's Starter plan. Free Render sleeps after 15 idle minutes, so the first visit waits and history pauses.
 - [ ] Hermes fee
 - [ ] Lift the beta cap
 - [ ] LP routes, labeled with impermanent loss
@@ -111,6 +114,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 23 Oct 2026, Sleep Well: the first screen shows only routes scoring 80 or more, with a toggle to All routes and a "What can go wrong" line per route. Replaces the Low / Moderate / High risk filter.
 - 23 Oct 2026, Jupiter Lend: SOL, USDC and USDT deposits into Jupiter Lend Earn for jl tokens in the wallet, beta. The Safety Score's exit part reads how much can be withdrawn right now.
 - 23 Oct 2026, four more LSTs: Sanctum Infinity (INF), Bybit (bbSOL), JPool (JSOL) and BlazeStake (bSOL) deposit in-app through Jupiter, beta.
 - 23 Oct 2026, Safety Score: 0 to 100 on every route from size, track record, 30-day outflows and exit, with a breakdown per route. Routes sort by score by default, and the risk level follows the score.
