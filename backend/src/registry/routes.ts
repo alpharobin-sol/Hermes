@@ -52,7 +52,9 @@ const JUPITER_LEND: Record<InputToken, { receipt: TokenInfo; defillamaPool: stri
 
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
-  | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana
+  | { kind: 'stake-pool'; pool: string } // SPL stake pool account on chain (SPL program or Sanctum's forks)
+  | { kind: 'marinade' } // Marinade's API
+  | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana, only where no live source exists
   | { kind: 'kamino'; reserve: string } // Kamino Lend main market reserve
   | { kind: 'jupiter-lend'; mint: string }; // Jupiter Lend earn token
 
@@ -73,7 +75,9 @@ export interface RouteConfig {
   direct?: DirectDeposit;
   website: string;
   source: RateSource;
-  defillamaPool?: string; // DefiLlama pool for deposit history, when the rate comes from another source
+  // First day DefiLlama recorded the protocol's deposits. Fixed, so the Safety Score's track record needs no live fetch.
+  trackedSince: string;
+  defillamaPool?: string; // DefiLlama pool for deposit history (Safety Score outflows), until Hermes keeps its own
   deposit: Partial<Record<SolanaNetwork, DepositStatus>>;
 }
 
@@ -90,7 +94,9 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('JitoSOL', 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'),
     direct: { kind: 'spl-stake-pool', pool: 'Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb' }, // same address on devnet
     website: 'https://www.jito.network/staking',
-    source: { kind: 'defillama', project: 'jito-liquid-staking', symbol: 'JITOSOL' },
+    source: { kind: 'stake-pool', pool: 'Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb' },
+    trackedSince: '2022-11-24',
+    defillamaPool: '0e7d0722-9054-4907-8593-567b353c0900',
     deposit: { 'mainnet-beta': 'beta', devnet: 'beta' },
   },
   {
@@ -102,7 +108,9 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('mSOL', 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So'),
     direct: { kind: 'marinade' },
     website: 'https://marinade.finance',
-    source: { kind: 'defillama', project: 'marinade-liquid-staking', symbol: 'MSOL' },
+    source: { kind: 'marinade' },
+    trackedSince: '2021-08-26',
+    defillamaPool: 'b3f93865-5ec8-4662-90a0-11808e0aa2bd',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -113,7 +121,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('BNSOL', 'BNso1VUJnh4zcfpZa6986Ea66P6TCp59hvtNJ8b1X85'),
     website: 'https://www.binance.com',
-    source: { kind: 'defillama', project: 'binance-staked-sol', symbol: 'BNSOL' },
+    source: { kind: 'stake-pool', pool: 'Hr9pzexrBge3vgmBNRR8u42CNQgBXdHm4UkUN2DH4a7r' },
+    trackedSince: '2024-09-12',
+    defillamaPool: '9e709e57-84eb-496b-82ce-2e8f6a17db1b',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -124,7 +134,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('jupSOL', 'jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v'),
     website: 'https://jup.ag',
-    source: { kind: 'defillama', project: 'jupiter-staked-sol', symbol: 'JUPSOL' },
+    source: { kind: 'stake-pool', pool: '8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr' },
+    trackedSince: '2024-08-16',
+    defillamaPool: '52bd72a7-9e81-4112-abb4-71673e8de9bf',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -135,7 +147,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('dSOL', 'Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ'),
     website: 'https://www.drift.trade',
-    source: { kind: 'defillama', project: 'drift-staked-sol', symbol: 'DSOL' },
+    source: { kind: 'stake-pool', pool: '9mhGNSPArRMHpLDMSmxAvuoizBqtBGqYdT8WGuqgxNdn' },
+    trackedSince: '2024-08-26',
+    defillamaPool: '296651fc-25f6-4434-b8ec-17c2af9808da',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -146,7 +160,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('hSOL', 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A'),
     website: 'https://www.helius.dev',
-    source: { kind: 'defillama', project: 'helius-staked-sol', symbol: 'HSOL' },
+    source: { kind: 'stake-pool', pool: '3wK2g8ZdzAH8FJ7PKr2RcvGh7V9VYson5hrVsJM5Lmws' },
+    trackedSince: '2024-08-16',
+    defillamaPool: 'd7e101d6-8e6c-4348-9c5f-62398872a301',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -157,7 +173,10 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('INF', '5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm'),
     website: 'https://app.sanctum.so',
+    // No live source outside DefiLlama yet: Sanctum's APY API returns 0 and its SOL value lags the market
     source: { kind: 'defillama', project: 'sanctum-infinity', symbol: 'INF' },
+    trackedSince: '2024-03-25',
+    defillamaPool: '3075a746-bdd1-4aac-bcd5-b035abee2622',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -168,7 +187,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('bbSOL', 'Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B'),
     website: 'https://www.bybit.com',
-    source: { kind: 'defillama', project: 'bybit-staked-sol', symbol: 'BBSOL' },
+    source: { kind: 'stake-pool', pool: '2aMLkB5p5gVvCwKkdSo5eZAL1WwhZbxezQr1wxiynRhq' },
+    trackedSince: '2024-09-25',
+    defillamaPool: 'f76cc844-73a2-4cc7-8de7-f9fb874c626d',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -179,7 +200,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('JSOL', '7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn'),
     website: 'https://jpool.one',
-    source: { kind: 'defillama', project: 'jpool', symbol: 'JSOL' },
+    source: { kind: 'stake-pool', pool: 'CtMyWsrUtAwXWiGr9WjHT5fC3p3fgV8cyGpLTo2LJzG1' },
+    trackedSince: '2022-01-01',
+    defillamaPool: '177d0a37-d0fb-4b18-b290-f46bbe8d307f',
     deposit: { 'mainnet-beta': 'beta' },
   },
   {
@@ -190,7 +213,9 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('bSOL', 'bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1'),
     website: 'https://stake.solblaze.org',
-    source: { kind: 'defillama', project: 'blazestake', symbol: 'BSOL' },
+    source: { kind: 'stake-pool', pool: 'stk9ApL5HeVAwPLr3TLhDXdZS8ptVu7zp6ov8HFDuMi' },
+    trackedSince: '2023-05-04',
+    defillamaPool: '387d6732-59f0-4ae0-8a88-aba75a5cbe4a',
     deposit: { 'mainnet-beta': 'beta' },
   },
 
@@ -206,6 +231,7 @@ export const ROUTES: RouteConfig[] = [
       direct: { kind: 'kamino-lend', market: KAMINO_MAIN_MARKET, reserve: KAMINO_RESERVES[token] },
       website: 'https://app.kamino.finance',
       source: { kind: 'kamino', reserve: KAMINO_RESERVES[token] },
+      trackedSince: '2023-10-12',
       deposit: { 'mainnet-beta': 'beta' },
     },
     {
@@ -219,6 +245,7 @@ export const ROUTES: RouteConfig[] = [
       direct: { kind: 'jupiter-lend' },
       website: 'https://jup.ag/lend/earn',
       source: { kind: 'jupiter-lend', mint: TOKENS[token].mint },
+      trackedSince: '2025-08-19',
       defillamaPool: JUPITER_LEND[token].defillamaPool,
       deposit: { 'mainnet-beta': 'beta' },
     },
