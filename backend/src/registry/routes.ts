@@ -140,7 +140,7 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('INF', '5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm'),
     website: 'https://app.sanctum.so',
     source: { kind: 'defillama', project: 'sanctum-infinity', symbol: 'INF' },
-    deposit: {},
+    deposit: { 'mainnet-beta': 'beta' },
   },
   {
     id: 'bybit',
@@ -151,7 +151,7 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('bbSOL', 'Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B'),
     website: 'https://www.bybit.com',
     source: { kind: 'defillama', project: 'bybit-staked-sol', symbol: 'BBSOL' },
-    deposit: {},
+    deposit: { 'mainnet-beta': 'beta' },
   },
   {
     id: 'jpool',
@@ -162,7 +162,7 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('JSOL', '7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn'),
     website: 'https://jpool.one',
     source: { kind: 'defillama', project: 'jpool', symbol: 'JSOL' },
-    deposit: {},
+    deposit: { 'mainnet-beta': 'beta' },
   },
   {
     id: 'blazestake',
@@ -173,7 +173,7 @@ export const ROUTES: RouteConfig[] = [
     receipt: lst('bSOL', 'bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1'),
     website: 'https://stake.solblaze.org',
     source: { kind: 'defillama', project: 'blazestake', symbol: 'BSOL' },
-    deposit: {},
+    deposit: { 'mainnet-beta': 'beta' },
   },
 
   // Lending: supply a token, earn the borrow interest

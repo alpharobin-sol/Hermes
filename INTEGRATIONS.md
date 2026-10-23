@@ -46,12 +46,12 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 | Jupiter (jupSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |
 | Drift (dSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |
 | Helius (hSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap, price impact 0.1 to 0.2% |
-| Sanctum Infinity (INF) | view only, hidden | pending | | | |
-| Bybit (bbSOL) | view only, hidden | pending | | | |
-| JPool (JSOL) | view only, hidden | pending | | | |
-| BlazeStake (bSOL) | view only, hidden | pending | | | |
+| Sanctum Infinity (INF) | beta | 23 Oct: Hermes 5.50% / $201.7M (DefiLlama). On-chain supply x Jupiter value: $201.2M. Sanctum's APY API returns 0 and its TVL API is stale. | Jupiter 0.01 / 1 / 10 SOL pass, received equals quote, 23 Oct | pending | Jupiter swap via Meteora DLMM, price impact under 0.03%. Exit: swap INF to SOL on Jupiter or at app.sanctum.so. |
+| Bybit (bbSOL) | beta | 23 Oct: Hermes 4.71% / $150.5M (DefiLlama). On-chain supply x Jupiter value: $150.1M. No protocol APY API. | Jupiter 0.01 / 1 / 10 SOL pass, received equals quote, 23 Oct | pending | Jupiter swap via Manifest (and Sanctum at 10 SOL), price impact 0.16 to 0.21%. Exit: swap bbSOL to SOL on Jupiter. |
+| JPool (JSOL) | beta | 23 Oct: Hermes 4.73% / $129.5M (DefiLlama). On-chain supply x Jupiter value: $129.4M. No protocol APY API. | Jupiter 0.01 / 1 / 10 SOL pass, received equals quote, 23 Oct | pending | Jupiter swap via Sanctum, Saber, Raydium. JPool's own stake pool gives the same JSOL for 1 SOL (0.72334), so no direct path yet. Buying and selling back costs about 0.4%. Exit: swap JSOL to SOL on Jupiter or unstake at jpool.one. |
+| BlazeStake (bSOL) | beta | 23 Oct: Hermes 4.62% / $91.4M (DefiLlama). BlazeStake API 4.86%. On-chain supply x Jupiter value: $91.1M. | Jupiter 0.01 / 1 / 10 SOL pass, received equals quote, 23 Oct | pending | Jupiter swap via Whirlpool. Jupiter gives more bSOL than BlazeStake's own stake pool (0.75712 vs 0.75644 for 1 SOL), so no direct path yet. Exit: swap bSOL to SOL on Jupiter or unstake at stake.solblaze.org. |
 | Kamino Lend SOL, USDC, USDT | beta | 23 Oct: rates come from Kamino's own reserve API (SOL 5.50% / $247M / 92% borrowed, USDC 31.3% / $120M / 99% borrowed, USDT 4.0% / $12.4M / 87% borrowed). Check against app.kamino.finance pending. | SOL 0.01 / 1 / 4 (first deposit, new Kamino account), USDC and USDT 1 / 1,000 pass, 23 Oct | pending | Kamino's transaction API builds it; Hermes swaps in a priority fee and simulates. First deposit pays one-time account rent (0.0241 SOL for SOL, 0.0298 SOL for USDC/USDT, measured by simulation). USDC was 99 to 100% borrowed at integration, so USDC withdrawals may have to wait. Exit: withdraw at app.kamino.finance when the reserve has liquidity. |
 | Jupiter Lend SOL, USDC, USDT | view only, hidden | pending | | | Phase 1, step 3 |
 | MarginFi | not listed | | | | Phase 1, step 4. Needs a live rate source first. |
 
-The six beta routes predate this gate. Their rate checks against each protocol's app are still to do.
+The first six beta routes predate this gate. Their rate checks against each protocol's app are still to do.
