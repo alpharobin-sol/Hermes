@@ -12,7 +12,7 @@ import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
 import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
-import { compareRoutes, inSleepWell, type SortBy, type View } from "./safety"
+import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 
 const RATE_REFRESH_MS = 60 * 1000
 
@@ -48,8 +48,8 @@ export function YieldPanel() {
 
   const [selectedSymbol, setSelectedSymbol] = useState(BASE_TOKENS[0].symbol)
   const [amount, setAmount] = useState("")
-  // Sleep Well is the first screen. All routes is one tap away.
-  const [view, setView] = useState<View>("sleep-well")
+  // Top rated is the first screen. All routes is one tap away.
+  const [view, setView] = useState<View>("top-rated")
   // Lists show the top three routes until "Show all"
   const [expanded, setExpanded] = useState(false)
   // Routes lead with the Safety Score. APY is one tap away.
@@ -117,7 +117,7 @@ export function YieldPanel() {
     () => routes.filter((route) => route.token === selectedToken.symbol).sort(compareRoutes(sortBy)),
     [routes, selectedToken.symbol, sortBy]
   )
-  const visibleRoutes = view === "all" ? forToken : forToken.filter(inSleepWell)
+  const visibleRoutes = view === "all" ? forToken : forToken.filter(isTopRated)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
   const sources = listOf([...new Set(forToken.map((route) => route.source))])
 

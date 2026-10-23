@@ -46,7 +46,7 @@ The vision deck's order: index first (read only), then the router, then DPO, the
 Better routing alone loses to Jupiter and Lulo. Hermes wins on trust and curation: a Michelin Guide of yield, not a Google of yield.
 
 - Safety Score (the "Hermes Score"): 0 to 100 for every route. The capstone suggests audit status, TVL volatility and team reputation as inputs.
-- Sleep Well: a mode that only routes to blue-chip protocols (the capstone names Kamino, Save and MarginFi) and ignores high-risk farms.
+- Sleep Well: a mode that only routes to blue-chip protocols (the capstone names Kamino, Save and MarginFi) and ignores high-risk farms. In Hermes it is called Top rated (owner's choice, 23 Oct 2026): routes with a Safety Score of 80 or more.
 - Notifications over dashboards. Alerts beat screens, for example "USDC yield on Lulo dropped to 2%, Kamino pays 12%. Move it?"
 
 Tutor's feedback: keep the Safety Score and Sleep Well front and center, so the product does not drift into a generic dashboard. A solid and credible direction in a competitive space.
