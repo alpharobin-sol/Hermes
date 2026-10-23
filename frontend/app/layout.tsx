@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Cinzel, Cormorant_Garamond, Inter } from "next/font/google"
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import "./styles/wallet-adapter.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -57,6 +58,7 @@ export default function RootLayout({
             <AppLayout>{children}</AppLayout>
           </AlertsProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
