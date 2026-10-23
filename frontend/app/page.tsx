@@ -137,7 +137,7 @@ const faqs = [
   },
   {
     question: "Can Hermes alert me when a route changes?",
-    answer: "Yes, on your phone or computer. Tap the bell under a route and allow notifications. Hermes tells you when its rate falls, a better top rated route opens, a lending reserve is nearly all borrowed, or it leaves Top rated, at most once a day per kind. On iPhone, add Hermes to your Home Screen first (Share, then Add to Home Screen). Hermes keeps only your device's notification address and the routes you watch, never your wallet. Turn alerts off any time in Settings.",
+    answer: "Yes, on your phone or computer. Tap the bell under a route and allow notifications. If your browser hides or blocks the prompt, Hermes shows you where to allow them. Hermes tells you when its rate falls, a better top rated route opens, a lending reserve is nearly all borrowed, or it leaves Top rated, at most once a day per kind. On iPhone, add Hermes to your Home Screen first (Share, then Add to Home Screen). Hermes keeps only your device's notification address and the routes you watch, never your wallet. Turn alerts off any time in Settings.",
   },
   {
     question: "Does Hermes charge a fee?",
