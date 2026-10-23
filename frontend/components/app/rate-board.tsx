@@ -59,6 +59,7 @@ interface RateBoardProps {
   onRetry: () => void
   sources: string
   updatedLabel: string | null
+  className?: string
 }
 
 export function RateBoard({
@@ -77,11 +78,12 @@ export function RateBoard({
   onRetry,
   sources,
   updatedLabel,
+  className,
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
 
   return (
-    <div className="plaque min-w-0 flex-[999_1_600px]">
+    <div className={cn("plaque min-w-0 flex-[999_1_600px]", className)}>
       <div className="plaque-inner overflow-hidden">
         {/* Token and risk */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-3 py-3 md:px-[18px] md:py-3.5">

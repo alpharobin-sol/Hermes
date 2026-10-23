@@ -148,7 +148,7 @@ export function YieldPanel() {
     <section
       id="rates"
       aria-label="Rates"
-      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-4 md:gap-6 md:px-8 md:pb-24 md:pt-16"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 md:pt-16"
     >
       <MobileDeposit
         ref={mobileCardRef}
@@ -165,6 +165,7 @@ export function YieldPanel() {
         onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
         isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
         routes={visibleRoutes}
+        totalForToken={forToken.length}
         risk={riskProfile}
         onRisk={setRiskProfile}
         route={loading || error ? null : selectedRoute}
@@ -191,6 +192,8 @@ export function YieldPanel() {
         onRetry={() => setReloadKey((key) => key + 1)}
         sources={sources}
         updatedLabel={updatedLabel(forToken)}
+        // On phones and tablets the card lists every route once an amount is typed, so this list steps aside
+        className={numericAmount > 0 && !loading && !error ? "max-lg:hidden" : undefined}
       />
 
       <DepositPanel

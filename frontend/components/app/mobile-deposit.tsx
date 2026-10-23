@@ -27,6 +27,7 @@ interface MobileDepositProps {
   onQuickAmount: (pct: string) => void
   isQuickActive: (pct: string) => boolean
   routes: YieldRoute[] // for the token, within the risk level, best APY first
+  totalForToken: number
   risk: RiskTier
   onRisk: (risk: RiskTier) => void
   route: YieldRoute | null
@@ -41,7 +42,8 @@ function riskLabel(route: YieldRoute): string {
   return RISK_LEVELS.find((level) => level.value === route.risk)?.label ?? route.risk
 }
 
-// Phones: one card, the way a swap app works. What you deposit, where it goes, one button.
+// Phones and tablets: one card, the way a swap app works. With an amount typed, every route shows in the card,
+// ranked by what it earns, the best marked and the gap shown for the rest.
 export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(function MobileDeposit(
   {
     tokens,
@@ -57,6 +59,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     onQuickAmount,
     isQuickActive,
     routes,
+    totalForToken,
     risk,
     onRisk,
     route,
@@ -69,10 +72,9 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
   ref
 ) {
   const [tokenSheet, setTokenSheet] = useState(false)
-  const [routeSheet, setRouteSheet] = useState(false)
   const overCap = isOverCap(route, numericAmount)
-  const best = route !== null && routes[0]?.id === route.id
   const borrowed = route ? borrowedPercent(route) : null
+  const showRoutes = numericAmount > 0 && ratesStatus === "ready"
 
   return (
     <section ref={ref} aria-label="Deposit" className="plaque min-w-0 basis-full scroll-mt-20 lg:hidden">
@@ -84,126 +86,83 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
         )}
 
         {/* What you deposit */}
-        <div className="relative flex flex-col gap-2.5">
-          <div className="rounded-[4px] border border-input bg-background px-3.5 py-3 focus-within:border-ink">
-            <div className="flex items-center justify-between gap-3">
-              <label htmlFor="mobile-amount" className="label-roman">
-                You deposit
-              </label>
-              {isConnected && balanceKnown ? (
-                <button type="button" onClick={() => onQuickAmount("Max")} className="text-xs text-muted-foreground">
-                  Balance: <span className="font-medium text-foreground">{formatTokenAmount(token.balance, token.symbol)}</span>
-                </button>
-              ) : (
-                <span className="text-xs text-muted-foreground">{isConnected ? "Balance: loading" : "Balance: —"}</span>
-              )}
-            </div>
-            <div className="mt-1.5 flex items-center gap-3">
-              <input
-                id="mobile-amount"
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                placeholder="0"
-                value={amount}
-                onChange={(e) => onAmount(e.target.value)}
-                aria-invalid={!!balanceIssue || overCap}
-                className="min-w-0 flex-1 bg-transparent p-0 text-[30px] font-semibold leading-tight text-foreground outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => tokens.length > 1 && setTokenSheet(true)}
-                aria-label={tokens.length > 1 ? `${token.symbol}. Change token` : token.symbol}
-                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[15px] font-semibold"
-              >
-                <Image src={token.icon} alt="" width={28} height={28} className="size-7" />
-                {token.symbol}
-                {tokens.length > 1 && <ChevronDown className="size-4 text-muted-foreground" />}
+        <div className="rounded-[4px] border border-input bg-background px-3.5 py-3 focus-within:border-ink">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="mobile-amount" className="label-roman">
+              You deposit
+            </label>
+            {isConnected && balanceKnown ? (
+              <button type="button" onClick={() => onQuickAmount("Max")} className="text-xs text-muted-foreground">
+                Balance: <span className="font-medium text-foreground">{formatTokenAmount(token.balance, token.symbol)}</span>
               </button>
-            </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">{isConnected ? "Balance: loading" : "Balance: —"}</span>
+            )}
           </div>
-
-          <div className="grid grid-cols-4 gap-1.5">
-            {QUICK_AMOUNTS.map((pct) => (
-              <button
-                key={pct}
-                type="button"
-                disabled={!balanceKnown}
-                onClick={() => onQuickAmount(pct)}
-                className={cn(
-                  "h-9 rounded-[2px] border text-[13px] font-medium disabled:text-placeholder",
-                  isQuickActive(pct) ? "border-frame bg-secondary text-foreground" : "border-hairline text-muted-foreground"
-                )}
-              >
-                {pct}
-              </button>
-            ))}
+          <div className="mt-1.5 flex items-center gap-3">
+            <input
+              id="mobile-amount"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="0"
+              value={amount}
+              onChange={(e) => onAmount(e.target.value)}
+              aria-invalid={!!balanceIssue || overCap}
+              className="min-w-0 flex-1 bg-transparent p-0 text-[30px] font-semibold leading-tight text-foreground outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => tokens.length > 1 && setTokenSheet(true)}
+              aria-label={tokens.length > 1 ? `${token.symbol}. Change token` : token.symbol}
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-3 text-[15px] font-semibold"
+            >
+              <Image src={token.icon} alt="" width={28} height={28} className="size-7" />
+              {token.symbol}
+              {tokens.length > 1 && <ChevronDown className="size-4 text-muted-foreground" />}
+            </button>
           </div>
-          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
         </div>
 
-        {/* Where it goes. The whole box opens the route list. */}
-        <button
-          type="button"
-          onClick={() => routes.length > 0 && setRouteSheet(true)}
-          disabled={!route}
-          aria-label={route ? `Into ${route.name}, ${formatApy(route)} APY. Change route` : "Route"}
-          className="flex w-full flex-col gap-2 rounded-[4px] border border-gilt bg-accent px-3.5 py-3 text-left disabled:cursor-default"
-        >
-          <span className="flex items-center justify-between">
-            <span className="label-roman">Into</span>
-            {route && routes.length > 1 && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink">
-                {routes.length} routes
-                <ChevronDown className="size-4" />
-              </span>
-            )}
-          </span>
-          {route ? (
-            <>
-              <span className="flex items-center gap-3">
-                <Medallion route={route} className="bg-card" />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
-                    {best && (
-                      <span className="rounded-[2px] border border-ink-line bg-ink-surface px-1.5 py-0.5 font-roman text-[9px] font-bold tracking-[0.1em] text-ink">
-                        Best APY
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {CATEGORY_LABELS[route.category]}
-                    {route.receipt && ` · get ${route.receipt}`}
-                  </span>
-                </span>
-                {/* APY, and what it earns on the amount typed */}
-                <span className="flex shrink-0 flex-col items-end">
-                  <span className="font-roman text-[22px] font-bold leading-tight text-ink">{formatApy(route)}</span>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {numericAmount > 0 ? (
-                      <>
-                        <span className="text-foreground">+{formatTokenAmount(numericAmount * route.apy, route.token)}</span> / yr
-                      </>
-                    ) : (
-                      "APY"
-                    )}
-                  </span>
-                </span>
-              </span>
-            </>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              {ratesStatus === "loading" ? "Checking live rates..." : ratesStatus === "error" ? "Rates unavailable" : `No ${token.symbol} route at this risk level`}
-            </span>
-          )}
-        </button>
+        <div className="grid grid-cols-4 gap-1.5">
+          {QUICK_AMOUNTS.map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              disabled={!balanceKnown}
+              onClick={() => onQuickAmount(pct)}
+              className={cn(
+                "h-9 rounded-[2px] border text-[13px] font-medium disabled:text-placeholder",
+                isQuickActive(pct) ? "border-frame bg-secondary text-foreground" : "border-hairline text-muted-foreground"
+              )}
+            >
+              {pct}
+            </button>
+          ))}
+        </div>
+        <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
+
+        {showRoutes ? (
+          <RouteChoices
+            routes={routes}
+            totalForToken={totalForToken}
+            token={token.symbol}
+            amount={numericAmount}
+            selectedId={route?.id ?? null}
+            onSelect={onSelectRoute}
+            risk={risk}
+            onRisk={onRisk}
+          />
+        ) : (
+          <BestRoute route={route} routes={routes} token={token.symbol} ratesStatus={ratesStatus} />
+        )}
 
         {/* Where the numbers come from, like a swap app's rate line */}
         {route && (
           <p className="px-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            {showRoutes && `${route.name}: `}
             {riskLabel(route)} risk · TVL {formatUSD(route.tvl)}
-            {borrowed !== null && ` · ${borrowed}% borrowed`} · rate from {route.source}
+            {borrowed !== null && ` · ${borrowed}% borrowed`} · from {route.source}
             {updatedLabel && `, ${updatedLabel}`}
           </p>
         )}
@@ -242,23 +201,171 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           setTokenSheet(false)
         }}
       />
-      <RouteSheet
-        open={routeSheet}
-        onOpenChange={setRouteSheet}
-        token={token.symbol}
-        routes={routes}
-        selectedId={route?.id ?? null}
-        amount={numericAmount}
-        risk={risk}
-        onRisk={onRisk}
-        onPick={(id) => {
-          onSelectRoute(id)
-          setRouteSheet(false)
-        }}
-      />
     </section>
   )
 })
+
+const BEST_TAG =
+  "rounded-[2px] border border-ink-line bg-ink-surface px-1.5 py-0.5 font-roman text-[9px] font-bold tracking-[0.1em] text-ink"
+
+// Before an amount: the best route, and a prompt to type one to compare them all
+function BestRoute({
+  route,
+  routes,
+  token,
+  ratesStatus,
+}: {
+  route: YieldRoute | null
+  routes: YieldRoute[]
+  token: string
+  ratesStatus: "loading" | "error" | "ready"
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-[4px] border border-gilt bg-accent px-3.5 py-3">
+      <span className="label-roman">Into</span>
+      {route ? (
+        <>
+          <span className="flex items-center gap-3">
+            <Medallion route={route} className="bg-card" />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
+                {routes[0]?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {CATEGORY_LABELS[route.category]}
+                {route.receipt && ` · get ${route.receipt}`}
+              </span>
+            </span>
+            <span className="flex shrink-0 flex-col items-end">
+              <span className="font-roman text-[22px] font-bold leading-tight text-ink">{formatApy(route)}</span>
+              <span className="text-[11px] text-muted-foreground">APY</span>
+            </span>
+          </span>
+          {routes.length > 1 && (
+            <span className="border-t border-frame pt-2 text-xs text-muted-foreground">
+              Type an amount to compare all {routes.length} routes.
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="text-sm text-muted-foreground">
+          {ratesStatus === "loading"
+            ? "Checking live rates..."
+            : ratesStatus === "error"
+              ? "Rates unavailable"
+              : `No ${token} route at this risk level`}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// With an amount: every route, best first, with what each earns and how far behind the best it is
+function RouteChoices({
+  routes,
+  totalForToken,
+  token,
+  amount,
+  selectedId,
+  onSelect,
+  risk,
+  onRisk,
+}: {
+  routes: YieldRoute[]
+  totalForToken: number
+  token: string
+  amount: number
+  selectedId: string | null
+  onSelect: (id: string) => void
+  risk: RiskTier
+  onRisk: (risk: RiskTier) => void
+}) {
+  const bestYearly = routes.length > 0 ? amount * routes[0].apy : 0
+  const hidden = totalForToken - routes.length
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-[4px] border border-gilt">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-frame bg-accent px-3 py-2.5">
+        <span className="label-roman text-foreground">
+          {routes.length} {routes.length === 1 ? "route" : "routes"}
+        </span>
+        <div role="group" aria-label="Risk up to" className="flex gap-0.5 rounded-[4px] border border-frame p-0.5">
+          {RISK_LEVELS.map((level) => (
+            <button
+              key={level.value}
+              type="button"
+              aria-pressed={level.value === risk}
+              onClick={() => onRisk(level.value)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-[2px] px-1.5 text-xs font-medium",
+                level.value === risk ? "bg-card text-foreground" : "text-muted-foreground"
+              )}
+            >
+              <span className={cn("size-1.5 rotate-45", level.color)} aria-hidden="true" />
+              {level.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div role="radiogroup" aria-label={`${token} routes`}>
+        {routes.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No {token} routes at {risk} risk. Raise the risk level to see {totalForToken} more.
+          </p>
+        )}
+        {routes.map((r, index) => {
+          const selected = r.id === selectedId
+          const yearly = amount * r.apy
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onSelect(r.id)}
+              className={cn(
+                "flex w-full items-center gap-3 border-t border-row-line px-3 py-2.5 text-left first:border-t-0",
+                selected ? "bg-accent" : "bg-card"
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className={cn("grid size-[18px] shrink-0 place-items-center rounded-full border-2", selected ? "border-ink" : "border-gilt")}
+              >
+                {selected && <span className="size-2 rounded-full bg-ink" />}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="font-display text-[19px] font-bold leading-[1.1]">{r.name}</span>
+                  {index === 0 && <span className={BEST_TAG}>Best</span>}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {r.receipt ?? CATEGORY_LABELS[r.category]} · {riskLabel(r)} risk
+                </span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end gap-0.5">
+                <span className={cn("text-[15px] font-semibold", index === 0 ? "text-ink" : "text-foreground")}>
+                  +{formatTokenAmount(yearly, r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {formatApy(r)} APY
+                  {index > 0 && ` · ${formatTokenAmount(bestYearly - yearly, r.token)} less`}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+        {hidden > 0 && routes.length > 0 && (
+          <p className="border-t border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
+            {hidden} more above {risk} risk.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function TokenSheet({
   open,
@@ -303,100 +410,6 @@ function TokenSheet({
               {t.symbol === selected && <Check className="size-4 text-ink" />}
             </button>
           ))}
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-function RouteSheet({
-  open,
-  onOpenChange,
-  token,
-  routes,
-  selectedId,
-  amount,
-  risk,
-  onRisk,
-  onPick,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  token: string
-  routes: YieldRoute[]
-  selectedId: string | null
-  amount: number
-  risk: RiskTier
-  onRisk: (risk: RiskTier) => void
-  onPick: (id: string) => void
-}) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <div className="flex flex-col gap-3 px-4 pb-3 pt-3">
-          <div className="pr-10">
-            <SheetTitle className="font-display text-[26px] font-bold leading-[1.1]">Choose a route</SheetTitle>
-            <SheetDescription className="mt-1 text-[13px] text-muted-foreground">
-              {token} routes, best APY first.
-            </SheetDescription>
-          </div>
-          <div role="group" aria-label="Risk up to" className="grid grid-cols-3 gap-0.5 rounded-[4px] border border-border p-[3px]">
-            {RISK_LEVELS.map((level) => (
-              <button
-                key={level.value}
-                type="button"
-                aria-pressed={level.value === risk}
-                onClick={() => onRisk(level.value)}
-                className={cn(
-                  "inline-flex h-9 items-center justify-center gap-2 rounded-[2px] text-[13px] font-medium",
-                  level.value === risk ? "bg-secondary text-foreground" : "text-muted-foreground"
-                )}
-              >
-                <span className={cn("size-[7px] rotate-45", level.color)} aria-hidden="true" />
-                {level.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div role="radiogroup" aria-label={`${token} routes`} className="overflow-y-auto border-t border-hairline">
-          {routes.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No {token} routes at {risk} risk. Raise the risk level.</p>
-          )}
-          {routes.map((r, index) => {
-            const selected = r.id === selectedId
-            return (
-              <button
-                key={r.id}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => onPick(r.id)}
-                className={cn("flex w-full items-center gap-3 border-b border-row-line px-4 py-3 text-left", selected && "bg-accent")}
-              >
-                <Medallion route={r} />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-display text-[20px] font-bold leading-[1.1]">{r.name}</span>
-                    {index === 0 && (
-                      <span className="rounded-[2px] border border-ink-line bg-ink-surface px-1.5 py-0.5 font-roman text-[9px] font-bold tracking-[0.1em] text-ink">
-                        Best APY
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {CATEGORY_LABELS[r.category]}
-                    {r.receipt && ` · ${r.receipt}`} · {riskLabel(r)} risk
-                  </span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-0.5">
-                  <span className={cn("font-roman text-lg font-bold", index === 0 ? "text-ink" : "text-foreground")}>{formatApy(r)}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {amount > 0 ? `+${formatTokenAmount(amount * r.apy, r.token)} / yr` : r.source}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
         </div>
       </SheetContent>
     </Sheet>

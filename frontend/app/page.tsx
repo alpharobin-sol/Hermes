@@ -28,7 +28,7 @@ const facts = ["Non-custodial", "No Hermes fee today", "Beta: real funds, capped
 // Reni's Aurora in an arch, with the headline on a plaque set over its lower edge
 function Hero() {
   return (
-    <section className="mx-auto max-w-[1200px] px-4 pt-4 md:px-8 md:pt-7">
+    <section className="mx-auto max-w-[1200px] px-4 pt-3 md:px-8 md:pt-7">
       <figure className="m-0 rounded-t-[100px] border border-gilt bg-card p-1 md:rounded-t-[246px] md:p-1.5">
         <Image
           src={banner}

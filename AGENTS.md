@@ -25,7 +25,7 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
-- Phones and tablets (under 1024px): one deposit card comes first, the way a swap app works. Amount and token, the route it goes into, one button. Token and route open as bottom sheets. The route list sits below the card.
+- Phones and tablets (under 1024px): one deposit card comes first, the way a swap app works (Titan is the reference). Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists every route by what it earns, best first, with the gap to the best for the rest, and the list below steps aside. The token opens as a bottom sheet.
 - Hero art: `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
 ## Live (23 October 2026)
