@@ -4,7 +4,7 @@ The backend for Hermes, a non-custodial yield router on Solana.
 
 It does two things:
 
-- Serves live yield routes: APY, TVL and risk tier for each route in the registry.
+- Serves live yield routes: APY, TVL, Safety Score and risk tier for each route in the registry.
 - Builds unsigned deposit transactions. The user's wallet signs and sends them. Hermes never holds funds.
 
 ## Layout
@@ -19,7 +19,10 @@ src/
 ├── registry/routes.ts          # every route: protocol, token, rate source, deposit status
 ├── services/
 │   ├── rates.ts                # live rates from DefiLlama, Kamino and Jupiter Lend
-│   ├── yields.ts               # joins the registry with live rates
+│   ├── yields.ts               # joins the registry with live rates and Safety Scores
+│   ├── safety.ts               # Safety Score: size, track record, outflows, exit
+│   ├── cache.ts                # TTL cache with a stale fallback, shared by rates and scores
+│   ├── jupiter.ts              # Jupiter swap API client
 │   ├── deposit.ts              # quotes every path for a deposit and builds the best one
 │   ├── stake-pool-deposit.ts   # direct SPL stake pool deposits (Jito)
 │   ├── marinade-deposit.ts     # direct Marinade deposits (mainnet)
@@ -40,13 +43,27 @@ src/
 
 Rates refresh every few minutes. If a source fails, its last good rates serve for up to an hour, then its routes drop out. The API never shows an estimate in place of a live number.
 
-The risk tier comes from TVL: low at $100M and above, moderate from $10M, high below. It says how much money already sits in the route. A lending reserve that is 95% or more borrowed is at least moderate, since withdrawals may have to wait. The tier does not measure contract or depeg risk.
+## Safety Score
+
+Every route gets a score from 0 to 100: four parts from live data, up to 25 points each. Each part comes back with its points, what it measured and its source.
+
+| Part | Measures | 0 points | 25 points | Source |
+| --- | --- | --- | --- | --- |
+| Size | Money in the route now (TVL) | $10M or less | $1B or more (log scale) | the route's rate source |
+| Track record | How long DefiLlama has tracked the protocol's deposits | new | 4 years or more | DefiLlama protocol API |
+| Outflows | Largest fall in deposits within the last 30 days, in tokens so price moves don't count | 40% or more | 10% or less | Kamino history, or DefiLlama pool history in SOL |
+| Exit, lending | Share of the reserve that is borrowed | 100% | 90% or less | rate source |
+| Exit, liquid staking | Price impact of selling 10,000 of the token for SOL | 5% or more | 1% or less | Jupiter quote |
+
+The history behind the score refreshes in the background (track record daily, outflows every 6 hours, exit quotes every 30 minutes), so requests don't wait on it. Right after a restart, a request waits up to 12 seconds for it. A route with any part missing has `safety: null`, for now every Jupiter Lend route. The score does not measure smart contract or depeg risk.
+
+The risk tier follows the score: low at 80 and above, moderate from 60, high below. A route without a score gets its tier from TVL: low at $100M and above, moderate from $10M, high below. A lending reserve that is 95% or more borrowed is at least moderate, since withdrawals may have to wait.
 
 ## Endpoints
 
 `GET /api/yields?token=SOL`
 
-Routes Hermes can deposit into for one token (SOL, USDC or USDT), highest APY first. Each route has `deposit`: `live` or `beta` for the network the API runs on.
+Routes Hermes can deposit into for one token (SOL, USDC or USDT), highest APY first. Each route has `deposit`: `live` or `beta` for the network the API runs on, and `safety`: `{ score, parts }` or `null`.
 
 Add `all=true` to include view-only routes (`deposit: null`). They link out to the protocol's app and are hidden on the site for now. `SHOW_VIEW_ONLY_ROUTES=true` includes them by default.
 

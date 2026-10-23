@@ -1,5 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
-import axiosRetry from 'axios-retry';
+import { AxiosInstance } from 'axios';
 import Decimal from 'decimal.js';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { logger } from '../utils/logger';
@@ -9,6 +8,7 @@ import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from '.
 import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
 import { buildKaminoDeposit, KaminoDepositPlan } from './kamino-deposit';
 import { DepositError } from './errors';
+import { createJupiterClient } from './jupiter';
 
 /**
  * HERMES DEPOSIT ROUTER
@@ -75,22 +75,7 @@ export class DepositService {
   private connections: Partial<Record<SolanaNetwork, Connection>> = {};
 
   constructor() {
-    const apiKey = process.env.JUPITER_API_KEY;
-
-    this.client = axios.create({
-      baseURL: process.env.JUPITER_API_URL || 'https://lite-api.jup.ag/swap/v1',
-      timeout: 15000,
-      headers: apiKey ? { 'x-api-key': apiKey } : undefined,
-    });
-
-    axiosRetry(this.client, {
-      retries: 3,
-      retryDelay: axiosRetry.exponentialDelay,
-      retryCondition: (error) => {
-        return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-               error.response?.status === 429;
-      },
-    });
+    this.client = createJupiterClient();
   }
 
   /**

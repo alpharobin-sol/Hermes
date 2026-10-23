@@ -26,6 +26,22 @@ export type RiskTier = "low" | "moderate" | "high";
 // live: passed every integration check, including a real deposit. beta: built and simulated, not yet proven with real funds.
 export type DepositStatus = "live" | "beta";
 
+// One part of the Safety Score, worth up to `max` points
+export interface SafetyPart {
+  key: "size" | "track-record" | "outflows" | "exit";
+  label: string;
+  points: number;
+  max: number;
+  detail: string; // what was measured, in plain words
+  source: string;
+}
+
+// 0 to 100 from live data: size, track record, 30-day outflows and exit. Not contract or depeg risk.
+export interface SafetyScore {
+  score: number;
+  parts: SafetyPart[];
+}
+
 // One route from GET /api/yields
 export interface YieldRoute {
   id: string;
@@ -36,7 +52,8 @@ export interface YieldRoute {
   receipt: string | null; // token the user receives, e.g. JitoSOL
   apy: number; // decimal
   tvl: number; // USD
-  risk: RiskTier; // from TVL; lending reserves 95% or more borrowed are at least moderate
+  risk: RiskTier; // band of the Safety Score (from TVL when unscored); lending reserves 95% or more borrowed are at least moderate
+  safety?: SafetyScore | null; // null while any part of the score is missing
   website: string;
   source: string; // where apy and tvl come from
   updatedAt: string;

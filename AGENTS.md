@@ -4,10 +4,12 @@
 
 Model: Titan for yield. Titan compares swap routes across DEX aggregators. Hermes compares yield routes across staking and lending protocols.
 
+Wedge: trust and curation. Hermes rates every route with a Safety Score built from live data and leads with the routes that score well. A guide to Solana yield, not another dashboard. Keep the Safety Score and Sleep Well front and center.
+
 - Non-custodial router. No vaults and no Hermes contracts hold money. The API builds unsigned transactions and the user's wallet signs them.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
-- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier comes from TVL, and a lending reserve 95% or more borrowed is at least moderate.
+- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve 95% or more borrowed is at least moderate.
 
 ## Canonical
 
@@ -32,17 +34,51 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
   - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Cards show how much of each reserve is borrowed, and the dialog warns at 95% or more.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
+- Safety Score on every route, 0 to 100, default sort. Four parts from live data, 25 points each: size (TVL), track record (how long DefiLlama has tracked the protocol), 30-day outflows (in tokens) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Tap a score for each part and its source. It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
-## Roadmap, in order
+## Roadmap
 
-1. Liquid staking: Jito direct and Marinade direct (built, waiting on the owner's deposits), then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
-2. Kamino Lend (built, waiting on the owner's deposit)
-3. Jupiter Lend
-4. MarginFi
-5. LP vaults
-6. Then: in-app withdrawals, the Hermes fee, lifting the beta cap
+From the vision deck, the Turbine tutor's feedback and the capstone research. Tick items off as they ship. Each route still goes through `INTEGRATIONS.md`, one at a time.
 
-Each route goes through `INTEGRATIONS.md`, one at a time.
+Trust and curation (the wedge)
+
+- [x] Safety Score on every route: 0 to 100 from live data, each part shown with its source
+- [ ] Sleep Well mode as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong. Later, one signed deposit split across two or three of them.
+- [ ] Plain labels for new users: staking, lending and LP, and what each can lose
+- [ ] More score inputs: depeg (LST market price vs fair value), validator concentration, incident history with links
+
+Routes
+
+- [ ] Owner deposits to move Jito, Marinade and Kamino Lend from beta to live (owner)
+- [ ] Rate checks against each protocol's app for the beta routes
+- [ ] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
+- [ ] Jupiter Lend
+- [ ] Save and MarginFi
+
+Smart router
+
+- [ ] Real yield by time horizon: entry and exit costs (price impact, rent, unstake delay) taken off the APY for 1 month, 6 months and 1 year
+- [ ] Match routes to the user's risk, time horizon and liquidity needs
+
+Portfolio and signals
+
+- [ ] Portfolio: what the connected wallet holds in each route and what it has earned
+- [ ] In-app withdrawals
+- [ ] Alerts: a rate drop, a better route, a reserve nearly all borrowed, a score drop
+- [ ] One-click move: Hermes proposes, the user signs
+
+Later
+
+- [ ] Hermes fee
+- [ ] Lift the beta cap
+- [ ] LP routes, labeled with impermanent loss
+- [ ] Automation (auto-exit, auto-rebalance). Needs the custody decision first.
+
+Open decisions for the owner
+
+- Custody: Hermes holds no funds today. Stay a router, or add delegated automation or a vault later? The vision deck says both.
+- LPs in or out for now
+- First user: CEX users new to DeFi, passive holders, or DAO treasuries
 
 ## Rules
 
@@ -51,7 +87,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 - Label real money and test funds plainly. Devnet means test SOL. Mainnet beta means real funds, start small.
 - Never handle private keys or seed phrases. The API builds unsigned transactions only.
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
-- Show where every number comes from. The risk tier says what it reflects: TVL, plus the borrowed share for lending.
+- Show where every number comes from. Each part of the Safety Score shows its points, what it measured and its source.
 - If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
 - One page: the yield panel and the FAQ.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
@@ -60,6 +96,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 23 Oct 2026, Safety Score: 0 to 100 on every route from size, track record, 30-day outflows and exit, with a breakdown per card. Routes sort by score by default, and the risk level follows the score.
 - 23 Oct 2026: a lending reserve 95% or more borrowed shows at least moderate risk.
 - 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.
 - 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.

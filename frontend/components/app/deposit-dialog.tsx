@@ -228,6 +228,12 @@ export function DepositDialog({
                 <span className="text-muted-foreground">APY</span>
                 <span className="text-foreground">{formatPercent(route.apy * 100)}</span>
               </div>
+              {route.safety && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Safety Score</span>
+                  <span className="text-foreground">{route.safety.score}/100</span>
+                </div>
+              )}
               {quote.method === "jupiter-swap" ? (
                 <>
                   <div className="flex justify-between">

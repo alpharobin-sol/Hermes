@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { AlertCircle, ArrowRight, ExternalLink, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronDown, ExternalLink, Shield, TrendingUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { Token } from "./TokenSelector";
-import { YieldAPI, type RiskTier, type YieldRoute } from "@/lib/api/yield-api";
+import { YieldAPI, type RiskTier, type SafetyScore, type YieldRoute } from "@/lib/api/yield-api";
 import { formatNumber, formatPercent, formatUSD } from "@/lib/helpers/formatters";
 import { IS_DEVNET } from "@/lib/network";
 import { useLoading } from "./layout/loading-context";
@@ -24,10 +24,11 @@ interface YieldRoutesProps {
   onDeposited?: () => void;
 }
 
-const RISK_LEVELS: { value: RiskTier; label: string; color: string }[] = [
-  { value: "low", label: "Low", color: "bg-success" },
-  { value: "moderate", label: "Moderate", color: "bg-warning" },
-  { value: "high", label: "High", color: "bg-destructive" },
+type SortBy = "safety" | "apy";
+
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: "safety", label: "Safety" },
+  { value: "apy", label: "APY" },
 ];
 
 const CATEGORY_LABELS: Record<YieldRoute["category"], string> = {
@@ -41,11 +42,21 @@ function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
   return order.indexOf(route.risk) <= order.indexOf(profile);
 }
 
+// Unscored routes sort last
+const scoreOf = (route: YieldRoute) => route.safety?.score ?? -1;
+
+function compareRoutes(sortBy: SortBy) {
+  return (a: YieldRoute, b: YieldRoute) =>
+    sortBy === "safety" ? scoreOf(b) - scoreOf(a) || b.apy - a.apy : b.apy - a.apy;
+}
+
 export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposited }: YieldRoutesProps) {
   const [routes, setRoutes] = useState<YieldRoute[]>([]);
   const [isLoading, setIsLoadingRoutes] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [depositRoute, setDepositRoute] = useState<YieldRoute | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("safety");
+  const [openScore, setOpenScore] = useState<string | null>(null);
   const { setIsLoading } = useLoading();
 
   const { publicKey } = useWallet();
@@ -120,8 +131,13 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
     );
   }
 
-  const visibleRoutes = routes.filter((route) => withinRisk(route, riskProfile));
+  const visibleRoutes = routes.filter((route) => withinRisk(route, riskProfile)).sort(compareRoutes(sortBy));
   const sources = [...new Set(routes.map((route) => route.source))].join(", ");
+  const bestApy = visibleRoutes.reduce<YieldRoute | null>((best, route) => (!best || route.apy > best.apy ? route : best), null);
+  const topScore = visibleRoutes.reduce<YieldRoute | null>(
+    (top, route) => (route.safety && (!top || scoreOf(route) > scoreOf(top)) ? route : top),
+    null
+  );
 
   if (visibleRoutes.length === 0) {
     return (
@@ -146,9 +162,26 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
             {visibleRoutes.length < routes.length && ` · ${routes.length - visibleRoutes.length} hidden by risk`}
           </span>
         </div>
-        <span className="font-mono text-[10px] text-muted-foreground">
-          {formatNumber(amount)} {token.symbol}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[10px] uppercase text-muted-foreground">Sort</span>
+          <div className="flex items-center border border-border/50">
+            {SORT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSortBy(option.value)}
+                aria-pressed={sortBy === option.value}
+                className={cn(
+                  "px-2 py-0.5 font-mono text-[10px] uppercase transition-colors",
+                  sortBy === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Routes */}
@@ -156,13 +189,26 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
         {visibleRoutes.map((route, index) => {
           const yearly = amount * route.apy;
           const canDeposit = route.deposit !== null;
+          const badges = [
+            route === topScore && "Top Safety Score",
+            route === bestApy && "Best APY",
+          ].filter((badge): badge is string => Boolean(badge));
+          const scoreOpen = openScore === route.id;
 
           return (
             <div
               key={route.id}
               className={cn("card-interactive group", index === 0 && "card-featured")}
             >
-              {index === 0 && <div className="absolute -top-2 left-3 badge-primary">Best APY</div>}
+              {badges.length > 0 && (
+                <div className="absolute -top-2 left-3 flex items-center gap-1">
+                  {badges.map((badge) => (
+                    <span key={badge} className="badge-primary">
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Hover corners */}
               <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-transparent group-hover:border-primary/60 transition-colors" />
@@ -180,7 +226,12 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
                       {CATEGORY_LABELS[route.category]}
                       {route.receipt && ` · get ${route.receipt}`}
                     </div>
-                    <RiskBar risk={route.risk} />
+                    <SafetyBadge
+                      safety={route.safety ?? null}
+                      risk={route.risk}
+                      open={scoreOpen}
+                      onToggle={() => setOpenScore(scoreOpen ? null : route.id)}
+                    />
                   </div>
                 </div>
 
@@ -245,6 +296,8 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
                   onDeposit={() => handleDeposit(route)}
                 />
               </div>
+
+              {scoreOpen && route.safety && <SafetyBreakdown safety={route.safety} />}
             </div>
           );
         })}
@@ -252,7 +305,9 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
 
       <p className="px-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
         Rates from {sources}, refreshed every few minutes. Returns assume today&apos;s APY holds and are not guaranteed.
-        Risk reflects TVL, and for lending how much of the reserve is borrowed. It does not cover contract or depeg risk.
+        The Safety Score adds four parts from live data, 25 points each: size, track record, 30-day outflows and exit.
+        Tap a score to see why. It does not cover smart contract bugs or depegs. Risk level follows the score: low from 80,
+        moderate from 60.
       </p>
 
       {depositRoute && (
@@ -268,26 +323,73 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
   );
 }
 
-function RiskBar({ risk }: { risk: RiskTier }) {
-  const activeIndex = RISK_LEVELS.findIndex((level) => level.value === risk);
-  const level = RISK_LEVELS[activeIndex];
+const SCORE_STYLES: Record<RiskTier, string> = {
+  low: "badge-success",
+  moderate: "badge-warning",
+  high: "badge-destructive",
+};
+
+// The route's Safety Score. Its color is the risk level, which follows the score.
+function SafetyBadge({
+  safety,
+  risk,
+  open,
+  onToggle,
+}: {
+  safety: SafetyScore | null;
+  risk: RiskTier;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  if (!safety) {
+    return (
+      <span
+        className="badge-base mt-1 bg-muted/30 text-muted-foreground"
+        title="Some of the data behind the score is unavailable right now. Risk level comes from TVL."
+      >
+        <Shield className="w-3 h-3" />
+        Not scored
+      </span>
+    );
+  }
 
   return (
-    <div className="flex items-center gap-1.5 mt-1" title="Risk tier from TVL, and for lending the borrowed share">
-      <div className="flex items-center gap-0.5">
-        {RISK_LEVELS.map((segment, index) => (
-          <div
-            key={segment.value}
-            className={cn(
-              "w-3.5 h-1.5",
-              index <= activeIndex ? level.color : "bg-muted/30",
-              index === 0 && "rounded-l-[2px]",
-              index === RISK_LEVELS.length - 1 && "rounded-r-[2px]"
-            )}
-          />
-        ))}
-      </div>
-      <span className="font-mono text-[8px] uppercase tracking-wide text-muted-foreground">{level.label}</span>
+    <button
+      onClick={onToggle}
+      aria-expanded={open}
+      title="Safety Score: size, track record, 30-day outflows and exit"
+      className={cn(SCORE_STYLES[risk], "mt-1 hover:opacity-80 transition-opacity")}
+    >
+      <Shield className="w-3 h-3" />
+      Safety {safety.score}
+      <ChevronDown className={cn("w-3 h-3 transition-transform", open && "rotate-180")} />
+    </button>
+  );
+}
+
+// What each part of the score measured, with its points and source
+function SafetyBreakdown({ safety }: { safety: SafetyScore }) {
+  return (
+    <div className="border-t border-border/30 px-3 py-3 space-y-3">
+      {safety.parts.map((part) => (
+        <div key={part.key}>
+          <div className="flex items-center justify-between font-mono text-[10px] uppercase">
+            <span className="text-muted-foreground">{part.label}</span>
+            <span className="text-foreground">
+              {part.points}/{part.max}
+            </span>
+          </div>
+          <div className="mt-1 h-1 bg-muted/30">
+            <div className="h-1 bg-primary" style={{ width: `${(part.points / part.max) * 100}%` }} />
+          </div>
+          <p className="mt-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
+            {part.detail} Source: {part.source}.
+          </p>
+        </div>
+      ))}
+      <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+        Not covered: smart contract bugs and depegs.
+      </p>
     </div>
   );
 }

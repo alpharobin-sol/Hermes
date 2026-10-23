@@ -48,7 +48,11 @@ const faqs = [
   },
   {
     question: "What are the risks?",
-    answer: "Every route carries the risks of its protocol: smart contract bugs, depegs and market moves. Hermes shows a risk level per route, but it cannot remove those risks. Start small.",
+    answer: "Every route carries the risks of its protocol: smart contract bugs, depegs and market moves. Hermes shows a Safety Score and a risk level per route, but it cannot remove those risks. Start small.",
+  },
+  {
+    question: "How is the Safety Score worked out?",
+    answer: "Four parts from live data, up to 25 points each. Size: how much is deposited, full points at $1B. Track record: how long DefiLlama has tracked the protocol's deposits, full points at 4 years. Outflows: the largest fall in deposits in the last 30 days, counted in tokens so price moves don't count. Exit: for lending, how much of the reserve is borrowed, and for liquid staking, the price impact of selling 10,000 tokens for SOL on Jupiter. Tap a score to see each part. The score does not cover smart contract bugs or depegs.",
   },
   {
     question: "Does Hermes charge a fee?",
