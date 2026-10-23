@@ -19,6 +19,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`)
 - API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`)
 - Repo: `alpharobin-sol/Hermes`
+- Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
 - Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
