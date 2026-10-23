@@ -1,94 +1,111 @@
-import { useState, useMemo, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { RiskMeter } from "./RiskMeter";
-import { TokenSelector, type Token } from "./TokenSelector";
-import { YieldRoutes } from "./yield-routes";
-import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances";
-import { IS_DEVNET } from "@/lib/network";
-import { YieldAPI } from "@/lib/api/yield-api";
-import type { BalanceIssue } from "./yield-routes";
+"use client"
 
-// Tokens the panel can offer. Only those with at least one route show up. Balances come from the connected wallet.
-const baseTokens: Token[] = [
-  { symbol: "SOL", name: "Solana", icon: "/brand-logos/solanaLogoMark.svg", balance: 0 },
-  { symbol: "USDC", name: "USD Coin", icon: "/brand-logos/usdcLogoMark.svg", balance: 0 },
-  { symbol: "USDT", name: "Tether", icon: "/brand-logos/tetherLogoMark.svg", balance: 0 },
-];
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useWallet } from "@solana/wallet-adapter-react"
+import { useWalletModal } from "@solana/wallet-adapter-react-ui"
 
-type RiskProfile = "low" | "moderate" | "high";
+import { YieldAPI, type RiskTier, type YieldRoute } from "@/lib/api/yield-api"
+import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances"
+import { useLoading } from "./layout/loading-context"
+import { RateBoard, RISK_LEVELS } from "./rate-board"
+import { DepositPanel, type BalanceIssue } from "./deposit-panel"
+import { DepositDialog } from "./deposit-dialog"
+import { MobileDeposit } from "./mobile-deposit"
+import { BASE_TOKENS } from "./tokens"
 
-// Round down so a quick amount or a shown limit never exceeds what the wallet can spend
-function floorTo(value: number, decimals: number): number {
-  const factor = 10 ** decimals;
-  return Math.floor(value * factor) / factor;
+// Routes at or below the chosen risk level
+function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
+  const order = RISK_LEVELS.map((level) => level.value)
+  return order.indexOf(route.risk) <= order.indexOf(profile)
 }
 
-function formatNumber(num: number): string {
-  return num.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+// Round down so a quick amount never exceeds what the wallet can spend
+function floorTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals
+  return Math.floor(value * factor) / factor
+}
+
+// The oldest update among the routes shown, so the label never claims fresher rates than it has
+function updatedLabel(routes: YieldRoute[]): string | null {
+  const times = routes.map((route) => Date.parse(route.updatedAt)).filter((t) => !isNaN(t))
+  if (times.length === 0) return null
+  const oldest = new Date(Math.min(...times))
+  return `${oldest.toISOString().slice(11, 16)} UTC`
 }
 
 export function YieldPanel() {
-  const { balances, isConnected, refresh: refreshBalances } = useTokenBalances();
+  const { balances, isConnected, refresh: refreshBalances } = useTokenBalances()
+  const { publicKey } = useWallet()
+  const { setVisible: setWalletModalVisible } = useWalletModal()
+  const { setIsLoading } = useLoading()
 
-  // SOL until the API says which tokens have routes. USDC and USDT return once a lending route is added.
-  const [routeTokens, setRouteTokens] = useState<string[]>([baseTokens[0].symbol]);
+  const [routes, setRoutes] = useState<YieldRoute[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const [selectedSymbol, setSelectedSymbol] = useState(BASE_TOKENS[0].symbol)
+  const [amount, setAmount] = useState("")
+  const [riskProfile, setRiskProfile] = useState<RiskTier>("moderate")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const mobileCardRef = useRef<HTMLElement>(null)
+
+  // Every route, once. Rates show before an amount is typed. Amount and risk are applied here.
   useEffect(() => {
-    const controller = new AbortController();
-    YieldAPI.getRoutes(undefined, { signal: controller.signal })
-      .then((routes) => {
-        const symbols = new Set(routes.map((route) => route.token));
-        const available = baseTokens.map((token) => token.symbol).filter((symbol) => symbols.has(symbol));
-        if (available.length > 0) setRouteTokens(available);
-      })
-      .catch(() => {
-        // Keep the SOL default. The route list shows its own error.
-      });
-    return () => controller.abort();
-  }, []);
+    const controller = new AbortController()
+    setLoading(true)
+    setIsLoading(true)
+    setError(null)
 
-  const tokens = useMemo(
-    () =>
-      baseTokens
-        .filter((token) => routeTokens.includes(token.symbol))
-        .map((token) => ({ ...token, balance: balances[token.symbol] ?? 0 })),
-    [balances, routeTokens]
-  );
-  const [selectedSymbol, setSelectedSymbol] = useState(baseTokens[0].symbol);
-  const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0];
-  const [amount, setAmount] = useState("");
-  const [riskProfile, setRiskProfile] = useState<RiskProfile>("moderate");
-  const [showRoutes, setShowRoutes] = useState(false);
+    YieldAPI.getRoutes(undefined, { signal: controller.signal })
+      .then((data) => setRoutes(data))
+      .catch((err) => {
+        if (err?.name === "AbortError") return
+        setRoutes([])
+        setError(err instanceof Error ? err.message : "Failed to load yields")
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+          setIsLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [reloadKey, setIsLoading])
+
+  // The token picker lists only tokens with at least one route. SOL shows while rates load.
+  const tokens = useMemo(() => {
+    const withRoutes = BASE_TOKENS.filter((token) => routes.some((route) => route.token === token.symbol))
+    const list = withRoutes.length > 0 ? withRoutes : [BASE_TOKENS[0]]
+    return list.map((token) => ({
+      ...token,
+      balance: balances[token.symbol] ?? 0,
+      count: routes.filter((route) => route.token === token.symbol).length,
+    }))
+  }, [balances, routes])
+  const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0]
+
+  const forToken = useMemo(
+    () => routes.filter((route) => route.token === selectedToken.symbol).sort((a, b) => b.apy - a.apy),
+    [routes, selectedToken.symbol]
+  )
+  const visibleRoutes = forToken.filter((route) => withinRisk(route, riskProfile))
+  const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
+  const sources = [...new Set(forToken.map((route) => route.source))].join(" and ")
 
   const numericAmount = useMemo(() => {
-    const parsed = Number.parseFloat(amount.replace(",", ""));
-    return isNaN(parsed) ? 0 : parsed;
-  }, [amount]);
-
-  useEffect(() => {
-    if (numericAmount > 0) {
-      setShowRoutes(false);
-      const timer = setTimeout(() => {
-        setShowRoutes(true);
-      }, 400);
-      return () => clearTimeout(timer);
-    } else {
-      setShowRoutes(false);
-    }
-  }, [numericAmount, selectedToken.symbol]);
-
-  const quickAmounts = ["25%", "50%", "75%", "MAX"];
+    const parsed = Number.parseFloat(amount.replace(/,/g, ""))
+    return isNaN(parsed) || parsed < 0 ? 0 : parsed
+  }, [amount])
 
   // Keep some SOL back so the deposit can pay its own fees
   const spendableBalance =
-    selectedToken.symbol === "SOL"
-      ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE)
-      : selectedToken.balance;
+    selectedToken.symbol === "SOL" ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE) : selectedToken.balance
 
   // Only judge the amount once the wallet's balance for this token has loaded
-  const balanceKnown = isConnected && balances[selectedToken.symbol] !== undefined;
+  const balanceKnown = isConnected && balances[selectedToken.symbol] !== undefined
   const balanceIssue: BalanceIssue =
     !balanceKnown || numericAmount <= 0
       ? null
@@ -96,129 +113,116 @@ export function YieldPanel() {
         ? "insufficient"
         : numericAmount > spendableBalance
           ? "fee-reserve"
-          : null;
+          : null
 
   const quickAmount = (pct: string) => {
-    const percentage = pct === "MAX" ? 100 : Number.parseInt(pct.replace("%", ""));
-    return floorTo((spendableBalance * percentage) / 100, 4);
-  };
+    const percentage = pct === "Max" ? 100 : Number.parseInt(pct.replace("%", ""))
+    return floorTo((spendableBalance * percentage) / 100, 4)
+  }
 
-  const handleQuickAmount = (pct: string) => {
-    setAmount(String(quickAmount(pct)));
-  };
+  const handleToken = (symbol: string) => {
+    if (symbol === selectedToken.symbol) return
+    // An amount typed for one token means nothing for another
+    setSelectedSymbol(symbol)
+    setSelectedId(null)
+    setAmount("")
+  }
 
-  const getActiveQuickAmount = (pct: string) => numericAmount > 0 && numericAmount === quickAmount(pct);
+  // On phones the list sits under the deposit card, so picking a route brings the card back into view
+  const handleSelect = (id: string) => {
+    setSelectedId(id)
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      mobileCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
+  const handleReview = () => {
+    if (!publicKey) {
+      setWalletModalVisible(true)
+      return
+    }
+    setReviewOpen(true)
+  }
 
   return (
-    <div className="flex flex-col gap-4 mx-auto max-w-2xl">
-      {/* Main Panel */}
-      <div className="card-base overflow-hidden">
-        {/* Header */}
-        <div className="card-header">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-heading mb-1">Yield Explorer</h3>
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-primary" />
-                <h2 className="text-caption">Discover Best Yields</h2>
-              </div>
-            </div>
+    <section
+      id="rates"
+      aria-label="Rates"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 md:pt-16"
+    >
+      <MobileDeposit
+        ref={mobileCardRef}
+        tokens={tokens}
+        token={selectedToken}
+        onToken={handleToken}
+        amount={amount}
+        onAmount={setAmount}
+        numericAmount={numericAmount}
+        isConnected={isConnected}
+        balanceKnown={balanceKnown}
+        spendable={spendableBalance}
+        balanceIssue={balanceIssue}
+        onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
+        isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
+        routes={visibleRoutes}
+        totalForToken={forToken.length}
+        risk={riskProfile}
+        onRisk={setRiskProfile}
+        route={loading || error ? null : selectedRoute}
+        onSelectRoute={setSelectedId}
+        ratesStatus={loading ? "loading" : error ? "error" : "ready"}
+        updatedLabel={updatedLabel(forToken)}
+        onConnect={() => setWalletModalVisible(true)}
+        onReview={handleReview}
+      />
 
-             <div className="flex flex-col items-end justify-end gap-2">
-              <button
-                onClick={() => handleQuickAmount("MAX")}
-                className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
-              >
-                <span className="text-caption">Balance:</span>
-                <span className="text-mono text-xs text-foreground">
-                  {formatNumber(selectedToken.balance)}
-                </span>
-                <span className="text-caption max-w-[60px] truncate">
-                  {selectedToken.symbol}
-                </span>
-              </button>
-            </div> 
-          </div> 
-        </div>
+      <RateBoard
+        tokens={tokens.map(({ symbol, icon, count }) => ({ symbol, icon, count }))}
+        token={selectedToken.symbol}
+        onToken={handleToken}
+        risk={riskProfile}
+        onRisk={setRiskProfile}
+        routes={visibleRoutes}
+        totalForToken={forToken.length}
+        selectedId={selectedRoute?.id ?? null}
+        onSelect={handleSelect}
+        amount={numericAmount}
+        loading={loading}
+        error={error}
+        onRetry={() => setReloadKey((key) => key + 1)}
+        sources={sources}
+        updatedLabel={updatedLabel(forToken)}
+        // On phones and tablets the card lists every route once an amount is typed, so this list steps aside
+        className={numericAmount > 0 && !loading && !error ? "max-lg:hidden" : undefined}
+      />
 
-        {IS_DEVNET && (
-          <div className="border-b border-warning/20 bg-warning/5 px-4 py-2 font-mono text-[11px] leading-relaxed text-warning">
-            DEVNET · Deposits use test SOL (get some at faucet.solana.com). APYs shown are mainnet rates for reference.
-          </div>
-        )}
+      <DepositPanel
+        token={selectedToken}
+        amount={amount}
+        onAmount={setAmount}
+        numericAmount={numericAmount}
+        isConnected={isConnected}
+        balanceKnown={balanceKnown}
+        spendable={spendableBalance}
+        balanceIssue={balanceIssue}
+        onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
+        isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
+        route={loading || error ? null : selectedRoute}
+        ratesStatus={loading ? "loading" : error ? "error" : "ready"}
+        onConnect={() => setWalletModalVisible(true)}
+        onReview={handleReview}
+        className="max-lg:hidden"
+      />
 
-        {/* Input Section */}
-        <div className="card-body">
-          
-          {/* Quick Amount Row */}
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-label">Deposit</span>
-            <div className="flex items-center gap-1">
-              {quickAmounts.map((pct, index) => {
-                const isActive = getActiveQuickAmount(pct);
-                return (
-                  <button
-                    key={pct}
-                    onClick={() => handleQuickAmount(pct)}
-                    className={cn(
-                      "quick-btn",
-                      isActive && "quick-btn-active",
-                      index === 0 && "rounded-l-sm",
-                      index === quickAmounts.length - 1 && "rounded-r-sm"
-                    )}
-                  >
-                    {pct}
-                  </button>
-                );
-              })}
-            </div>
-            
-          </div>
-
-          {/* Input + Token Selector */}
-          <div className="flex items-center gap-0">
-          <div className="input-wrapper flex items-center gap-2 rounded-l-xl border-primary/5 min-h-[48px]">
-            <input
-              type="text"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="input-lg flex-1 min-w-0"
-            />
-            
-              
-             <RiskMeter value={riskProfile} onChange={setRiskProfile} />
-              
-            
-            </div>
-            <TokenSelector
-              tokens={tokens}
-              selectedToken={selectedToken}
-              onSelect={(token) => setSelectedSymbol(token.symbol)}
-
-            />
-          </div>
-
-          {balanceIssue && (
-            <p className="mt-2 font-mono text-[11px] text-destructive">
-              {balanceIssue === "insufficient"
-                ? `Insufficient ${selectedToken.symbol} balance. You have ${formatNumber(selectedToken.balance)} ${selectedToken.symbol}.`
-                : `Keep ${SOL_FEE_RESERVE} SOL for network fees. You can deposit up to ${floorTo(spendableBalance, 4)} SOL.`}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Yield Routes */}
-      {showRoutes && numericAmount > 0 && (
-        <YieldRoutes
-          token={selectedToken}
+      {reviewOpen && selectedRoute && (
+        <DepositDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          route={selectedRoute}
           amount={numericAmount}
-          riskProfile={riskProfile}
-          balanceIssue={balanceIssue}
           onDeposited={refreshBalances}
         />
       )}
-    </div>
-  );
+    </section>
+  )
 }
