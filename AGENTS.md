@@ -1,12 +1,15 @@
 # Hermes
 
-**Thesis: Solana yield is spread across dozens of protocols, each with its own app and its own rate. Hermes shows the live rates side by side and builds the deposit for the route you pick. You sign it in your own wallet. Hermes never holds funds.**
+**Thesis: Solana yield is spread across dozens of protocols, each with its own app and its own rate. Hermes shows the live rates side by side and builds the deposit for the route you pick. You sign it in your own wallet. Routed deposits never touch Hermes.**
+
+Guides: `docs/VISION.md` distills the owner's vision deck, the Turbine tutor's feedback and the capstone research. Read it before planning work. It is the reference for what Hermes is.
 
 Model: Titan for yield. Titan compares swap routes across DEX aggregators. Hermes compares yield routes across staking and lending protocols.
 
 Wedge: trust and curation. Hermes rates every route with a Safety Score built from live data and leads with the routes that score well. A guide to Solana yield, not another dashboard. Keep the Safety Score and Sleep Well front and center.
 
-- Non-custodial router. No vaults and no Hermes contracts hold money. The API builds unsigned transactions and the user's wallet signs them.
+- Router first. Routed deposits are non-custodial: the API builds unsigned transactions and the user's wallet signs them. Today no Hermes vault or contract holds money.
+- Custody (owner's decision, 23 Oct 2026): Hermes can hold funds for automation only. A user opts in by moving funds into a Hermes vault that auto-allocates, auto-exits and rebalances. The vault needs a Hermes program, an outside security review and caps before real funds go in.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
 - Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve 95% or more borrowed is at least moderate.
@@ -72,11 +75,10 @@ Later
 - [ ] Hermes fee
 - [ ] Lift the beta cap
 - [ ] LP routes, labeled with impermanent loss
-- [ ] Automation (auto-exit, auto-rebalance). Needs the custody decision first.
+- [ ] Automation vault (DPO): opt-in, Hermes holds the funds and auto-allocates, auto-exits and rebalances on Signal Engine alerts. Needs a Hermes program, an outside security review and caps before real funds.
 
 Open decisions for the owner
 
-- Custody: Hermes holds no funds today. Stay a router, or add delegated automation or a vault later? The vision deck says both.
 - LPs in or out for now
 - First user: CEX users new to DeFi, passive holders, or DAO treasuries
 
@@ -88,7 +90,7 @@ Open decisions for the owner
 - Never handle private keys or seed phrases. The API builds unsigned transactions only.
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
 - Show where every number comes from. Each part of the Safety Score shows its points, what it measured and its source.
-- If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
+- If it does not serve comparing Solana yields, depositing from your own wallet, or (later) opt-in automation, it waits.
 - One page: the yield panel and the FAQ.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
