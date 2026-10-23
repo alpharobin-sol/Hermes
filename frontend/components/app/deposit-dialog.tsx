@@ -11,7 +11,7 @@ import { DepositAPI, type DepositQuote } from "@/lib/api/deposit-api"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
-import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, formatApy } from "./rate-board"
+import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -219,8 +219,12 @@ export function DepositDialog({
                     <span className="text-2xl font-semibold text-ink">
                       ≈ {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol}
                     </span>
-                    {route.category === "liquid-staking" && (
+                    {route.category === "liquid-staking" ? (
                       <span className="text-xs text-muted-foreground">Sits in your own wallet and earns staking yield.</span>
+                    ) : (
+                      <span className="text-xs leading-relaxed text-muted-foreground">
+                        Sits in your own wallet and grows in value as interest accrues. Withdraw at {hostOf(route.website)}.
+                      </span>
                     )}
                   </>
                 ) : status === "quoting" ? (
@@ -301,6 +305,13 @@ export function DepositDialog({
               <Notice tone="warning">
                 {Math.min(100, Math.round(route.utilization * 100))}% of this {route.token} reserve is borrowed. Withdrawals
                 may have to wait until borrowers repay or new deposits arrive.
+              </Notice>
+            )}
+
+            {withdrawablePercent(route) !== null && exitTight(route) && status !== "success" && (
+              <Notice tone="warning">
+                Only {withdrawablePercent(route)}% of this {route.token} reserve can be withdrawn right now. Withdrawals may
+                have to wait until borrowers repay or {route.name}&apos;s withdrawal limit widens.
               </Notice>
             )}
 

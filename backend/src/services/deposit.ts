@@ -7,6 +7,7 @@ import { getRoute, depositCap, depositStatus, DirectDeposit, RouteConfig, TokenI
 import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from './stake-pool-deposit';
 import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
 import { buildKaminoDeposit, KaminoDepositPlan } from './kamino-deposit';
+import { buildJupiterLendDeposit, quoteJupiterLendDeposit } from './jupiter-lend-deposit';
 import { DepositError } from './errors';
 import { createJupiterClient } from './jupiter';
 
@@ -21,12 +22,17 @@ import { createJupiterClient } from './jupiter';
  *   against the Jupiter swap API and build whichever gives more of the token. Other LSTs go through Jupiter.
  * - SOL, USDC, USDT -> Kamino Lend: supplied through Kamino's transaction API, held as a position in the
  *   user's Kamino account rather than a token in the wallet.
+ * - SOL, USDC, USDT -> Jupiter Lend Earn: built from Jupiter's deposit instruction, minting a jl token
+ *   (jlWSOL, jlUSDC, jlUSDT) into the wallet. Quoted against a Jupiter swap to the same jl token.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
  */
 
 export type DepositMethod = 'jupiter-swap' | 'direct';
 
 const MAX_PRICE_IMPACT_PCT = Number(process.env.DEPOSIT_MAX_PRICE_IMPACT_PCT || 1);
+
+// A swap must beat a direct deposit by at least this share (0.01%) to be built instead
+const DIRECT_TIE_SHARE = 0.0001;
 
 // SOL kept back for the token account rent and fees
 const FEE_BUFFER_LAMPORTS = 10_000_000;
@@ -156,6 +162,12 @@ export class DepositService {
     }
 
     candidates.sort((a, b) => new Decimal(b.quote.outAmount).cmp(a.quote.outAmount));
+    // A direct deposit has no slippage. Keep it when a swap leads by less than DIRECT_TIE_SHARE.
+    const direct = candidates.find((candidate) => candidate.quote.method === 'direct');
+    if (direct && direct !== candidates[0]) {
+      const lead = new Decimal(candidates[0].quote.outAmount).minus(direct.quote.outAmount).div(candidates[0].quote.outAmount);
+      if (lead.lt(DIRECT_TIE_SHARE)) candidates.splice(0, 0, ...candidates.splice(candidates.indexOf(direct), 1));
+    }
     const [best, ...others] = candidates;
     best.quote.compared = others.map((other) => ({
       method: other.quote.method,
@@ -180,6 +192,33 @@ export class DepositService {
         quote: {
           ...this.positionQuote(route, network, amount),
           setupCostSol: plan?.setupCostSol ?? null,
+        },
+      };
+    }
+
+    if (direct.kind === 'jupiter-lend') {
+      const token = TOKENS[route.token];
+      const receipt = route.receipt!;
+      const raw = new Decimal(request.amount).mul(new Decimal(10).pow(token.decimals)).floor();
+      const shares = await quoteJupiterLendDeposit(token, raw);
+      const outAmount = shares.div(new Decimal(10).pow(receipt.decimals)).toFixed();
+      return {
+        quote: {
+          network,
+          routeId: route.id,
+          method: 'direct',
+          inputToken: token,
+          outputToken: receipt,
+          inAmount: raw.div(new Decimal(10).pow(token.decimals)).toFixed(),
+          outAmount,
+          // Minted at Jupiter Lend's share rate, there is no slippage
+          minOutAmount: outAmount,
+          priceImpactPct: 0,
+          slippageBps: 0,
+          routeLabels: [directLabel(route)],
+          compared: [],
+          position: null,
+          setupCostSol: null,
         },
       };
     }
@@ -350,6 +389,27 @@ export class DepositService {
       };
     }
 
+    // Jupiter Lend's builder checks the balance and simulates itself
+    if (direct.kind === 'jupiter-lend') {
+      const token = TOKENS[route.token];
+      const plan = await buildJupiterLendDeposit(this.getConnection('mainnet-beta'), {
+        asset: token,
+        receipt: route.receipt!,
+        amount: new Decimal(quote.inAmount).mul(new Decimal(10).pow(token.decimals)).floor(),
+        user,
+      });
+      const transaction = Buffer.from(plan.transaction.serialize()).toString('base64');
+      logger.info(`Built Jupiter Lend deposit: ${quote.inAmount} ${route.token} -> ${plan.outAmount} ${route.receipt!.symbol}`);
+      return {
+        // The jl tokens the simulation minted
+        quote: { ...quote, outAmount: plan.outAmount, minOutAmount: plan.outAmount },
+        transaction,
+        transactions: [transaction],
+        lastValidBlockHeight: plan.lastValidBlockHeight,
+        prioritizationFeeLamports: 0,
+      };
+    }
+
     const lamports = toLamports(quote.inAmount);
     const connection = this.getConnection(network);
 
@@ -405,7 +465,7 @@ function stakePoolTarget(route: RouteConfig, pool: string): StakePoolTarget {
   return { symbol: route.receipt!.symbol, pool, mint: route.receipt!.mint };
 }
 
-// SPL stake pools exist on devnet at the same address (Jito). Marinade and Kamino deposits are mainnet only.
+// SPL stake pools exist on devnet at the same address (Jito). Marinade and lending deposits are mainnet only.
 function directAvailable(direct: DirectDeposit, network: SolanaNetwork): boolean {
   return direct.kind === 'spl-stake-pool' || network === 'mainnet-beta';
 }
@@ -416,6 +476,8 @@ function directLabel(route: RouteConfig): string {
       return 'Marinade liquid staking';
     case 'kamino-lend':
       return 'Kamino Lend main market';
+    case 'jupiter-lend':
+      return 'Jupiter Lend Earn';
     default:
       return `${route.name} stake pool`;
   }

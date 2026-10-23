@@ -8,7 +8,7 @@ import { IS_DEVNET } from "@/lib/network"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
-import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, formatApy } from "./rate-board"
+import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown } from "./safety"
 
@@ -54,6 +54,7 @@ export function DepositPanel({
 }: DepositPanelProps) {
   const yearly = route ? numericAmount * route.apy : 0
   const borrowed = route ? borrowedPercent(route) : null
+  const withdrawable = route ? withdrawablePercent(route) : null
   const overCap = isOverCap(route, numericAmount)
 
   return (
@@ -161,6 +162,11 @@ export function DepositPanel({
                     {borrowed}%
                   </dd>
                 </div>
+              ) : withdrawable !== null ? (
+                <div className="flex flex-col gap-1" title="Share of the reserve that can be withdrawn right now">
+                  <dt className="label-roman text-[10px]">Withdrawable now</dt>
+                  <dd className={cn("m-0 text-[15px] font-medium", exitTight(route) && "text-warning")}>{withdrawable}%</dd>
+                </div>
               ) : (
                 <div className="flex flex-col gap-1">
                   <dt className="label-roman text-[10px]">Est. monthly</dt>
@@ -253,7 +259,8 @@ export function RouteNotes({ route, compact = false }: { route: YieldRoute; comp
           {route.depositCap != null && ` Up to ${route.depositCap.toLocaleString()} ${route.token} per deposit.`} Start small.
         </Note>
       )}
-      {!compact && route.deposit && route.category === "lending" && (
+      {/* Lending into an account (Kamino) sets the account up on a first deposit. Tokens like jlUSDC only need a token account. */}
+      {!compact && route.deposit && route.category === "lending" && !route.receipt && (
         <Note tone="muted">
           Your first {route.name} deposit pays one-time account rent in SOL. You see the exact amount before you sign.
         </Note>
@@ -262,6 +269,12 @@ export function RouteNotes({ route, compact = false }: { route: YieldRoute; comp
         <Note>
           {borrowed}% of this {route.token} reserve is borrowed. Withdrawals may have to wait until borrowers repay or new
           deposits arrive.
+        </Note>
+      )}
+      {withdrawablePercent(route) !== null && exitTight(route) && (
+        <Note>
+          Only {withdrawablePercent(route)}% of this {route.token} reserve can be withdrawn right now. Withdrawals may have to
+          wait until borrowers repay or {route.name}&apos;s withdrawal limit widens.
         </Note>
       )}
       {!route.deposit && !IS_DEVNET && (

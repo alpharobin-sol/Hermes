@@ -14,6 +14,7 @@ export interface Rate {
   apy: number; // decimal, 0.05 = 5%
   tvl: number; // USD
   utilization?: number; // lending only: share of the supply that is borrowed, 1 = all of it
+  withdrawable?: number; // lending only: share of the supply that can be withdrawn right now
   updatedAt: number; // ms timestamp of the fetch
   defillamaPool?: string; // DefiLlama pool id, for its history
 }
@@ -80,7 +81,8 @@ const kaminoRates = rateSource('Kamino', async () => {
     const supply = Number(reserve.totalSupply);
     const borrow = Number(reserve.totalBorrow);
     const utilization = supply > 0 && Number.isFinite(borrow) ? borrow / supply : undefined;
-    rates.set(reserve.reserve, { apy, tvl, utilization, updatedAt: now });
+    const withdrawable = utilization !== undefined ? Math.max(0, 1 - utilization) : undefined;
+    rates.set(reserve.reserve, { apy, tvl, utilization, withdrawable, updatedAt: now });
   }
   return rates;
 });
@@ -98,7 +100,11 @@ const jupiterLendRates = rateSource('Jupiter Lend', async () => {
     const price = Number(token.asset?.price);
     if (!Number.isFinite(rateBps) || !Number.isFinite(decimals) || !Number.isFinite(price)) continue;
     const tvl = (Number(token.totalAssets) / 10 ** decimals) * price;
-    rates.set(token.assetAddress, { apy: rateBps / 10_000, tvl, updatedAt: now });
+    // What can leave right now: limited by the liquidity not lent out and by Jupiter Lend's withdrawal limit
+    const supplied = Number(token.liquiditySupplyData?.supply);
+    const withdrawableNow = Number(token.liquiditySupplyData?.withdrawable);
+    const withdrawable = supplied > 0 && Number.isFinite(withdrawableNow) ? Math.min(1, withdrawableNow / supplied) : undefined;
+    rates.set(token.assetAddress, { apy: rateBps / 10_000, tvl, withdrawable, updatedAt: now });
   }
   return rates;
 });

@@ -27,6 +27,7 @@ src/
 │   ├── stake-pool-deposit.ts   # direct SPL stake pool deposits (Jito)
 │   ├── marinade-deposit.ts     # direct Marinade deposits (mainnet)
 │   ├── kamino-deposit.ts       # Kamino Lend deposits via Kamino's transaction API (mainnet)
+│   ├── jupiter-lend-deposit.ts # Jupiter Lend Earn deposits from Jupiter's deposit instruction (mainnet)
 │   ├── compute-budget.ts       # priority fee for direct deposits
 │   └── errors.ts               # errors written for users
 ├── config/runtime.ts           # SOLANA_NETWORK switch
@@ -52,12 +53,12 @@ Every route gets a score from 0 to 100: four parts from live data, up to 25 poin
 | Size | Money in the route now (TVL) | $10M or less | $1B or more (log scale) | the route's rate source |
 | Track record | How long DefiLlama has tracked the protocol's deposits | new | 4 years or more | DefiLlama protocol API |
 | Outflows | Largest fall in deposits within the last 30 days, in tokens so price moves don't count | 40% or more | 10% or less | Kamino history, or DefiLlama pool history in SOL |
-| Exit, lending | Share of the reserve that is borrowed | 100% | 90% or less | rate source |
+| Exit, lending | Share of the reserve that can't be withdrawn right now: borrowed (Kamino), or borrowed or held back by the withdrawal limit (Jupiter Lend) | 100% | 90% or less | rate source |
 | Exit, liquid staking | Price impact of selling 10,000 of the token for SOL | 5% or more | 1% or less | Jupiter quote |
 
-The history behind the score refreshes in the background (track record daily, outflows every 6 hours, exit quotes every 30 minutes), so requests don't wait on it. Right after a restart, a request waits up to 12 seconds for it. A route with any part missing has `safety: null`, for now every Jupiter Lend route. The score does not measure smart contract or depeg risk.
+The history behind the score refreshes in the background (track record daily, outflows every 6 hours, exit quotes every 30 minutes), so requests don't wait on it. Right after a restart, a request waits up to 12 seconds for it. A route with any part missing has `safety: null`. Jupiter Lend's history on DefiLlama has gaps, so outflows accept two weeks of data in the window and say how many days they saw. The score does not measure smart contract or depeg risk.
 
-The risk tier follows the score: low at 80 and above, moderate from 60, high below. A route without a score gets its tier from TVL: low at $100M and above, moderate from $10M, high below. A lending reserve that is 95% or more borrowed is at least moderate, since withdrawals may have to wait.
+The risk tier follows the score: low at 80 and above, moderate from 60, high below. A route without a score gets its tier from TVL: low at $100M and above, moderate from $10M, high below. A lending reserve with 95% or more borrowed or held back is at least moderate, since withdrawals may have to wait.
 
 ## Endpoints
 
@@ -69,7 +70,7 @@ Add `all=true` to include view-only routes (`deposit: null`). They link out to t
 
 `POST /api/deposit/quote` with `{ routeId, amount, slippageBps?, userPublicKey? }`
 
-Quotes a deposit. `amount` is in UI units, e.g. `"1.5"` SOL. Routes with a direct deposit (Jito, Marinade) are quoted directly and through Jupiter. The quote is the one that returns more, and `compared` lists the other.
+Quotes a deposit. `amount` is in UI units, e.g. `"1.5"` SOL. Routes with a direct deposit (Jito, Marinade, Jupiter Lend) are quoted directly and through Jupiter. The quote is the one that returns more, and `compared` lists the other. A direct deposit wins unless the swap leads by 0.01% or more, since it has no slippage.
 
 Lending quotes (Kamino Lend) set `position` (the deposit is held there, not as a wallet token). With `userPublicKey`, they also build and simulate the deposit and return `setupCostSol`: the one-time account rent of a first deposit.
 
