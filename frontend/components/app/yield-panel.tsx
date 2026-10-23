@@ -50,6 +50,8 @@ export function YieldPanel() {
   const [amount, setAmount] = useState("")
   // Sleep Well is the first screen. All routes is one tap away.
   const [view, setView] = useState<View>("sleep-well")
+  // Lists show the top three routes until "Show all"
+  const [expanded, setExpanded] = useState(false)
   // Routes lead with the Safety Score. APY is one tap away.
   const [sortBy, setSortBy] = useState<SortBy>("safety")
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -149,6 +151,7 @@ export function YieldPanel() {
     // An amount typed for one token means nothing for another
     setSelectedSymbol(symbol)
     setSelectedId(null)
+    setExpanded(false)
     setAmount("")
   }
 
@@ -192,6 +195,8 @@ export function YieldPanel() {
         totalForToken={forToken.length}
         view={view}
         onView={setView}
+        expanded={expanded}
+        onExpandedChange={setExpanded}
         sortBy={sortBy}
         onSort={setSortBy}
         route={loading || error ? null : selectedRoute}
@@ -208,6 +213,8 @@ export function YieldPanel() {
         onToken={handleToken}
         view={view}
         onView={setView}
+        expanded={expanded}
+        onExpandedChange={setExpanded}
         sortBy={sortBy}
         onSort={setSortBy}
         routes={visibleRoutes}

@@ -12,7 +12,17 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy, withdrawablePercent } from "./rate-board"
 import { AmountMessages, PrimaryAction, QUICK_AMOUNTS, RouteNotes, isOverCap, type BalanceIssue } from "./deposit-panel"
 import { formatTokenAmount, type Token } from "./tokens"
-import { SafetyBreakdown, SortToggle, ViewToggle, bestApyRoute, safetyText, type SortBy, type View } from "./safety"
+import {
+  TOP_ROUTES,
+  SafetyBreakdown,
+  SortToggle,
+  ViewToggle,
+  bestApyRoute,
+  listedRoutes,
+  safetyText,
+  type SortBy,
+  type View,
+} from "./safety"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -31,6 +41,8 @@ interface MobileDepositProps {
   totalForToken: number
   view: View
   onView: (view: View) => void
+  expanded: boolean // all routes in the view, not just the top three
+  onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
   route: YieldRoute | null
@@ -65,6 +77,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     totalForToken,
     view,
     onView,
+    expanded,
+    onExpandedChange,
     sortBy,
     onSort,
     route,
@@ -158,6 +172,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             onSelect={onSelectRoute}
             view={view}
             onView={onView}
+            expanded={expanded}
+            onExpandedChange={onExpandedChange}
             sortBy={sortBy}
             onSort={onSort}
           />
@@ -271,7 +287,7 @@ function BestRoute({
             <>
               No {token} route makes Sleep Well right now.{" "}
               <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                Show all routes
+                Switch to All routes
               </button>
             </>
           )}
@@ -291,6 +307,8 @@ function RouteChoices({
   onSelect,
   view,
   onView,
+  expanded,
+  onExpandedChange,
   sortBy,
   onSort,
 }: {
@@ -302,10 +320,13 @@ function RouteChoices({
   onSelect: (id: string) => void
   view: View
   onView: (view: View) => void
+  expanded: boolean
+  onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
 }) {
   const best = bestApyRoute(routes)
+  const listed = listedRoutes(routes, expanded, selectedId)
   const bestYearly = best ? amount * best.apy : 0
   const hidden = totalForToken - routes.length
 
@@ -324,11 +345,11 @@ function RouteChoices({
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             No {token} route makes Sleep Well right now.{" "}
             <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-              Show all {totalForToken} {totalForToken === 1 ? "route" : "routes"}
+              Switch to All routes
             </button>
           </p>
         )}
-        {routes.map((r) => {
+        {listed.map((r) => {
           const selected = r.id === selectedId
           const isBest = r === best
           const yearly = amount * r.apy
@@ -371,11 +392,21 @@ function RouteChoices({
             </button>
           )
         })}
+        {routes.length > TOP_ROUTES && (
+          <button
+            type="button"
+            onClick={() => onExpandedChange(!expanded)}
+            aria-expanded={expanded}
+            className="flex w-full items-center justify-center border-t border-row-line bg-card px-3 py-2.5 text-[13px] font-medium text-ink"
+          >
+            {expanded ? `Show top ${TOP_ROUTES}` : `Show all ${routes.length} routes`}
+          </button>
+        )}
         {hidden > 0 && routes.length > 0 && (
           <p className="border-t border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
             {hidden} more outside Sleep Well.{" "}
             <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-              Show all
+              Switch to All routes
             </button>
           </p>
         )}

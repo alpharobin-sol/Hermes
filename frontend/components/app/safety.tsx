@@ -59,6 +59,17 @@ export function ViewToggle({ value, onChange, compact = false }: { value: View; 
   )
 }
 
+// Route lists open on the top three in the current sort, plus the selected route if it sits further down.
+// "Show all" opens the rest.
+export const TOP_ROUTES = 3
+
+export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId: string | null): YieldRoute[] {
+  if (expanded || routes.length <= TOP_ROUTES) return routes
+  const top = routes.slice(0, TOP_ROUTES)
+  const selected = routes.find((route) => route.id === selectedId)
+  return selected && !top.includes(selected) ? [...top, selected] : top
+}
+
 // A plain line on how the route can lose money and how to get out, from what Hermes knows about it now
 export function whatCanGoWrong(route: YieldRoute): string {
   if (route.category === "lending") {

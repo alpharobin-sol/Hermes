@@ -7,7 +7,18 @@ import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
-import { SLEEP_WELL_MIN_SCORE, SafetyCell, SortToggle, ViewToggle, bestApyRoute, safetyText, type SortBy, type View } from "./safety"
+import {
+  SLEEP_WELL_MIN_SCORE,
+  TOP_ROUTES,
+  SafetyCell,
+  SortToggle,
+  ViewToggle,
+  bestApyRoute,
+  listedRoutes,
+  safetyText,
+  type SortBy,
+  type View,
+} from "./safety"
 
 export const RISK_LEVELS: { value: RiskTier; label: string; color: string; text: string }[] = [
   { value: "low", label: "Low", color: "bg-success", text: "text-success" },
@@ -63,6 +74,8 @@ interface RateBoardProps {
   onToken: (symbol: string) => void
   view: View
   onView: (view: View) => void
+  expanded: boolean // all routes in the view, not just the top three
+  onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
   routes: YieldRoute[] // for the token, in the view, in sortBy order
@@ -84,6 +97,8 @@ export function RateBoard({
   onToken,
   view,
   onView,
+  expanded,
+  onExpandedChange,
   sortBy,
   onSort,
   routes,
@@ -100,6 +115,7 @@ export function RateBoard({
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
   const bestApy = bestApyRoute(routes)
+  const listed = listedRoutes(routes, expanded, selectedId)
 
   return (
     <div className={cn("plaque min-w-0 flex-[999_1_600px]", className)}>
@@ -183,14 +199,14 @@ export function RateBoard({
               <>
                 No {token} route makes Sleep Well right now.{" "}
                 <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                  Show all {totalForToken} {totalForToken === 1 ? "route" : "routes"}
+                  Switch to All routes
                 </button>
               </>
             )}
           </p>
         ) : (
           <div role="radiogroup" aria-label={`${token} routes`}>
-            {routes.map((route) => (
+            {listed.map((route) => (
               <RouteRow
                 key={route.id}
                 route={route}
@@ -200,11 +216,21 @@ export function RateBoard({
                 onSelect={() => onSelect(route.id)}
               />
             ))}
+            {routes.length > TOP_ROUTES && (
+              <button
+                type="button"
+                onClick={() => onExpandedChange(!expanded)}
+                aria-expanded={expanded}
+                className="flex w-full items-center justify-center border-t border-row-line px-3 py-3 text-sm font-medium text-ink hover:bg-plate"
+              >
+                {expanded ? `Show top ${TOP_ROUTES}` : `Show all ${routes.length} routes`}
+              </button>
+            )}
             {hidden > 0 && (
               <p className="border-t border-row-line px-3 py-3 text-xs text-muted-foreground md:px-[18px]">
                 {hidden} more {hidden === 1 ? "route" : "routes"} outside Sleep Well.{" "}
                 <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                  Show all routes
+                  Switch to All routes
                 </button>
               </p>
             )}
