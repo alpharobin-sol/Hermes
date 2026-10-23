@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy } from "./rate-board"
 import { AmountMessages, PrimaryAction, QUICK_AMOUNTS, RouteNotes, isOverCap, type BalanceIssue } from "./deposit-panel"
 import { formatTokenAmount, type Token } from "./tokens"
+import { SafetyBreakdown, SortToggle, bestApyRoute, safetyText, type SortBy } from "./safety"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -26,10 +27,12 @@ interface MobileDepositProps {
   balanceIssue: BalanceIssue
   onQuickAmount: (pct: string) => void
   isQuickActive: (pct: string) => boolean
-  routes: YieldRoute[] // for the token, within the risk level, best APY first
+  routes: YieldRoute[] // for the token, within the risk level, in sortBy order
   totalForToken: number
   risk: RiskTier
   onRisk: (risk: RiskTier) => void
+  sortBy: SortBy
+  onSort: (sort: SortBy) => void
   route: YieldRoute | null
   onSelectRoute: (id: string) => void
   ratesStatus: "loading" | "error" | "ready"
@@ -43,7 +46,7 @@ function riskLabel(route: YieldRoute): string {
 }
 
 // Phones and tablets: one card, the way a swap app works. With an amount typed, every route shows in the card,
-// ranked by what it earns, the best marked and the gap shown for the rest.
+// by Safety Score or by what it earns, the best APY marked and the gap to it shown for the rest.
 export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(function MobileDeposit(
   {
     tokens,
@@ -62,6 +65,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     totalForToken,
     risk,
     onRisk,
+    sortBy,
+    onSort,
     route,
     onSelectRoute,
     ratesStatus,
@@ -152,6 +157,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             onSelect={onSelectRoute}
             risk={risk}
             onRisk={onRisk}
+            sortBy={sortBy}
+            onSort={onSort}
           />
         ) : (
           <BestRoute route={route} routes={routes} token={token.symbol} ratesStatus={ratesStatus} />
@@ -161,11 +168,13 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
         {route && (
           <p className="px-0.5 text-[11px] leading-relaxed text-muted-foreground">
             {showRoutes && `${route.name}: `}
-            {riskLabel(route)} risk · TVL {formatUSD(route.tvl)}
+            {safetyText(route)} · {riskLabel(route)} risk · TVL {formatUSD(route.tvl)}
             {borrowed !== null && ` · ${borrowed}% borrowed`} · from {route.source}
             {updatedLabel && `, ${updatedLabel}`}
           </p>
         )}
+
+        {route && <SafetyBreakdown route={route} />}
 
         {route && <RouteNotes route={route} compact />}
 
@@ -230,7 +239,7 @@ function BestRoute({
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
-                {routes[0]?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
+                {bestApyRoute(routes)?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
               </span>
               <span className="text-xs text-muted-foreground">
                 {CATEGORY_LABELS[route.category]}
@@ -261,7 +270,7 @@ function BestRoute({
   )
 }
 
-// With an amount: every route, best first, with what each earns and how far behind the best it is
+// With an amount: every route in sortBy order, with what each earns and how far behind the best APY it is
 function RouteChoices({
   routes,
   totalForToken,
@@ -271,6 +280,8 @@ function RouteChoices({
   onSelect,
   risk,
   onRisk,
+  sortBy,
+  onSort,
 }: {
   routes: YieldRoute[]
   totalForToken: number
@@ -280,8 +291,11 @@ function RouteChoices({
   onSelect: (id: string) => void
   risk: RiskTier
   onRisk: (risk: RiskTier) => void
+  sortBy: SortBy
+  onSort: (sort: SortBy) => void
 }) {
-  const bestYearly = routes.length > 0 ? amount * routes[0].apy : 0
+  const best = bestApyRoute(routes)
+  const bestYearly = best ? amount * best.apy : 0
   const hidden = totalForToken - routes.length
 
   return (
@@ -290,6 +304,7 @@ function RouteChoices({
         <span className="label-roman text-foreground">
           {routes.length} {routes.length === 1 ? "route" : "routes"}
         </span>
+        <SortToggle value={sortBy} onChange={onSort} compact />
         <div role="group" aria-label="Risk up to" className="flex gap-0.5 rounded-[4px] border border-frame p-0.5">
           {RISK_LEVELS.map((level) => (
             <button
@@ -315,8 +330,9 @@ function RouteChoices({
             No {token} routes at {risk} risk. Raise the risk level to see {totalForToken} more.
           </p>
         )}
-        {routes.map((r, index) => {
+        {routes.map((r) => {
           const selected = r.id === selectedId
+          const isBest = r === best
           const yearly = amount * r.apy
           return (
             <button
@@ -339,19 +355,19 @@ function RouteChoices({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="font-display text-[19px] font-bold leading-[1.1]">{r.name}</span>
-                  {index === 0 && <span className={BEST_TAG}>Best</span>}
+                  {isBest && <span className={BEST_TAG}>Best APY</span>}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {r.receipt ?? CATEGORY_LABELS[r.category]} · {riskLabel(r)} risk
+                  {r.receipt ?? CATEGORY_LABELS[r.category]} · {safetyText(r)}
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className={cn("text-[15px] font-semibold", index === 0 ? "text-ink" : "text-foreground")}>
+                <span className={cn("text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
                   +{formatTokenAmount(yearly, r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {formatApy(r)} APY
-                  {index > 0 && ` · ${formatTokenAmount(bestYearly - yearly, r.token)} less`}
+                  {!isBest && ` · ${formatTokenAmount(bestYearly - yearly, r.token)} less`}
                 </span>
               </span>
             </button>

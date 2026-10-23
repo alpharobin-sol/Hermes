@@ -292,6 +292,7 @@ export function DepositDialog({
                   <Row label="Rate">{route.name} rate, no slippage</Row>
                 )}
                 {compared.length === 0 && quote.routeLabels.length > 0 && <Row label="Route">{pickedLabel}</Row>}
+                {route.safety && <Row label="Safety Score">{route.safety.score}/100</Row>}
                 <Row label="Hermes fee">None</Row>
               </dl>
             )}

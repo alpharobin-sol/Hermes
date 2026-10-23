@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
+import { SafetyCell, SortToggle, bestApyRoute, safetyText, type SortBy } from "./safety"
 
 export const RISK_LEVELS: { value: RiskTier; label: string; color: string; text: string }[] = [
   { value: "low", label: "Low", color: "bg-success", text: "text-success" },
@@ -49,7 +50,9 @@ interface RateBoardProps {
   onToken: (symbol: string) => void
   risk: RiskTier
   onRisk: (risk: RiskTier) => void
-  routes: YieldRoute[] // for the token, within the risk level, best APY first
+  sortBy: SortBy
+  onSort: (sort: SortBy) => void
+  routes: YieldRoute[] // for the token, within the risk level, in sortBy order
   totalForToken: number
   selectedId: string | null
   onSelect: (id: string) => void
@@ -68,6 +71,8 @@ export function RateBoard({
   onToken,
   risk,
   onRisk,
+  sortBy,
+  onSort,
   routes,
   totalForToken,
   selectedId,
@@ -81,6 +86,7 @@ export function RateBoard({
   className,
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
+  const bestApy = bestApyRoute(routes)
 
   return (
     <div className={cn("plaque min-w-0 flex-[999_1_600px]", className)}>
@@ -115,7 +121,11 @@ export function RateBoard({
             })}
           </div>
 
-          <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto">
+            <span className="flex items-center gap-2">
+              <span className="label-roman whitespace-nowrap text-xs">Sort</span>
+              <SortToggle value={sortBy} onChange={onSort} />
+            </span>
             <span id="risk-label" className="label-roman whitespace-nowrap text-xs">
               Risk up to
             </span>
@@ -148,7 +158,7 @@ export function RateBoard({
           <span>APY</span>
           <span className="hidden xl:block">Est. yearly</span>
           <span>TVL</span>
-          <span>Risk</span>
+          <span>Safety</span>
           <span />
         </div>
 
@@ -182,11 +192,11 @@ export function RateBoard({
           </p>
         ) : (
           <div role="radiogroup" aria-label={`${token} routes`}>
-            {routes.map((route, index) => (
+            {routes.map((route) => (
               <RouteRow
                 key={route.id}
                 route={route}
-                best={index === 0}
+                best={route === bestApy}
                 selected={route.id === selectedId}
                 amount={amount}
                 onSelect={() => onSelect(route.id)}
@@ -203,26 +213,12 @@ export function RateBoard({
 
         <p className="border-t border-hairline bg-plate px-3 py-3 text-xs leading-relaxed text-muted-foreground md:px-[18px]">
           {sources ? `Rates from ${sources}${updatedLabel ? `, updated ${updatedLabel}` : ""}. ` : ""}
-          Returns assume today&apos;s APY holds and are not guaranteed. Risk reflects TVL, and for lending how much of
-          the reserve is borrowed. It does not cover contract or depeg risk.
+          Returns assume today&apos;s APY holds and are not guaranteed. The Safety Score adds four parts from live data,
+          25 points each: size, track record, 30-day outflows and exit. Pick a route to see why it scores what it does.
+          It does not cover smart contract bugs or depegs. Risk level follows the score: low from 80, moderate from 60.
         </p>
       </div>
     </div>
-  )
-}
-
-function RiskBars({ risk }: { risk: RiskTier }) {
-  const activeIndex = RISK_LEVELS.findIndex((level) => level.value === risk)
-  const level = RISK_LEVELS[activeIndex]
-  return (
-    <span className="flex flex-col gap-1.5" title="Risk tier from TVL, and for lending the borrowed share">
-      <span className="flex gap-[3px]" aria-hidden="true">
-        {RISK_LEVELS.map((segment, index) => (
-          <span key={segment.value} className={cn("h-1.5 w-4 rounded-[1px]", index <= activeIndex ? level.color : "bg-hairline")} />
-        ))}
-      </span>
-      <span className={cn("text-xs font-medium", level.text)}>{level.label}</span>
-    </span>
   )
 }
 
@@ -241,7 +237,6 @@ function RouteRow({
 }) {
   const yearly = amount * route.apy
   const borrowed = borrowedPercent(route)
-  const riskLabel = RISK_LEVELS.find((level) => level.value === route.risk)?.label ?? route.risk
 
   return (
     <div className={cn("border-t border-row-line transition-colors", selected ? "bg-accent" : "hover:bg-plate")}>
@@ -272,7 +267,7 @@ function RouteRow({
                   {` · ${borrowed}% borrowed`}
                 </span>
               )}
-              <span className="lg:hidden">{` · ${riskLabel} risk`}</span>
+              <span className="lg:hidden">{` · ${safetyText(route)}`}</span>
             </span>
           </span>
         </span>
@@ -294,7 +289,7 @@ function RouteRow({
         <span className="hidden text-sm font-medium lg:block">{formatUSD(route.tvl)}</span>
 
         <span className="hidden lg:flex">
-          <RiskBars risk={route.risk} />
+          <SafetyCell route={route} />
         </span>
 
         <span

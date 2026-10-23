@@ -75,7 +75,7 @@ const steps = [
   {
     numeral: "II",
     title: "Compare routes side by side",
-    body: "Each row shows the rate, where it comes from, the pool size and a risk tier.",
+    body: "Each row shows the rate, where it comes from, the pool size and a Safety Score from 0 to 100. Pick a route to see why it scores what it does.",
   },
   {
     numeral: "III",
@@ -122,7 +122,11 @@ const faqs = [
   },
   {
     question: "What are the risks?",
-    answer: "Every route carries the risks of its protocol: smart contract bugs, depegs and market moves. Hermes shows a risk level per route, but it cannot remove those risks. Start small.",
+    answer: "Every route carries the risks of its protocol: smart contract bugs, depegs and market moves. Hermes shows a Safety Score and a risk level per route, but it cannot remove those risks. Start small.",
+  },
+  {
+    question: "How is the Safety Score worked out?",
+    answer: "Four parts from live data, up to 25 points each. Size: how much is deposited, full points at $1B. Track record: how long DefiLlama has tracked the protocol's deposits, full points at 4 years. Outflows: the largest fall in deposits in the last 30 days, counted in tokens so price moves don't count. Exit: for lending, how much of the reserve is borrowed, and for liquid staking, the price impact of selling 10,000 tokens for SOL on Jupiter. Pick a route to see each part. The score does not cover smart contract bugs or depegs.",
   },
   {
     question: "Does Hermes charge a fee?",

@@ -1,13 +1,18 @@
 # Hermes
 
-**Thesis: Solana yield is spread across dozens of protocols, each with its own app and its own rate. Hermes shows the live rates side by side and builds the deposit for the route you pick. You sign it in your own wallet. Hermes never holds funds.**
+**Thesis: Solana yield is spread across dozens of protocols, each with its own app and its own rate. Hermes shows the live rates side by side and builds the deposit for the route you pick. You sign it in your own wallet. Routed deposits never touch Hermes.**
+
+Guides: `docs/VISION.md` distills the owner's vision deck, the Turbine tutor's feedback and the capstone research. Read it before planning work. It is the reference for what Hermes is.
 
 Model: Titan for yield. Titan compares swap routes across DEX aggregators. Hermes compares yield routes across staking and lending protocols.
 
-- Non-custodial router. No vaults and no Hermes contracts hold money. The API builds unsigned transactions and the user's wallet signs them.
+Wedge: trust and curation. Hermes rates every route with a Safety Score built from live data and leads with the routes that score well. A guide to Solana yield, not another dashboard. Keep the Safety Score and Sleep Well front and center.
+
+- Router first. Routed deposits are non-custodial: the API builds unsigned transactions and the user's wallet signs them. Today no Hermes vault or contract holds money.
+- Custody (owner's decision, 23 Oct 2026): Hermes can hold funds for automation only. A user opts in by moving funds into a Hermes vault that auto-allocates, auto-exits and rebalances. The vault needs a Hermes program, an outside security review and caps before real funds go in.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
-- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier comes from TVL, and a lending reserve 95% or more borrowed is at least moderate.
+- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve 95% or more borrowed is at least moderate.
 
 ## Canonical
 
@@ -41,17 +46,50 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
   - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Rows show how much of each reserve is borrowed, and the dialog warns at 95% or more.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
+- Safety Score on every route, 0 to 100, default sort. Four parts from live data, 25 points each: size (TVL), track record (how long DefiLlama has tracked the protocol), 30-day outflows (in tokens) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
-## Roadmap, in order
+## Roadmap
 
-1. Liquid staking: Jito direct and Marinade direct (built, waiting on the owner's deposits), then the hidden LSTs (Sanctum Infinity, Bybit, JPool, BlazeStake)
-2. Kamino Lend (built, waiting on the owner's deposit)
-3. Jupiter Lend
-4. MarginFi
-5. LP vaults
-6. Then: in-app withdrawals, the Hermes fee, lifting the beta cap
+From the vision deck, the Turbine tutor's feedback and the capstone research. Tick items off as they ship. Each route still goes through `INTEGRATIONS.md`, one at a time.
 
-Each route goes through `INTEGRATIONS.md`, one at a time.
+Trust and curation (the wedge)
+
+- [x] Safety Score on every route: 0 to 100 from live data, each part shown with its source
+- [ ] Sleep Well mode as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong. Later, one signed deposit split across two or three of them.
+- [ ] Plain labels for new users: staking, lending and LP, and what each can lose
+- [ ] More score inputs: depeg (LST market price vs fair value), validator concentration, incident history with links
+
+Routes
+
+- [ ] Owner deposits to move Jito, Marinade and Kamino Lend from beta to live (owner)
+- [ ] Rate checks against each protocol's app for the beta routes
+- [ ] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
+- [ ] Jupiter Lend
+- [ ] Save and MarginFi
+
+Smart router
+
+- [ ] Real yield by time horizon: entry and exit costs (price impact, rent, unstake delay) taken off the APY for 1 month, 6 months and 1 year
+- [ ] Match routes to the user's risk, time horizon and liquidity needs
+
+Portfolio and signals
+
+- [ ] Portfolio: what the connected wallet holds in each route and what it has earned
+- [ ] In-app withdrawals
+- [ ] Alerts: a rate drop, a better route, a reserve nearly all borrowed, a score drop
+- [ ] One-click move: Hermes proposes, the user signs
+
+Later
+
+- [ ] Hermes fee
+- [ ] Lift the beta cap
+- [ ] LP routes, labeled with impermanent loss
+- [ ] Automation vault (DPO): opt-in, Hermes holds the funds and auto-allocates, auto-exits and rebalances on Signal Engine alerts. Needs a Hermes program, an outside security review and caps before real funds.
+
+Open decisions for the owner
+
+- LPs in or out for now
+- First user: CEX users new to DeFi, passive holders, or DAO treasuries
 
 ## Rules
 
@@ -60,8 +98,8 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 - Label real money and test funds plainly. Devnet means test SOL. Mainnet beta means real funds, start small.
 - Never handle private keys or seed phrases. The API builds unsigned transactions only.
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
-- Show where every number comes from. The risk tier says what it reflects: TVL, plus the borrowed share for lending.
-- If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
+- Show where every number comes from. Each part of the Safety Score shows its points, what it measured and its source.
+- If it does not serve comparing Solana yields, depositing from your own wallet, or (later) opt-in automation, it waits.
 - One page: the hero, the rate board with its deposit panel, how it works, and the FAQ. Rates show before an amount is typed.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
@@ -69,6 +107,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 23 Oct 2026, Safety Score: 0 to 100 on every route from size, track record, 30-day outflows and exit, with a breakdown per route. Routes sort by score by default, and the risk level follows the score.
 - 23 Oct 2026, Aurora redesign: new look from the X banner, Night theme, rates on load with a rate board and a deposit panel, a single deposit card on phones, the dialog shows every path Hermes checked, real favicons.
 - 23 Oct 2026: a lending reserve 95% or more borrowed shows at least moderate risk.
 - 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.

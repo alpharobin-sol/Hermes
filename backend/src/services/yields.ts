@@ -2,6 +2,7 @@ import { logger } from '../utils/logger';
 import { solanaNetwork } from '../config/runtime';
 import { ROUTES, Category, DepositStatus, InputToken, depositCap, depositStatus } from '../registry/routes';
 import { getRate, refreshRates, SOURCE_LABELS } from './rates';
+import { refreshSafetyInputs, safetyScore, SafetyScore } from './safety';
 
 export type RiskTier = 'low' | 'moderate' | 'high';
 
@@ -14,7 +15,8 @@ export interface YieldRoute {
   receipt: string | null; // token the user receives, e.g. JitoSOL
   apy: number; // decimal
   tvl: number; // USD
-  risk: RiskTier;
+  risk: RiskTier; // band of the Safety Score, or from TVL while the route has no score
+  safety: SafetyScore | null; // null while any part of the score is missing
   website: string;
   source: string; // where apy and tvl come from
   updatedAt: string;
@@ -27,15 +29,22 @@ export interface YieldRoute {
 const HIGH_UTILIZATION = 0.95;
 
 /**
- * Risk tier from TVL: how much money already sits in the route. A lending reserve that is 95% or
- * more borrowed is at least moderate, since withdrawals may have to wait.
+ * Risk tier: low at a Safety Score of 80 or more, moderate from 60, high below.
+ * Without a score it comes from TVL: low at $100M or more, moderate from $10M, high below.
+ * A lending reserve 95% or more borrowed is at least moderate, since withdrawals may have to wait.
  * It does not measure contract or depeg risk.
  */
-export function riskTier(tvl: number, utilization?: number): RiskTier {
-  const byTvl: RiskTier = tvl >= 100_000_000 ? 'low' : tvl >= 10_000_000 ? 'moderate' : 'high';
-  if (byTvl === 'low' && utilization !== undefined && utilization >= HIGH_UTILIZATION) return 'moderate';
-  return byTvl;
+export function riskTier(tvl: number, utilization?: number, score?: number): RiskTier {
+  const tier: RiskTier =
+    score !== undefined
+      ? score >= 80 ? 'low' : score >= 60 ? 'moderate' : 'high'
+      : tvl >= 100_000_000 ? 'low' : tvl >= 10_000_000 ? 'moderate' : 'high';
+  if (tier === 'low' && utilization !== undefined && utilization >= HIGH_UTILIZATION) return 'moderate';
+  return tier;
 }
+
+// How long a request waits for Safety Score history that is still loading, e.g. just after a restart
+const SAFETY_WAIT_MS = 12_000;
 
 // View-only routes (no in-app deposit on this network) stay in the registry and keep their live
 // rates, but the site leaves them out until each one gets an in-app deposit. Set to true to show them.
@@ -54,40 +63,51 @@ export async function getYieldRoutes(
     (route) => (!token || route.token === token) && (includeViewOnly || depositStatus(route, network) !== null)
   );
 
-  const rows = await Promise.all(
-    routes.map(async (route): Promise<YieldRoute | null> => {
-      const rate = await getRate(route.source);
-      // No rate, no row
-      if (!rate) return null;
+  const rates = await Promise.all(routes.map((route) => getRate(route.source)));
 
-      return {
-        id: route.id,
-        protocol: route.protocol,
-        name: route.name,
-        category: route.category,
-        token: route.token,
-        receipt: route.receipt?.symbol ?? null,
-        apy: rate.apy,
-        tvl: rate.tvl,
-        risk: riskTier(rate.tvl, rate.utilization),
-        website: route.website,
-        source: SOURCE_LABELS[route.source.kind],
-        updatedAt: new Date(rate.updatedAt).toISOString(),
-        utilization: rate.utilization ?? null,
-        deposit: depositStatus(route, network),
-        depositCap: depositCap(route, network),
-      };
-    })
-  );
+  // Scores come from cached history. If some are missing, give the refresh a moment to fill them.
+  if (routes.some((route, i) => rates[i] && !safetyScore(route, rates[i]))) {
+    await Promise.race([refreshSafetyInputs(), new Promise((resolve) => setTimeout(resolve, SAFETY_WAIT_MS))]);
+  }
+
+  const rows = routes.map((route, i): YieldRoute | null => {
+    const rate = rates[i];
+    // No rate, no row
+    if (!rate) return null;
+    const safety = safetyScore(route, rate);
+
+    return {
+      id: route.id,
+      protocol: route.protocol,
+      name: route.name,
+      category: route.category,
+      token: route.token,
+      receipt: route.receipt?.symbol ?? null,
+      apy: rate.apy,
+      tvl: rate.tvl,
+      risk: riskTier(rate.tvl, rate.utilization, safety?.score),
+      safety,
+      website: route.website,
+      source: SOURCE_LABELS[route.source.kind],
+      updatedAt: new Date(rate.updatedAt).toISOString(),
+      utilization: rate.utilization ?? null,
+      deposit: depositStatus(route, network),
+      depositCap: depositCap(route, network),
+    };
+  });
 
   return rows.filter((row): row is YieldRoute => row !== null).sort((a, b) => b.apy - a.apy);
 }
 
 /**
- * Keep the rate caches warm so user requests never wait on a cold fetch
+ * Keep the rate and Safety Score caches warm so user requests never wait on a cold fetch
  */
 export function startRateRefresh(intervalMs: number = 5 * 60 * 1000): NodeJS.Timeout {
-  const refresh = () => refreshRates().catch((error) => logger.error('Rate refresh failed:', error));
+  // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
+  const refresh = () =>
+    refreshRates()
+      .then(() => refreshSafetyInputs())
+      .catch((error) => logger.error('Rate refresh failed:', error));
   refresh();
   return setInterval(refresh, intervalMs);
 }

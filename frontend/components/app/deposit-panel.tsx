@@ -10,6 +10,7 @@ import { formatUSD } from "@/lib/helpers/formatters"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, formatApy } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
+import { SafetyBreakdown } from "./safety"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -172,6 +173,8 @@ export function DepositPanel({
             <p className="-mt-1 text-[11px] text-muted-foreground">Rate and TVL from {route.source}.</p>
           </div>
         )}
+
+        {route && <SafetyBreakdown route={route} />}
 
         {route && <RouteNotes route={route} />}
 

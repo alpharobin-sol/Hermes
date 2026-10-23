@@ -12,6 +12,7 @@ import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
 import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
+import { compareRoutes, type SortBy } from "./safety"
 
 // Routes at or below the chosen risk level
 function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
@@ -47,6 +48,8 @@ export function YieldPanel() {
   const [selectedSymbol, setSelectedSymbol] = useState(BASE_TOKENS[0].symbol)
   const [amount, setAmount] = useState("")
   const [riskProfile, setRiskProfile] = useState<RiskTier>("moderate")
+  // Routes lead with the Safety Score. APY is one tap away.
+  const [sortBy, setSortBy] = useState<SortBy>("safety")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const mobileCardRef = useRef<HTMLElement>(null)
@@ -88,8 +91,8 @@ export function YieldPanel() {
   const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0]
 
   const forToken = useMemo(
-    () => routes.filter((route) => route.token === selectedToken.symbol).sort((a, b) => b.apy - a.apy),
-    [routes, selectedToken.symbol]
+    () => routes.filter((route) => route.token === selectedToken.symbol).sort(compareRoutes(sortBy)),
+    [routes, selectedToken.symbol, sortBy]
   )
   const visibleRoutes = forToken.filter((route) => withinRisk(route, riskProfile))
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
@@ -168,6 +171,8 @@ export function YieldPanel() {
         totalForToken={forToken.length}
         risk={riskProfile}
         onRisk={setRiskProfile}
+        sortBy={sortBy}
+        onSort={setSortBy}
         route={loading || error ? null : selectedRoute}
         onSelectRoute={setSelectedId}
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
@@ -182,6 +187,8 @@ export function YieldPanel() {
         onToken={handleToken}
         risk={riskProfile}
         onRisk={setRiskProfile}
+        sortBy={sortBy}
+        onSort={setSortBy}
         routes={visibleRoutes}
         totalForToken={forToken.length}
         selectedId={selectedRoute?.id ?? null}

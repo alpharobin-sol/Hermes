@@ -17,6 +17,7 @@ The route is in the registry with a live rate. The site hides view-only routes f
 - [ ] Route added to the registry with its rate source
 - [ ] APY and TVL from `/api/yields` checked against the protocol's own app. Write down the date and both numbers.
 - [ ] The website link opens the right page
+- [ ] The route has a Safety Score: its protocol is on DefiLlama and its deposit history has a source in `backend/src/services/safety.ts`. Without both the card says Not scored.
 
 ## 2. Beta
 
