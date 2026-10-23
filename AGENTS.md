@@ -47,7 +47,8 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
   - A direct deposit is built unless a Jupiter swap beats it by 0.01% or more: a direct deposit has no slippage.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
-- Safety Score on every route, 0 to 100, default sort. Four parts from live data, 25 points each: size (TVL), track record (how long DefiLlama has tracked the protocol), 30-day outflows (in tokens) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
+- Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF is the one route still on DefiLlama: Sanctum has no working live source.
+- Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Kamino or DefiLlama history until Hermes keeps its own) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
 ## Roadmap
 
@@ -95,6 +96,7 @@ Open decisions for the owner
 ## Rules
 
 - Never fake or mock data or success. A route shows only with a live rate. If a source fails, its routes drop out. No hardcoded APY or TVL, ever.
+- Live rates come from the chain or the protocol itself. An aggregator (DefiLlama) only where no live source exists, named as the source, and replaced as soon as one does.
 - A route gets a deposit button only through its deposit status in the registry, and only after it passes `INTEGRATIONS.md`. `live` needs a real deposit by the owner.
 - Label real money and test funds plainly. Devnet means test SOL. Mainnet beta means real funds, start small.
 - Never handle private keys or seed phrases. The API builds unsigned transactions only.

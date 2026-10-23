@@ -106,7 +106,7 @@ export async function getYieldRoutes(
 /**
  * Keep the rate and Safety Score caches warm so user requests never wait on a cold fetch
  */
-export function startRateRefresh(intervalMs: number = 5 * 60 * 1000): NodeJS.Timeout {
+export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout {
   // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
   const refresh = () =>
     refreshRates()

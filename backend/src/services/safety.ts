@@ -1,5 +1,5 @@
 import { solanaNetwork } from '../config/runtime';
-import { depositStatus, KAMINO_MAIN_MARKET, RateSource, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
+import { depositStatus, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
 import { cached, Cached } from './cache';
 import { createJupiterClient } from './jupiter';
 import { getRate, http, Rate, SOURCE_LABELS } from './rates';
@@ -8,7 +8,8 @@ import { getRate, http, Rate, SOURCE_LABELS } from './rates';
  * SAFETY SCORE
  * 0 to 100 for each route: four parts worth 25 points each, all from live data.
  * - Size: money in the route now. $10M or less scores 0, $1B or more scores 25.
- * - Track record: how long DefiLlama has tracked the protocol's deposits. 4 years or more scores 25.
+ * - Track record: how long the protocol has held deposits, from the first day DefiLlama recorded them (a fixed date
+ *   in the registry). 4 years or more scores 25.
  * - Outflows: the largest fall in deposits within the last 30 days, counted in the deposit token so price
  *   moves don't count. 10% or less scores 25, 40% or more scores 0.
  * - Exit: how easily money gets out today.
@@ -71,42 +72,6 @@ function largestFall(series: number[]): number {
     if (peak > 0) fall = Math.max(fall, (peak - value) / peak);
   }
   return fall;
-}
-
-// Track record: when DefiLlama first tracked the protocol's deposits, as a ms timestamp
-
-// The DefiLlama protocol behind a route's rate source
-function defillamaProtocol(source: RateSource): string {
-  switch (source.kind) {
-    case 'defillama':
-      return source.project;
-    case 'kamino':
-      return 'kamino-lend';
-    case 'jupiter-lend':
-      return 'jupiter-lend';
-  }
-}
-
-const trackRecords = new Map<string, Cached<number>>();
-
-function trackRecord(protocol: string): Cached<number> {
-  let entry = trackRecords.get(protocol);
-  if (!entry) {
-    entry = cached(
-      `DefiLlama track record for ${protocol}`,
-      async () => {
-        // The response holds the whole TVL history, up to several MB
-        const response = await http.get(`https://api.llama.fi/protocol/${protocol}`);
-        const history: any[] = Array.isArray(response.data?.tvl) ? response.data.tvl : [];
-        const dates = history.map((point) => Number(point?.date)).filter((date) => Number.isFinite(date) && date > 0);
-        if (dates.length === 0) throw new Error('no TVL history');
-        return Math.min(...dates) * 1000;
-      },
-      { ttlMs: DAY_MS, maxStaleMs: 7 * DAY_MS, retryAfterMs: 10 * 60 * 1000 }
-    );
-    trackRecords.set(protocol, entry);
-  }
-  return entry;
 }
 
 // Outflows: the largest fall in deposits within the window, in the deposit token
@@ -285,10 +250,10 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
  * Never fetches: refreshSafetyInputs keeps the history warm.
  */
 export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null {
-  const trackedSince = trackRecord(defillamaProtocol(route.source)).peek();
+  const trackedSince = Date.parse(route.trackedSince);
   const outflow = outflows(route)?.peek();
   const exit = exitPart(route, rate);
-  if (trackedSince === undefined || !outflow || !exit) return null;
+  if (!Number.isFinite(trackedSince) || !outflow || !exit) return null;
 
   const years = (Date.now() - trackedSince) / (365 * DAY_MS);
   const unit = route.token;
@@ -308,7 +273,7 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
       points: points(years, 0, 4),
       max: PART_MAX,
       detail: `Deposits tracked since ${monthYear(trackedSince)}.`,
-      source: 'DefiLlama',
+      source: "DefiLlama's first record",
     },
     {
       key: 'outflows',
@@ -330,7 +295,7 @@ let refreshing: Promise<void> | null = null;
 
 /**
  * Fetch the history behind the scores where it is due, so requests never wait on it.
- * Each kind of input runs one fetch at a time: the protocol histories are large.
+ * Each kind of input runs one fetch at a time.
  * Routes Hermes deposits into go first.
  */
 export function refreshSafetyInputs(): Promise<void> {
@@ -339,14 +304,12 @@ export function refreshSafetyInputs(): Promise<void> {
   const network = solanaNetwork();
   const hasDeposit = (route: RouteConfig) => Number(depositStatus(route, network) !== null);
   const routes = [...ROUTES].sort((a, b) => hasDeposit(b) - hasDeposit(a));
-  const protocols = [...new Set(routes.map((route) => defillamaProtocol(route.source)))];
 
   const inSequence = async <T>(items: T[], fetch: (item: T) => Promise<unknown> | undefined) => {
     for (const item of items) await fetch(item);
   };
 
   refreshing = Promise.all([
-    inSequence(protocols, (protocol) => trackRecord(protocol).get()),
     inSequence(routes, (route) => outflows(route)?.get()),
     inSequence(routes, (route) => swapExit(route)?.get()),
   ])
