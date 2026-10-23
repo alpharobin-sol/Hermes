@@ -36,7 +36,7 @@ export interface YieldRoute {
   receipt: string | null; // token the user receives, e.g. JitoSOL
   apy: number; // decimal
   tvl: number; // USD
-  risk: RiskTier; // from TVL alone
+  risk: RiskTier; // from TVL; lending reserves 95% or more borrowed are at least moderate
   website: string;
   source: string; // where apy and tvl come from
   updatedAt: string;
