@@ -1,231 +1,168 @@
-import { useState, useEffect } from "react"
-import { X, Settings } from "lucide-react"
-import { cn } from "@/lib/utils"
+"use client"
 
-import { SettingsModal } from "../settings-modal"
-
-import useAppLogo from "@/asssets/image";
+import { useEffect, useState } from "react"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
-import Link from "next/link"
-import { CustomConnectButton } from "../wallet-connect/CustomConnectKit"
+import { Menu, Settings, X } from "lucide-react"
 
-interface AppHeaderProps {
-  isLoading?: boolean
+import { cn } from "@/lib/utils"
+import { IS_DEVNET } from "@/lib/network"
+import { SettingsModal } from "../settings-modal"
+import { CustomConnectButton } from "../wallet-connect/CustomConnectKit"
+import { useLoading } from "./loading-context"
+import wordmarkLight from "@/public/brand/hermes-wordmark-light.png"
+import wordmarkDark from "@/public/brand/hermes-wordmark-dark.png"
+
+const NAV_ITEMS = [
+  { label: "Rates", href: "#rates" },
+  { label: "How it works", href: "#how" },
+  { label: "Questions", href: "#faq" },
+]
+
+// Black wordmark on Aurora, white on Night. CSS picks one, so there is no flash on load.
+function Wordmark({ className }: { className?: string }) {
+  return (
+    <>
+      <Image src={wordmarkLight} alt="Hermes" className={cn("w-auto dark:hidden", className)} preload />
+      <Image src={wordmarkDark} alt="Hermes" className={cn("hidden w-auto dark:block", className)} />
+    </>
+  )
 }
 
-export function AppHeader({ isLoading = false }: AppHeaderProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+function NetworkPill() {
+  return (
+    <span
+      title={IS_DEVNET ? "Devnet uses test SOL." : "Real funds. Start small."}
+      className="inline-flex h-8 items-center gap-2 rounded-full border border-frame px-3 text-xs font-medium text-muted-foreground"
+    >
+      <span className="size-2 rounded-full bg-beta-dot" />
+      {IS_DEVNET ? "Devnet · test SOL" : "Mainnet beta"}
+    </span>
+  )
+}
+
+export function AppHeader() {
+  const [menuOpen, setMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const pathname = usePathname()
+  const { isLoading } = useLoading()
 
-  const app_logo = useAppLogo()
-
-
-  const [isScrolled, setIsScrolled] = useState(false)
-
+  // Keep the page from scrolling behind the open menu
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10)
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll)
-    }
-  }, [])
-
-
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [pathname])
-
-  // Prevent body scroll when menu is open
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
-    }
+    document.body.style.overflow = menuOpen ? "hidden" : ""
     return () => {
       document.body.style.overflow = ""
     }
-  }, [mobileMenuOpen])
-
-  const navItems = [
-    { label: "Yield", href: "/" },
-  ]
+  }, [menuOpen])
 
   return (
     <>
-      {/* MAIN HEADER */}
-      <header
-        className={cn(
-          "sticky top-0 z-50 transition-all duration-300",
-          isScrolled &&
-          "bg-gradient-to-br from-background/60 to-background/50 backdrop-blur-md supports-[backdrop-filter]:bg-background/40 border-b border-border/50"
-        )}
-      >
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-6 px-4 md:h-[76px] md:px-8">
+          <a href="#top" aria-label="Hermes home" className="flex items-center">
+            <Wordmark className="h-[22px] md:h-[26px]" />
+          </a>
 
-        <div className="h-1.5 ">
-          {/* <div
-            className={cn(
-              "fixed inset-0 z-80 bg-black/50 backdrop-blur-xs transition-all duration-300 opacity-50 pointer-events-auto h-1.5"
-            )} /> */}
-        </div>
+          <nav aria-label="Sections" className="hidden items-center gap-1 md:flex">
+            {NAV_ITEMS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="px-3.5 py-3 font-roman text-[13px] font-semibold tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
 
-
-        <div className="mx-auto flex h-12 md:h-14 items-center justify-between px-2.5 pb-1 md:px-4">
-          {/* LEFT SIDE */}
-          <div className="flex items-center gap-1 md:gap-8">
-            {/* Mobile Menu Toggle */}
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden lg:block">
+              <NetworkPill />
+            </div>
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex items-center justify-center text-foreground transition-all md:hidden h-7 w-7 group"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="w-4 h-[2px] bg-primary group-hover:bg-primary" />
-                  <span className="w-2 h-[2px] bg-primary group-hover:bg-primary" />
-                  <span className="w-3 h-[2px] bg-primary group-hover:bg-primary" />
-                </div>
-              ) : (
-                <div className="flex flex-col items-start gap-1">
-                  <span className="w-4 h-[2px] bg-muted-foreground group-hover:bg-primary" />
-                  <span className="w-2 h-[2px] bg-muted-foreground group-hover:bg-primary" />
-                  <span className="w-3 h-[2px] bg-muted-foreground group-hover:bg-primary" />
-                </div>
-              )}
-            </button>
-
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              {/* <div className="w-1 h-5 bg-primary" /> */}
-
-              <Image
-                src={app_logo}
-                alt="App Logo"
-
-                width={96}
-                height={40}
-                className="object-contain h-8 md:h-10 w-auto"
-                priority
-
-              />
-            </Link>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const active = pathname === item.href
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className={cn(
-                      "relative px-4 py-2 text-nav transition-all group rounded-sm",
-                      active
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-
-                    {item.label}
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
-
-          {/* RIGHT SIDE */}
-          <div className="flex items-center gap-2">
-            {/* Settings Button */}
-            <button
+              type="button"
               onClick={() => setSettingsOpen(true)}
-              className={cn(
-                "flex items-center justify-center w-9 h-9  border-border/50",
-                "transition-all hover:border-primary/50 hover:text-primary relative group"
-              )}
               aria-label="Settings"
+              className="hidden size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:grid"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="size-[18px]" strokeWidth={1.75} />
             </button>
             <CustomConnectButton />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+              className="grid size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground md:hidden"
+            >
+              <Menu className="size-[18px]" />
+            </button>
           </div>
         </div>
 
-        {/* Loading Bar */}
-        <div className="relative h-[2px] w-full overflow-hidden">
-          {isLoading ? (
-            <div className="absolute inset-0 bg-border/20">
-              <div className="absolute h-full w-8 animate-pulse bg-gradient-to-r from-transparent via-primary to-transparent"
-                style={{ animation: "scan 2s infinite linear" }} />
-            </div>
-          ) : (
-            <></>
-          )}
+        {/* Shows while live rates load */}
+        <div className="relative h-0.5 w-full overflow-hidden" aria-hidden="true">
+          {isLoading && <div className="animate-scan absolute top-0 h-full w-1/5 bg-primary" />}
         </div>
       </header>
 
-      {/* BACKDROP OVERLAY */}
+      {/* Phone menu */}
       <div
-        onClick={() => setMobileMenuOpen(false)}
+        onClick={() => setMenuOpen(false)}
         className={cn(
-          "fixed inset-0 z-80 bg-black/50 backdrop-blur-sm transition-all duration-300 md:hidden",
-          mobileMenuOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+          "fixed inset-0 z-50 bg-[rgba(43,20,14,0.6)] transition-opacity duration-300 md:hidden",
+          menuOpen ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       />
-
-      {/* MOBILE MENU - Slides from LEFT */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        aria-hidden={!menuOpen}
         className={cn(
-          "fixed inset-y-0 left-0 z-99 w-72 bg-card border-r border-border/50 shadow-2xl",
-          "transform transition-transform duration-300 ease-in-out md:hidden",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 right-0 z-50 flex w-72 flex-col border-l border-frame bg-card transition-transform duration-300 md:hidden",
+          menuOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
         )}
       >
-        <div className="flex h-14 items-center justify-between border-b border-border/50 px-4">
-          <span className="font-mono text-sm font-bold uppercase tracking-wider">Menu</span>
-
+        <div className="flex h-16 items-center justify-between border-b border-border px-4">
+          <span className="label-roman">Menu</span>
+          <button
+            type="button"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close menu"
+            tabIndex={menuOpen ? 0 : -1}
+            className="grid size-11 place-items-center rounded-[4px] text-muted-foreground"
+          >
+            <X className="size-[18px]" />
+          </button>
         </div>
-
-        {/* Navigation Links */}
-        <nav className="flex flex-col p-4 gap-1">
-          {navItems.map((item) => {
-            const active = pathname === item.href
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  "nav-link text-left text-nav",
-                  // currentTab === item.id ? "nav-link-active" : "nav-link-inactive"
-
-                  active
-                    ? "nav-link-active"
-                    : "nav-link-inactive"
-                )}
-              >
-                {active && (
-                  <>
-
-                  </>
-                )}
-                {item.label}
-              </Link>
-            )
-          })}
+        <nav aria-label="Sections" className="flex flex-col p-2">
+          {NAV_ITEMS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              tabIndex={menuOpen ? 0 : -1}
+              onClick={() => setMenuOpen(false)}
+              className="rounded-[4px] px-3 py-3.5 font-roman text-sm font-semibold tracking-[0.14em] text-foreground hover:bg-secondary"
+            >
+              {item.label}
+            </a>
+          ))}
+          <button
+            type="button"
+            tabIndex={menuOpen ? 0 : -1}
+            onClick={() => {
+              setMenuOpen(false)
+              setSettingsOpen(true)
+            }}
+            className="rounded-[4px] px-3 py-3.5 text-left font-roman text-sm font-semibold tracking-[0.14em] text-foreground hover:bg-secondary"
+          >
+            Settings
+          </button>
         </nav>
+        <div className="mt-auto border-t border-border p-4">
+          <NetworkPill />
+        </div>
       </div>
 
-      {/* Settings Modal */}
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )

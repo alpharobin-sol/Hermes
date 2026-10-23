@@ -19,6 +19,14 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
 
+## Brand
+
+- Look: Aurora, from the Hermes X banner (Guido Reni's Aurora fresco, 1614, public domain, with the Hermes mark as Apollo). Aurora is the default theme. Night is the dark option in Settings.
+- Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
+- Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
+- Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
+- Hero art: `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
+
 ## Live (23 October 2026)
 
 - The site shows only routes Hermes deposits into in-app: the six LSTs and Kamino Lend (SOL, USDC, USDT) below.
@@ -29,7 +37,7 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
   - JitoSOL and mSOL: Hermes quotes the protocol directly (Jito's stake pool, Marinade's liquid staking program) and Jupiter, and builds whichever gives more of the token. The dialog shows both.
   - BNSOL, jupSOL, dSOL and hSOL: through the Jupiter swap API
-  - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Cards show how much of each reserve is borrowed, and the dialog warns at 95% or more.
+  - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Rows show how much of each reserve is borrowed, and the dialog warns at 95% or more.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 
@@ -53,13 +61,14 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
 - Show where every number comes from. The risk tier says what it reflects: TVL, plus the borrowed share for lending.
 - If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
-- One page: the yield panel and the FAQ.
+- One page: the hero, the rate board with its deposit panel, how it works, and the FAQ. Rates show before an amount is typed.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
 - Commit to a branch and merge through a PR. Run `npm run build` in `backend` and `frontend` before pushing.
 
 ## Shipped
 
+- 23 Oct 2026, Aurora redesign: new look from the X banner, Night theme, rates on load with a rate board and a deposit panel, the dialog shows every path Hermes checked, real favicons.
 - 23 Oct 2026: a lending reserve 95% or more borrowed shows at least moderate risk.
 - 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.
 - 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.
