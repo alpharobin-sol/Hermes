@@ -40,7 +40,7 @@ src/
 
 Rates refresh every few minutes. If a source fails, its last good rates serve for up to an hour, then its routes drop out. The API never shows an estimate in place of a live number.
 
-The risk tier comes from TVL only: low at $100M and above, moderate from $10M, high below. It says how much money already sits in the route. It does not measure contract or depeg risk.
+The risk tier comes from TVL: low at $100M and above, moderate from $10M, high below. It says how much money already sits in the route. A lending reserve that is 95% or more borrowed is at least moderate, since withdrawals may have to wait. The tier does not measure contract or depeg risk.
 
 ## Endpoints
 

@@ -252,7 +252,7 @@ export function YieldRoutes({ token, amount, riskProfile, balanceIssue, onDeposi
 
       <p className="px-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
         Rates from {sources}, refreshed every few minutes. Returns assume today&apos;s APY holds and are not guaranteed.
-        Risk reflects TVL only, not contract or depeg risk.
+        Risk reflects TVL, and for lending how much of the reserve is borrowed. It does not cover contract or depeg risk.
       </p>
 
       {depositRoute && (
@@ -273,7 +273,7 @@ function RiskBar({ risk }: { risk: RiskTier }) {
   const level = RISK_LEVELS[activeIndex];
 
   return (
-    <div className="flex items-center gap-1.5 mt-1" title="Risk tier from TVL">
+    <div className="flex items-center gap-1.5 mt-1" title="Risk tier from TVL, and for lending the borrowed share">
       <div className="flex items-center gap-0.5">
         {RISK_LEVELS.map((segment, index) => (
           <div

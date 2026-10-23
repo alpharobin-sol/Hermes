@@ -7,7 +7,7 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Non-custodial router. No vaults and no Hermes contracts hold money. The API builds unsigned transactions and the user's wallet signs them.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
-- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier comes from TVL only.
+- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier comes from TVL, and a lending reserve 95% or more borrowed is at least moderate.
 
 ## Canonical
 
@@ -51,7 +51,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 - Label real money and test funds plainly. Devnet means test SOL. Mainnet beta means real funds, start small.
 - Never handle private keys or seed phrases. The API builds unsigned transactions only.
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
-- Show where every number comes from. The risk tier says it reflects TVL only.
+- Show where every number comes from. The risk tier says what it reflects: TVL, plus the borrowed share for lending.
 - If it does not serve comparing Solana yields and depositing from your own wallet, it waits.
 - One page: the yield panel and the FAQ.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
@@ -60,6 +60,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
+- 23 Oct 2026: a lending reserve 95% or more borrowed shows at least moderate risk.
 - 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.
 - 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.
 - 22 Oct 2026: view-only routes hidden from the site, kept in the registry. Insufficient balance state before deposits (PR #10).
