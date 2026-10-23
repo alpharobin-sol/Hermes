@@ -5,12 +5,14 @@ import { StakePoolLayout } from '@solana/spl-stake-pool';
 import { logger } from '../utils/logger';
 import { cached } from './cache';
 import { KAMINO_MAIN_MARKET, RateSource, ROUTES, TOKENS } from '../registry/routes';
+import { tokenValueNear } from './history';
 
 /**
  * Live APY and TVL for every route in the registry, read from the chain or the protocol itself:
  * - Stake pool LSTs: each pool's own account on chain, priced in USD with Jupiter's SOL price
+ * - INF: Sanctum Infinity's pool account on chain. Its APY comes from Hermes's own history of INF's SOL value,
+ *   and from DefiLlama only until that history is a day old (Sanctum's APY API returns 0).
  * - mSOL: Marinade's API. Kamino Lend: Kamino's API. Jupiter Lend: Jupiter's API.
- * - INF only: DefiLlama, until a live source exists (Sanctum's APY API returns 0)
  * Fast sources refresh every minute. When a source is down, routes that depend on it drop out.
  * Hermes never fills the gap with an estimate.
  */
@@ -20,6 +22,9 @@ export interface Rate {
   tvl: number; // USD
   utilization?: number; // lending only: share of the supply that is borrowed, 1 = all of it
   withdrawable?: number; // lending only: share of the supply that can be withdrawn right now
+  deposits?: number; // in the route's token (SOL for LSTs), for Hermes's own history
+  tokenValue?: number; // LSTs: SOL per token, the value APY compounds on
+  source?: string; // where the APY came from, when not the source's usual label
   updatedAt: number; // ms timestamp of the fetch
   defillamaPool?: string; // DefiLlama pool id, for its history
 }
@@ -96,7 +101,13 @@ const stakePoolRates = rateSource('stake pools on chain', async () => {
     const current = lamports / Number(pool.poolTokenSupply.toString());
     const previous = Number(pool.lastEpochTotalLamports.toString()) / Number(pool.lastEpochPoolTokenSupply.toString());
     if (!(current > 0) || !(previous > 0) || !Number.isFinite(current) || !Number.isFinite(previous)) return;
-    rates.set(pools[i], { apy: Math.pow(current / previous, epochsPerYear) - 1, tvl: (lamports / 1e9) * price, updatedAt: now });
+    rates.set(pools[i], {
+      apy: Math.pow(current / previous, epochsPerYear) - 1,
+      tvl: (lamports / 1e9) * price,
+      deposits: lamports / 1e9,
+      tokenValue: current,
+      updatedAt: now,
+    });
   });
   return rates;
 });
@@ -110,12 +121,66 @@ const marinadeRates = rateSource(
     const value = Number(apy.data?.value);
     const tvl = Number(tlv.data?.staked_usd);
     if (!Number.isFinite(value) || !(tvl > 0)) throw new Error('unexpected Marinade response');
-    return new Map([['marinade', { apy: value, tvl, updatedAt: Date.now() }]]);
+    const deposits = Number(tlv.data?.staked_sol);
+    const tokenValue = Number(apy.data?.end_price);
+    return new Map([
+      [
+        'marinade',
+        {
+          apy: value,
+          tvl,
+          deposits: deposits > 0 ? deposits : undefined,
+          tokenValue: tokenValue > 0 ? tokenValue : undefined,
+          updatedAt: Date.now(),
+        },
+      ],
+    ]);
   },
   5 * MINUTE_MS
 );
 
-// Keyed by `${project}:${symbol}`. The pools list is ~10 MB, only Solana pools are kept. Only INF uses it.
+const INFINITY_PROGRAM = new PublicKey('5ocnV1qiCgaQR8Jb8xWnVbApfaygJ8tNoZfgPwsgx9kx');
+const [INFINITY_STATE] = PublicKey.findProgramAddressSync([Buffer.from('state')], INFINITY_PROGRAM);
+// Pool state layout: total SOL value (u64) first, the INF mint at byte 144
+const INFINITY_MINT_OFFSET = 144;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const INFINITY_ROUTE = ROUTES.find((route) => route.source.kind === 'infinity');
+
+// INF's SOL value about a week ago (at least a day ago) from Hermes's history. Checked every 30 minutes.
+const infinityPastValue = cached(
+  'INF value history',
+  () => (INFINITY_ROUTE ? tokenValueNear(INFINITY_ROUTE.id, new Date(Date.now() - 7 * DAY_MS), new Date(Date.now() - DAY_MS)) : Promise.resolve(null)),
+  { ttlMs: 30 * MINUTE_MS, maxStaleMs: 6 * 60 * MINUTE_MS }
+);
+
+// Keyed "infinity". TVL is the SOL value Sanctum Infinity's pool records on chain. APY compounds INF's SOL value
+// against Hermes's own reading from about a week ago. Until that history is a day old, DefiLlama's APY stands in.
+const infinityRates = rateSource('Sanctum Infinity on chain', async () => {
+  const [state, price] = await Promise.all([connection.getAccountInfo(INFINITY_STATE), solPrice.get()]);
+  if (!state || state.data.length < INFINITY_MINT_OFFSET + 32) throw new Error('no Infinity pool state');
+  if (!price) throw new Error('no SOL price');
+  // Supply from the mint account itself (u64 at byte 36, decimals at byte 44): public RPCs refuse getTokenSupply
+  const mint = await connection.getAccountInfo(new PublicKey(state.data.subarray(INFINITY_MINT_OFFSET, INFINITY_MINT_OFFSET + 32)));
+  if (!mint || mint.data.length < 45) throw new Error('no INF mint');
+  const supply = Number(mint.data.readBigUInt64LE(36)) / 10 ** mint.data[44];
+  const solValue = Number(state.data.readBigUInt64LE(0)) / 1e9;
+  if (!(solValue > 0) || !(supply > 0)) throw new Error('empty Infinity pool');
+  const tokenValue = solValue / supply;
+
+  const past = await infinityPastValue.get();
+  let apy: number | undefined;
+  let source: string | undefined;
+  if (past && past.value > 0 && Date.now() - past.at >= DAY_MS) {
+    apy = Math.pow(tokenValue / past.value, (365.25 * DAY_MS) / (Date.now() - past.at)) - 1;
+  } else {
+    apy = (await defillamaRates.get())?.get('sanctum-infinity:INF')?.apy;
+    source = 'DefiLlama';
+  }
+  if (apy === undefined || !Number.isFinite(apy)) return new Map();
+  return new Map([['infinity', { apy, tvl: solValue * price, deposits: solValue, tokenValue, source, updatedAt: Date.now() }]]);
+});
+
+// Keyed by `${project}:${symbol}`. The pools list is ~10 MB, only Solana pools are kept. Only INF's APY uses it, until Hermes has a day of history.
 const defillamaRates = rateSource('DefiLlama', async () => {
   const response = await http.get('https://yields.llama.fi/pools');
   const pools: any[] = Array.isArray(response.data?.data) ? response.data.data : [];
@@ -152,7 +217,7 @@ const kaminoRates = rateSource('Kamino', async () => {
     const borrow = Number(reserve.totalBorrow);
     const utilization = supply > 0 && Number.isFinite(borrow) ? borrow / supply : undefined;
     const withdrawable = utilization !== undefined ? Math.max(0, 1 - utilization) : undefined;
-    rates.set(reserve.reserve, { apy, tvl, utilization, withdrawable, updatedAt: now });
+    rates.set(reserve.reserve, { apy, tvl, utilization, withdrawable, deposits: supply > 0 ? supply : undefined, updatedAt: now });
   }
   return rates;
 });
@@ -174,13 +239,15 @@ const jupiterLendRates = rateSource('Jupiter Lend', async () => {
     const supplied = Number(token.liquiditySupplyData?.supply);
     const withdrawableNow = Number(token.liquiditySupplyData?.withdrawable);
     const withdrawable = supplied > 0 && Number.isFinite(withdrawableNow) ? Math.min(1, withdrawableNow / supplied) : undefined;
-    rates.set(token.assetAddress, { apy: rateBps / 10_000, tvl, withdrawable, updatedAt: now });
+    const deposits = Number(token.totalAssets) / 10 ** decimals;
+    rates.set(token.assetAddress, { apy: rateBps / 10_000, tvl, withdrawable, deposits, updatedAt: now });
   }
   return rates;
 });
 
 export const SOURCE_LABELS: Record<RateSource['kind'], string> = {
   'stake-pool': 'On-chain',
+  infinity: 'On-chain',
   marinade: 'Marinade',
   defillama: 'DefiLlama',
   kamino: 'Kamino',
@@ -196,6 +263,8 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
       return (await stakePoolRates.get())?.get(source.pool);
     case 'marinade':
       return (await marinadeRates.get())?.get('marinade');
+    case 'infinity':
+      return (await infinityRates.get())?.get('infinity');
     case 'defillama':
       return (await defillamaRates.get())?.get(`${source.project}:${source.symbol}`);
     case 'kamino':
@@ -209,5 +278,5 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
  * Fetch every source whose cache is due, so requests hit a warm cache
  */
 export async function refreshRates(): Promise<void> {
-  await Promise.all([stakePoolRates, marinadeRates, defillamaRates, kaminoRates, jupiterLendRates].map((source) => source.get()));
+  await Promise.all([stakePoolRates, infinityRates, marinadeRates, kaminoRates, jupiterLendRates].map((source) => source.get()));
 }

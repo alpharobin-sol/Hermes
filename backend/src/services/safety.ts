@@ -3,6 +3,7 @@ import { depositStatus, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TOKENS } from '
 import { cached, Cached } from './cache';
 import { createJupiterClient } from './jupiter';
 import { getRate, http, Rate, SOURCE_LABELS } from './rates';
+import { depositHistory } from './history';
 
 /**
  * SAFETY SCORE
@@ -157,6 +158,16 @@ async function kaminoOutflow(reserve: string): Promise<Outflow> {
   return { fall: largestFall(series), days: series.length, source: 'Kamino' };
 }
 
+// Hermes's own history, once it covers at least two weeks of the window. Deposits are recorded in the route's
+// token, so price moves don't count.
+async function hermesOutflow(route: RouteConfig): Promise<Outflow | null> {
+  const since = Date.now() - OUTFLOW_WINDOW_MS;
+  const points = await depositHistory(route.id, new Date(since));
+  if (!points || points.length === 0 || Date.now() - points[0].at < MIN_POINTS * DAY_MS) return null;
+  const days = new Set(points.map((point) => Math.floor(point.at / DAY_MS))).size;
+  return { fall: largestFall(points.map((point) => point.value)), days, source: 'Hermes history' };
+}
+
 const outflowCaches = new Map<string, Cached<Outflow>>();
 
 // Undefined for routes with no deposit history source
@@ -166,9 +177,10 @@ function outflows(route: RouteConfig): Cached<Outflow> | undefined {
 
   let entry = outflowCaches.get(route.id);
   if (!entry) {
-    const fetcher = source.kind === 'kamino' ? () => kaminoOutflow(source.reserve) : () => defillamaOutflow(route);
+    const fallback = source.kind === 'kamino' ? () => kaminoOutflow(source.reserve) : () => defillamaOutflow(route);
+    const fetcher = async () => (await hermesOutflow(route)) ?? fallback();
     entry = cached(`deposit history for ${route.id}`, fetcher, {
-      ttlMs: 6 * HOUR_MS,
+      ttlMs: HOUR_MS,
       maxStaleMs: DAY_MS,
       retryAfterMs: 10 * 60 * 1000,
     });
