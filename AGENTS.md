@@ -12,13 +12,14 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Custody (owner's decision, 23 Oct 2026): Hermes can hold funds for automation only. A user opts in by moving funds into a Hermes vault that auto-allocates, auto-exits and rebalances. The vault needs a Hermes program, an outside security review and caps before real funds go in.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
-- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve 95% or more borrowed is at least moderate.
+- Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve with 95% or more borrowed or held back is at least moderate.
 
 ## Canonical
 
 - Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`)
 - API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`)
 - Repo: `alpharobin-sol/Hermes`
+- Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
 - Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
@@ -35,14 +36,15 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 
 ## Live (23 October 2026)
 
-- The site shows only routes Hermes deposits into in-app: ten LSTs and Kamino Lend (SOL, USDC, USDT) below.
-- Hidden for now, not removed: routes that send users to another app. They stay in the registry with live rates (`/api/yields?all=true` lists them) and come back one at a time as each gets an in-app deposit:
-  - Jupiter Lend SOL, USDC, USDT (Jupiter Lend API)
+- The site shows only routes Hermes deposits into in-app: ten LSTs, Kamino Lend and Jupiter Lend (SOL, USDC, USDT) below.
+- No route is hidden right now. A route without an in-app deposit stays in the registry with its live rate, off the site (`/api/yields?all=true` lists it), until its deposit passes `INTEGRATIONS.md`.
 - The token picker lists only tokens that have a route: SOL, USDC and USDT since Kamino Lend.
 - Mainnet deposits (real funds), all beta, capped at 10 SOL each:
   - JitoSOL and mSOL: Hermes quotes the protocol directly (Jito's stake pool, Marinade's liquid staking program) and Jupiter, and builds whichever gives more of the token. The dialog shows both.
   - BNSOL, jupSOL, dSOL, hSOL, INF, bbSOL, JSOL and bSOL: through the Jupiter swap API
   - Kamino Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built by Kamino's transaction API (`POST /ktx/klend/deposit`, the one the Kamino app uses, not in Kamino's public API docs). The deposit is a position in the user's own Kamino account, managed and withdrawn at app.kamino.finance. A first deposit pays one-time account rent in SOL (measured live by simulation, about 0.024 to 0.03 SOL) and the dialog shows it before signing. Rows show how much of each reserve is borrowed, and the dialog warns at 95% or more.
+  - Jupiter Lend SOL, USDC, USDT (capped at 1,000 USDC or USDT each): built from Jupiter's deposit instruction. Hermes accepts only the Jupiter Lend program with the user as the only signer, adds the jl token account and, for SOL, wraps and unwraps SOL. The user gets jlWSOL, jlUSDC or jlUSDT in the wallet, growing as interest accrues. Withdrawn at jup.ag/lend/earn. Rows show how much can be withdrawn right now, and the dialog warns at 5% or less.
+  - A direct deposit is built unless a Jupiter swap beats it by 0.01% or more: a direct deposit has no slippage.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 - Safety Score on every route, 0 to 100, default sort. Four parts from live data, 25 points each: size (TVL), track record (how long DefiLlama has tracked the protocol), 30-day outflows (in tokens) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
@@ -63,7 +65,7 @@ Routes
 - [ ] Owner deposits to move Jito, Marinade and Kamino Lend from beta to live (owner)
 - [ ] Rate checks against each protocol's app for the beta routes
 - [x] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
-- [ ] Jupiter Lend
+- [x] Jupiter Lend
 - [ ] Save and MarginFi
 
 Smart router
@@ -106,6 +108,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 23 Oct 2026, Jupiter Lend: SOL, USDC and USDT deposits into Jupiter Lend Earn for jl tokens in the wallet, beta. The Safety Score's exit part reads how much can be withdrawn right now.
 - 23 Oct 2026, four more LSTs: Sanctum Infinity (INF), Bybit (bbSOL), JPool (JSOL) and BlazeStake (bSOL) deposit in-app through Jupiter, beta.
 - 23 Oct 2026, Safety Score: 0 to 100 on every route from size, track record, 30-day outflows and exit, with a breakdown per route. Routes sort by score by default, and the risk level follows the score.
 - 23 Oct 2026, Aurora redesign: new look from the X banner, Night theme, rates on load with a rate board and a deposit panel, a single deposit card on phones, the dialog shows every path Hermes checked, real favicons.

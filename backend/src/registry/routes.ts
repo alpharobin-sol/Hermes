@@ -34,6 +34,22 @@ const KAMINO_RESERVES: Record<InputToken, string> = {
   USDT: 'H3t6qZ1JkguCNTi9uzVKqQ7dvt2cum4XiXWom6Gn5e5S',
 };
 
+// Jupiter Lend Earn: the jl token a deposit mints, and the DefiLlama Earn pool that tracks its deposits
+const JUPITER_LEND: Record<InputToken, { receipt: TokenInfo; defillamaPool: string }> = {
+  SOL: {
+    receipt: { symbol: 'jlWSOL', mint: '2uQsyo1fXXQkDtcpXnLofWy88PxcvnfH2L8FPSE62FVU', decimals: 9 },
+    defillamaPool: '19721758-74e1-4a0c-acf8-6903257b80e5',
+  },
+  USDC: {
+    receipt: { symbol: 'jlUSDC', mint: '9BEcn9aPEmhSPbPQeFGjidRiEKki46fVQDyPpSQXPA2D', decimals: 6 },
+    defillamaPool: 'd783c8df-e2ed-44b4-8317-161ccc1b5f06',
+  },
+  USDT: {
+    receipt: { symbol: 'jlUSDT', mint: 'Cmn4v2wipYV41dkakDvCgFJpxhtaaKt11NyWV8pjSE8A', decimals: 6 },
+    defillamaPool: 'a2fbc7ec-22c2-43fe-aa42-49f854aa940d',
+  },
+};
+
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana
@@ -44,7 +60,8 @@ export type RateSource =
 export type DirectDeposit =
   | { kind: 'spl-stake-pool'; pool: string } // SPL stake pool that mints the receipt
   | { kind: 'marinade' } // Marinade liquid staking program, mainnet only
-  | { kind: 'kamino-lend'; market: string; reserve: string }; // supply to a Kamino Lend reserve, mainnet only
+  | { kind: 'kamino-lend'; market: string; reserve: string } // supply to a Kamino Lend reserve, mainnet only
+  | { kind: 'jupiter-lend' }; // supply to Jupiter Lend Earn for its jl token, mainnet only
 
 export interface RouteConfig {
   id: string; // unique, used by the deposit API
@@ -56,6 +73,7 @@ export interface RouteConfig {
   direct?: DirectDeposit;
   website: string;
   source: RateSource;
+  defillamaPool?: string; // DefiLlama pool for deposit history, when the rate comes from another source
   deposit: Partial<Record<SolanaNetwork, DepositStatus>>;
 }
 
@@ -196,9 +214,13 @@ export const ROUTES: RouteConfig[] = [
       name: 'Jupiter Lend',
       category: 'lending',
       token,
+      // The deposit mints a jl token into the wallet. It grows in value as interest accrues.
+      receipt: JUPITER_LEND[token].receipt,
+      direct: { kind: 'jupiter-lend' },
       website: 'https://jup.ag/lend/earn',
       source: { kind: 'jupiter-lend', mint: TOKENS[token].mint },
-      deposit: {},
+      defillamaPool: JUPITER_LEND[token].defillamaPool,
+      deposit: { 'mainnet-beta': 'beta' },
     },
   ]),
 ];

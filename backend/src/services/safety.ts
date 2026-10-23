@@ -12,7 +12,8 @@ import { getRate, http, Rate, SOURCE_LABELS } from './rates';
  * - Outflows: the largest fall in deposits within the last 30 days, counted in the deposit token so price
  *   moves don't count. 10% or less scores 25, 40% or more scores 0.
  * - Exit: how easily money gets out today.
- *   Lending: the share of the reserve that is borrowed. 90% or less scores 25, 100% scores 0.
+ *   Lending: the share of deposits that can't be withdrawn right now (borrowed, or held back by a withdrawal limit).
+ *   90% or less scores 25, 100% scores 0.
  *   Liquid staking: the price impact of selling 10,000 of the token for SOL on Jupiter. 1% or less scores 25, 5% or more 0.
  * It does not measure smart contract or depeg risk. A route with any part missing has no score.
  */
@@ -112,6 +113,7 @@ function trackRecord(protocol: string): Cached<number> {
 
 interface Outflow {
   fall: number; // share of the peak
+  days: number; // daily points the window had
   source: string;
 }
 
@@ -142,11 +144,11 @@ function priceAt(prices: { at: number; price: number }[], at: number): number | 
   return best && Math.abs(best.at - at) <= 6 * HOUR_MS ? best.price : undefined;
 }
 
-// A daily series needs most of its days to say anything about the window
-const MIN_POINTS = 20;
+// A daily series needs at least two weeks of the window to say anything about it. Sources can have gaps.
+const MIN_POINTS = 14;
 
 async function defillamaOutflow(route: RouteConfig): Promise<Outflow> {
-  const pool = (await getRate(route.source))?.defillamaPool;
+  const pool = route.defillamaPool ?? (await getRate(route.source))?.defillamaPool;
   if (!pool) throw new Error('no DefiLlama pool');
 
   const response = await http.get(`https://yields.llama.fi/chart/${pool}`);
@@ -171,7 +173,7 @@ async function defillamaOutflow(route: RouteConfig): Promise<Outflow> {
   }
 
   if (series.length < MIN_POINTS) throw new Error(`only ${series.length} days of history`);
-  return { fall: largestFall(series), source: 'DefiLlama' };
+  return { fall: largestFall(series), days: series.length, source: 'DefiLlama' };
 }
 
 async function kaminoOutflow(reserve: string): Promise<Outflow> {
@@ -187,15 +189,15 @@ async function kaminoOutflow(reserve: string): Promise<Outflow> {
     .filter((value: number) => Number.isFinite(value) && value > 0);
 
   if (series.length < MIN_POINTS) throw new Error(`only ${series.length} days of history`);
-  return { fall: largestFall(series), source: 'Kamino' };
+  return { fall: largestFall(series), days: series.length, source: 'Kamino' };
 }
 
 const outflowCaches = new Map<string, Cached<Outflow>>();
 
-// Undefined for routes with no deposit history source yet (Jupiter Lend)
+// Undefined for routes with no deposit history source
 function outflows(route: RouteConfig): Cached<Outflow> | undefined {
   const source = route.source;
-  if (source.kind === 'jupiter-lend') return undefined;
+  if (source.kind === 'jupiter-lend' && !route.defillamaPool) return undefined;
 
   let entry = outflowCaches.get(route.id);
   if (!entry) {
@@ -247,12 +249,21 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
   const base = { key: 'exit' as const, label: 'Exit', max: PART_MAX };
 
   if (route.category === 'lending') {
-    if (rate.utilization === undefined) return undefined;
-    const borrowed = Math.min(1, rate.utilization);
+    if (rate.utilization !== undefined) {
+      const borrowed = Math.min(1, rate.utilization);
+      return {
+        ...base,
+        points: points(borrowed, 1, 0.9),
+        detail: `${formatPercent(borrowed)} of the reserve is borrowed. ${formatUsd(rate.tvl * (1 - borrowed))} can be withdrawn now.`,
+        source: SOURCE_LABELS[route.source.kind],
+      };
+    }
+    // Sources that report what can leave now rather than what is borrowed (Jupiter Lend)
+    if (rate.withdrawable === undefined) return undefined;
     return {
       ...base,
-      points: points(borrowed, 1, 0.9),
-      detail: `${formatPercent(borrowed)} of the reserve is borrowed. ${formatUsd(rate.tvl * (1 - borrowed))} can be withdrawn now.`,
+      points: points(1 - rate.withdrawable, 1, 0.9),
+      detail: `${formatPercent(rate.withdrawable)} of deposits (${formatUsd(rate.tvl * rate.withdrawable)}) can be withdrawn now. The rest is lent out or held back by ${route.name}'s withdrawal limit.`,
       source: SOURCE_LABELS[route.source.kind],
     };
   }
@@ -304,10 +315,9 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
       label: 'Outflows',
       points: points(outflow.fall, 0.4, 0.1),
       max: PART_MAX,
-      detail:
-        outflow.fall < 0.01
-          ? `Deposits fell less than 1% in the last 30 days, counted in ${unit}.`
-          : `Deposits fell at most ${formatPercent(outflow.fall)} in the last 30 days, counted in ${unit}.`,
+      detail: `${
+        outflow.fall < 0.01 ? 'Deposits fell less than 1%' : `Deposits fell at most ${formatPercent(outflow.fall)}`
+      } in the last 30 days${outflow.days < 28 ? ` (${outflow.days} days of data)` : ''}, counted in ${unit}.`,
       source: outflow.source,
     },
     exit,
