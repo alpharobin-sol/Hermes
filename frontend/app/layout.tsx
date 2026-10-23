@@ -7,6 +7,7 @@ import "./styles/wallet-adapter.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import AppLayout from "@/components/app/layout/app-layout"
 import { AlertsProvider } from "@/components/app/alerts"
+import { SITE_URL } from "@/lib/site"
 
 // Cormorant Garamond for headlines, Cinzel (Roman capitals) for rates and labels, Inter for sentences
 const cormorant = Cormorant_Garamond({
@@ -28,6 +29,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
   title: "Hermes - Yield Aggregator for Solana",
   description: "Compare live Solana yields across liquid staking and lending, then deposit from your own wallet.",
   appleWebApp: { capable: true, title: "Hermes", statusBarStyle: "default" },

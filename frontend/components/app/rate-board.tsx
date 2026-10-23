@@ -16,6 +16,7 @@ import {
   bestApyRoute,
   listedRoutes,
   safetyText,
+  showAllLabel,
   type SortBy,
   type View,
 } from "./safety"
@@ -199,7 +200,7 @@ export function RateBoard({
               <>
                 No {token} route is top rated right now.{" "}
                 <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                  Switch to All routes
+                  {showAllLabel(totalForToken, token)}
                 </button>
               </>
             )}

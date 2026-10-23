@@ -47,7 +47,7 @@ function Hero() {
           <NetworkPill className="mb-2.5 h-7 px-2.5 text-[11px] md:mb-3.5 lg:hidden" />
           <p className="eyebrow mb-2.5 hidden md:mb-3.5 lg:block">Live Solana yields</p>
           <h1 className="font-display text-[28px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
-            Compare Solana yields.
+            Compare Solana yields.{" "}
             <br />
             <em className="text-[0.8em] font-medium sm:text-[1em]">Deposit from your own wallet.</em>
           </h1>

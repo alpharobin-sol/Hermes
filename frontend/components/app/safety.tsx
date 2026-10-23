@@ -19,6 +19,11 @@ export type View = "top-rated" | "all"
 
 export const TOP_RATED_MIN_SCORE = 80
 
+// The way out of an empty Top rated view, with the count so it's clear routes exist
+export function showAllLabel(count: number, token: string): string {
+  return count === 1 ? `Show the ${token} route` : `Show all ${count} ${token} routes`
+}
+
 const VIEW_OPTIONS: { value: View; label: string }[] = [
   { value: "top-rated", label: "Top rated" },
   { value: "all", label: "All routes" },
