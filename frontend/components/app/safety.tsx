@@ -13,6 +13,61 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "apy", label: "APY" },
 ]
 
+// Sleep Well: the first screen. Routes that score 80 or more and whose reserve isn't nearly all borrowed or held
+// back (risk level low). "All routes" shows the rest.
+export type View = "sleep-well" | "all"
+
+export const SLEEP_WELL_MIN_SCORE = 80
+
+const VIEW_OPTIONS: { value: View; label: string }[] = [
+  { value: "sleep-well", label: "Sleep Well" },
+  { value: "all", label: "All routes" },
+]
+
+export function inSleepWell(route: YieldRoute): boolean {
+  return !!route.safety && route.safety.score >= SLEEP_WELL_MIN_SCORE && route.risk === "low"
+}
+
+export function ViewToggle({ value, onChange, compact = false }: { value: View; onChange: (view: View) => void; compact?: boolean }) {
+  return (
+    <div
+      role="group"
+      aria-label="Routes to show"
+      className={cn("flex gap-0.5 rounded-[4px] border p-0.5", compact ? "border-frame" : "border-border p-[3px]")}
+    >
+      {VIEW_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={option.value === value}
+          onClick={() => onChange(option.value)}
+          title={option.value === "sleep-well" ? `Only routes with a Safety Score of ${SLEEP_WELL_MIN_SCORE} or more` : undefined}
+          className={cn(
+            "inline-flex items-center whitespace-nowrap rounded-[2px] font-medium transition-colors",
+            compact ? "h-8 px-2 text-xs" : "h-9 px-2.5 text-[13px] md:px-3",
+            option.value === value
+              ? compact
+                ? "bg-card text-foreground"
+                : "bg-secondary text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// A plain line on how the route can lose money and how to get out, from what Hermes knows about it now
+export function whatCanGoWrong(route: YieldRoute): string {
+  if (route.category === "lending") {
+    const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
+    return `Your ${route.token} is lent to borrowers. A withdrawal waits when most of the reserve is borrowed.${now} A bug or bad debt in ${route.name} could lose funds.`
+  }
+  return `${route.receipt ?? "The token"} can trade below its SOL value for a while, and a bug in ${route.name}'s program could lose funds. You can swap back to SOL at the market price at any time.`
+}
+
 // Unscored routes sort last
 const scoreOf = (route: YieldRoute) => route.safety?.score ?? -1
 

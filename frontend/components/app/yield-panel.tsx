@@ -4,27 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { useWalletModal } from "@solana/wallet-adapter-react-ui"
 
-import { YieldAPI, type RiskTier, type YieldRoute } from "@/lib/api/yield-api"
+import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances"
 import { useLoading } from "./layout/loading-context"
-import { RateBoard, RISK_LEVELS } from "./rate-board"
+import { RateBoard } from "./rate-board"
 import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
 import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
-import { compareRoutes, type SortBy } from "./safety"
+import { compareRoutes, inSleepWell, type SortBy, type View } from "./safety"
 
 const RATE_REFRESH_MS = 60 * 1000
 
 // "A", "A and B", "A, B and C"
 function listOf(items: string[]): string {
   return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
-}
-
-// Routes at or below the chosen risk level
-function withinRisk(route: YieldRoute, profile: RiskTier): boolean {
-  const order = RISK_LEVELS.map((level) => level.value)
-  return order.indexOf(route.risk) <= order.indexOf(profile)
 }
 
 // Round down so a quick amount never exceeds what the wallet can spend
@@ -54,14 +48,15 @@ export function YieldPanel() {
 
   const [selectedSymbol, setSelectedSymbol] = useState(BASE_TOKENS[0].symbol)
   const [amount, setAmount] = useState("")
-  const [riskProfile, setRiskProfile] = useState<RiskTier>("moderate")
+  // Sleep Well is the first screen. All routes is one tap away.
+  const [view, setView] = useState<View>("sleep-well")
   // Routes lead with the Safety Score. APY is one tap away.
   const [sortBy, setSortBy] = useState<SortBy>("safety")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const mobileCardRef = useRef<HTMLElement>(null)
 
-  // Every route, once. Rates show before an amount is typed. Amount and risk are applied here.
+  // Every route, once. Rates show before an amount is typed. Amount and view are applied here.
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
@@ -120,7 +115,7 @@ export function YieldPanel() {
     () => routes.filter((route) => route.token === selectedToken.symbol).sort(compareRoutes(sortBy)),
     [routes, selectedToken.symbol, sortBy]
   )
-  const visibleRoutes = forToken.filter((route) => withinRisk(route, riskProfile))
+  const visibleRoutes = view === "all" ? forToken : forToken.filter(inSleepWell)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
   const sources = listOf([...new Set(forToken.map((route) => route.source))])
 
@@ -195,8 +190,8 @@ export function YieldPanel() {
         isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
         routes={visibleRoutes}
         totalForToken={forToken.length}
-        risk={riskProfile}
-        onRisk={setRiskProfile}
+        view={view}
+        onView={setView}
         sortBy={sortBy}
         onSort={setSortBy}
         route={loading || error ? null : selectedRoute}
@@ -211,8 +206,8 @@ export function YieldPanel() {
         tokens={tokens.map(({ symbol, icon, count }) => ({ symbol, icon, count }))}
         token={selectedToken.symbol}
         onToken={handleToken}
-        risk={riskProfile}
-        onRisk={setRiskProfile}
+        view={view}
+        onView={setView}
         sortBy={sortBy}
         onSort={setSortBy}
         routes={visibleRoutes}

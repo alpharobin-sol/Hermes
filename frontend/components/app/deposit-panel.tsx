@@ -10,7 +10,7 @@ import { formatUSD } from "@/lib/helpers/formatters"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
-import { SafetyBreakdown } from "./safety"
+import { SafetyBreakdown, whatCanGoWrong } from "./safety"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -253,6 +253,11 @@ export function RouteNotes({ route, compact = false }: { route: YieldRoute; comp
   const borrowed = borrowedPercent(route)
   return (
     <div className="flex flex-col gap-2 empty:hidden">
+      {route.deposit && (
+        <Note tone="muted">
+          <span className="font-medium text-foreground">What can go wrong:</span> {whatCanGoWrong(route)}
+        </Note>
+      )}
       {!compact && route.deposit === "beta" && !IS_DEVNET && (
         <Note>
           Beta route with real funds.

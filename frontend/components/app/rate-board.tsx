@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
-import { SafetyCell, SortToggle, bestApyRoute, safetyText, type SortBy } from "./safety"
+import { SLEEP_WELL_MIN_SCORE, SafetyCell, SortToggle, ViewToggle, bestApyRoute, safetyText, type SortBy, type View } from "./safety"
 
 export const RISK_LEVELS: { value: RiskTier; label: string; color: string; text: string }[] = [
   { value: "low", label: "Low", color: "bg-success", text: "text-success" },
@@ -61,11 +61,11 @@ interface RateBoardProps {
   tokens: { symbol: string; icon: string; count: number }[]
   token: string
   onToken: (symbol: string) => void
-  risk: RiskTier
-  onRisk: (risk: RiskTier) => void
+  view: View
+  onView: (view: View) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
-  routes: YieldRoute[] // for the token, within the risk level, in sortBy order
+  routes: YieldRoute[] // for the token, in the view, in sortBy order
   totalForToken: number
   selectedId: string | null
   onSelect: (id: string) => void
@@ -82,8 +82,8 @@ export function RateBoard({
   tokens,
   token,
   onToken,
-  risk,
-  onRisk,
+  view,
+  onView,
   sortBy,
   onSort,
   routes,
@@ -104,7 +104,7 @@ export function RateBoard({
   return (
     <div className={cn("plaque min-w-0 flex-[999_1_600px]", className)}>
       <div className="plaque-inner overflow-hidden">
-        {/* Token and risk */}
+        {/* Token, sort and view */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-3 py-3 md:px-[18px] md:py-3.5">
           {/* Phones pick the token in the deposit card, so the board shows a title there */}
           <h2 className="font-roman text-[13px] font-bold tracking-[0.14em] lg:hidden">
@@ -139,29 +139,7 @@ export function RateBoard({
               <span className="label-roman whitespace-nowrap text-xs">Sort</span>
               <SortToggle value={sortBy} onChange={onSort} />
             </span>
-            <span id="risk-label" className="label-roman whitespace-nowrap text-xs">
-              Risk up to
-            </span>
-            <div role="group" aria-labelledby="risk-label" className="flex gap-0.5 rounded-[4px] border border-border p-[3px]">
-              {RISK_LEVELS.map((level) => {
-                const active = level.value === risk
-                return (
-                  <button
-                    key={level.value}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => onRisk(level.value)}
-                    className={cn(
-                      "inline-flex h-9 items-center gap-2 rounded-[2px] px-2.5 text-[13px] font-medium transition-colors md:px-3",
-                      active ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span className={cn("size-[7px] rotate-45", level.color)} aria-hidden="true" />
-                    {level.label}
-                  </button>
-                )
-              })}
-            </div>
+            <ViewToggle value={view} onChange={onView} />
           </div>
         </div>
 
@@ -199,9 +177,16 @@ export function RateBoard({
           </div>
         ) : routes.length === 0 ? (
           <p className="border-t border-row-line px-5 py-8 text-center text-sm text-muted-foreground">
-            {totalForToken === 0
-              ? `No ${token} routes in Hermes right now.`
-              : `No ${token} routes at ${risk} risk. Raise the risk level to see ${totalForToken} more.`}
+            {totalForToken === 0 ? (
+              `No ${token} routes in Hermes right now.`
+            ) : (
+              <>
+                No {token} route makes Sleep Well right now.{" "}
+                <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                  Show all {totalForToken} {totalForToken === 1 ? "route" : "routes"}
+                </button>
+              </>
+            )}
           </p>
         ) : (
           <div role="radiogroup" aria-label={`${token} routes`}>
@@ -217,8 +202,10 @@ export function RateBoard({
             ))}
             {hidden > 0 && (
               <p className="border-t border-row-line px-3 py-3 text-xs text-muted-foreground md:px-[18px]">
-                {hidden} more {hidden === 1 ? "route" : "routes"} above {risk} risk. Raise the risk level to see{" "}
-                {hidden === 1 ? "it" : "them"}.
+                {hidden} more {hidden === 1 ? "route" : "routes"} outside Sleep Well.{" "}
+                <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                  Show all routes
+                </button>
               </p>
             )}
           </div>
@@ -229,6 +216,7 @@ export function RateBoard({
           Returns assume today&apos;s APY holds and are not guaranteed. The Safety Score adds four parts from live data,
           25 points each: size, track record, 30-day outflows and exit. Pick a route to see why it scores what it does.
           It does not cover smart contract bugs or depegs. Risk level follows the score: low from 80, moderate from 60.
+          Sleep Well shows only routes scoring {SLEEP_WELL_MIN_SCORE} or more.
         </p>
       </div>
     </div>
