@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { useWalletModal } from "@solana/wallet-adapter-react-ui"
 
@@ -10,6 +10,7 @@ import { useLoading } from "./layout/loading-context"
 import { RateBoard, RISK_LEVELS } from "./rate-board"
 import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
+import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
 
 // Routes at or below the chosen risk level
@@ -48,6 +49,7 @@ export function YieldPanel() {
   const [riskProfile, setRiskProfile] = useState<RiskTier>("moderate")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const mobileCardRef = useRef<HTMLElement>(null)
 
   // Every route, once. Rates show before an amount is typed. Amount and risk are applied here.
   useEffect(() => {
@@ -126,6 +128,14 @@ export function YieldPanel() {
     setAmount("")
   }
 
+  // On phones the list sits under the deposit card, so picking a route brings the card back into view
+  const handleSelect = (id: string) => {
+    setSelectedId(id)
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      mobileCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }
+
   const handleReview = () => {
     if (!publicKey) {
       setWalletModalVisible(true)
@@ -138,8 +148,33 @@ export function YieldPanel() {
     <section
       id="rates"
       aria-label="Rates"
-      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-6 px-4 pb-16 pt-10 md:px-8 md:pb-24 md:pt-16"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-4 md:gap-6 md:px-8 md:pb-24 md:pt-16"
     >
+      <MobileDeposit
+        ref={mobileCardRef}
+        tokens={tokens}
+        token={selectedToken}
+        onToken={handleToken}
+        amount={amount}
+        onAmount={setAmount}
+        numericAmount={numericAmount}
+        isConnected={isConnected}
+        balanceKnown={balanceKnown}
+        spendable={spendableBalance}
+        balanceIssue={balanceIssue}
+        onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
+        isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
+        routes={visibleRoutes}
+        risk={riskProfile}
+        onRisk={setRiskProfile}
+        route={loading || error ? null : selectedRoute}
+        onSelectRoute={setSelectedId}
+        ratesStatus={loading ? "loading" : error ? "error" : "ready"}
+        updatedLabel={updatedLabel(forToken)}
+        onConnect={() => setWalletModalVisible(true)}
+        onReview={handleReview}
+      />
+
       <RateBoard
         tokens={tokens.map(({ symbol, icon, count }) => ({ symbol, icon, count }))}
         token={selectedToken.symbol}
@@ -149,7 +184,7 @@ export function YieldPanel() {
         routes={visibleRoutes}
         totalForToken={forToken.length}
         selectedId={selectedRoute?.id ?? null}
-        onSelect={setSelectedId}
+        onSelect={handleSelect}
         amount={numericAmount}
         loading={loading}
         error={error}
@@ -173,6 +208,7 @@ export function YieldPanel() {
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
         onConnect={() => setWalletModalVisible(true)}
         onReview={handleReview}
+        className="max-lg:hidden"
       />
 
       {reviewOpen && selectedRoute && (

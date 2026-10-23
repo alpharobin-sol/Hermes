@@ -39,7 +39,9 @@ export function Medallion({ route, className }: { route: YieldRoute; className?:
   )
 }
 
-const GRID = "md:grid md:grid-cols-[minmax(0,1fr)_104px_120px_80px_100px_20px] md:gap-4"
+// 1024 to 1279px leaves out est. yearly: the deposit panel shows it for the selected route
+const GRID =
+  "lg:grid lg:grid-cols-[minmax(0,1fr)_104px_80px_100px_20px] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_104px_120px_80px_100px_20px]"
 
 interface RateBoardProps {
   tokens: { symbol: string; icon: string; count: number }[]
@@ -79,17 +81,15 @@ export function RateBoard({
   const hidden = totalForToken - routes.length
 
   return (
-    <div className="plaque min-w-0 flex-[999_1_640px]">
+    <div className="plaque min-w-0 flex-[999_1_600px]">
       <div className="plaque-inner overflow-hidden">
         {/* Token and risk */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-3 py-3 md:px-[18px] md:py-3.5">
-          {/* Phone: tokens share one row, risk takes the next */}
-          <div
-            role="group"
-            aria-label="Token"
-            className="grid w-full gap-1.5 sm:flex sm:w-auto sm:flex-wrap"
-            style={{ gridTemplateColumns: `repeat(${Math.max(tokens.length, 1)}, minmax(0, 1fr))` }}
-          >
+          {/* Phones pick the token in the deposit card, so the board shows a title there */}
+          <h2 className="font-roman text-[13px] font-bold tracking-[0.14em] lg:hidden">
+            {loading || error ? `${token} routes` : `Compare ${totalForToken} ${token} ${totalForToken === 1 ? "route" : "routes"}`}
+          </h2>
+          <div role="group" aria-label="Token" className="hidden flex-wrap gap-1.5 lg:flex">
             {tokens.map((t) => {
               const active = t.symbol === token
               return (
@@ -99,7 +99,7 @@ export function RateBoard({
                   aria-pressed={active}
                   onClick={() => onToken(t.symbol)}
                   className={cn(
-                    "inline-flex h-11 items-center justify-center gap-2 rounded-full border pl-2 pr-3 text-sm font-semibold transition-colors sm:justify-start sm:gap-2.5 sm:pr-3.5",
+                    "inline-flex h-11 items-center gap-2.5 rounded-full border pl-2 pr-3.5 text-sm font-semibold transition-colors",
                     active
                       ? "border-frame bg-secondary text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
@@ -144,7 +144,7 @@ export function RateBoard({
         <div aria-hidden="true" className={cn("hidden px-[18px] py-3 label-roman", GRID)}>
           <span>Route</span>
           <span>APY</span>
-          <span>Est. yearly</span>
+          <span className="hidden xl:block">Est. yearly</span>
           <span>TVL</span>
           <span>Risk</span>
           <span />
@@ -270,35 +270,35 @@ function RouteRow({
                   {` · ${borrowed}% borrowed`}
                 </span>
               )}
-              <span className="md:hidden">{` · ${riskLabel} risk`}</span>
+              <span className="lg:hidden">{` · ${riskLabel} risk`}</span>
             </span>
           </span>
         </span>
 
         {/* APY and its source */}
-        <span className="flex shrink-0 flex-col items-end gap-0.5 md:items-start">
-          <span className={cn("font-roman text-lg font-bold md:text-[21px]", best ? "text-ink" : "text-foreground")}>
+        <span className="flex shrink-0 flex-col items-end gap-0.5 lg:items-start">
+          <span className={cn("font-roman text-lg font-bold lg:text-[21px]", best ? "text-ink" : "text-foreground")}>
             {formatApy(route)}
           </span>
-          <span className="hidden text-[11px] text-muted-foreground md:block">{route.source}</span>
+          <span className="hidden text-[11px] text-muted-foreground lg:block">{route.source}</span>
         </span>
 
         {/* Returns at today's APY, in the deposit token */}
-        <span className="hidden flex-col gap-0.5 md:flex">
+        <span className="hidden flex-col gap-0.5 xl:flex">
           <span className="text-sm font-medium">{amount > 0 ? `+${formatTokenAmount(yearly, route.token)} ${route.token}` : "—"}</span>
           {amount > 0 && <span className="text-[11px] text-muted-foreground">{formatTokenAmount(yearly / 12, route.token)} / mo</span>}
         </span>
 
-        <span className="hidden text-sm font-medium md:block">{formatUSD(route.tvl)}</span>
+        <span className="hidden text-sm font-medium lg:block">{formatUSD(route.tvl)}</span>
 
-        <span className="hidden md:flex">
+        <span className="hidden lg:flex">
           <RiskBars risk={route.risk} />
         </span>
 
         <span
           aria-hidden="true"
           className={cn(
-            "hidden size-[18px] place-items-center rounded-full border-2 md:grid",
+            "hidden size-[18px] place-items-center rounded-full border-2 lg:grid",
             selected ? "border-ink" : "border-gilt"
           )}
         >
@@ -306,24 +306,6 @@ function RouteRow({
         </span>
       </button>
 
-      {/* Phone: the selected route opens its details under the row */}
-      {selected && (
-        <dl className="grid grid-cols-2 gap-3 border-t border-border px-3 pb-3.5 pt-2.5 md:hidden">
-          <Detail label="Est. yearly" value={amount > 0 ? `+${formatTokenAmount(yearly, route.token)} ${route.token}` : "—"} />
-          <Detail label="TVL" value={formatUSD(route.tvl)} />
-          {borrowed !== null && <Detail label="Borrowed" value={`${borrowed}%`} />}
-          <Detail label="Source" value={route.source} />
-        </dl>
-      )}
-    </div>
-  )
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="label-roman text-[10px]">{label}</dt>
-      <dd className="m-0 text-sm font-medium">{value}</dd>
     </div>
   )
 }

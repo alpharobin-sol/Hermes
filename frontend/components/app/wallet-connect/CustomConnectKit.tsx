@@ -32,15 +32,15 @@ export function CustomConnectButton({ className }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn(connected ? "btn-frame" : "btn-teal", "h-11 px-3.5 text-sm md:px-[18px]", className)}
+        className={cn(connected ? "btn-frame" : "btn-teal", "h-11 whitespace-nowrap px-3.5 text-sm md:px-[18px]", className)}
       >
         <Wallet className="size-4" strokeWidth={2} />
         {connected ? (
           <span>{short}</span>
         ) : (
           <>
-            <span className="md:hidden">Connect</span>
-            <span className="hidden md:inline">Connect wallet</span>
+            <span className="lg:hidden">Connect</span>
+            <span className="hidden lg:inline">Connect wallet</span>
           </>
         )}
       </button>

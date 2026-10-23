@@ -25,6 +25,7 @@ Model: Titan for yield. Titan compares swap routes across DEX aggregators. Herme
 - Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
+- Phones and tablets (under 1024px): one deposit card comes first, the way a swap app works. Amount and token, the route it goes into, one button. Token and route open as bottom sheets. The route list sits below the card.
 - Hero art: `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
 ## Live (23 October 2026)
@@ -68,7 +69,7 @@ Each route goes through `INTEGRATIONS.md`, one at a time.
 
 ## Shipped
 
-- 23 Oct 2026, Aurora redesign: new look from the X banner, Night theme, rates on load with a rate board and a deposit panel, the dialog shows every path Hermes checked, real favicons.
+- 23 Oct 2026, Aurora redesign: new look from the X banner, Night theme, rates on load with a rate board and a deposit panel, a single deposit card on phones, the dialog shows every path Hermes checked, real favicons.
 - 23 Oct 2026: a lending reserve 95% or more borrowed shows at least moderate risk.
 - 23 Oct 2026, Kamino Lend: SOL, USDC and USDT deposits into Kamino's main market, with one-time rent and borrowed share shown before signing. USDC and USDT back in the token picker.
 - 22 Oct 2026, Marinade direct: mSOL deposits compare Marinade's own deposit with Jupiter and build the better one.

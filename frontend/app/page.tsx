@@ -39,23 +39,23 @@ function Hero() {
         />
       </figure>
 
-      <div className="plaque relative mx-2 -mt-5 border-gilt sm:mx-auto sm:max-w-[840px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
-        <div className="plaque-inner px-4 pb-7 pt-6 text-center sm:px-6 md:px-10 md:pb-10 md:pt-9">
-          <p className="eyebrow mb-2.5 text-[11px] md:mb-3.5 md:text-[13px]">Live Solana yields</p>
-          <h1 className="font-display text-[29px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
+      <div className="plaque relative mx-2 -mt-6 border-gilt sm:mx-auto sm:max-w-[840px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
+        {/* Phones get the headline only, so the deposit card comes right after it */}
+        <div className="plaque-inner px-4 pb-4 pt-4 text-center sm:px-6 sm:pb-7 sm:pt-6 md:px-10 md:pb-10 md:pt-9">
+          <p className="eyebrow mb-2 text-[11px] sm:mb-2.5 md:mb-3.5 md:text-[13px]">Live Solana yields</p>
+          <h1 className="font-display text-[28px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
             Compare Solana yields.
             <br />
-            <em className="font-medium">Deposit from your own wallet.</em>
+            <em className="text-[0.8em] font-medium sm:text-[1em]">Deposit from your own wallet.</em>
           </h1>
-          <p className="mx-auto mt-3.5 max-w-[600px] text-sm leading-relaxed text-muted-foreground md:mt-[18px] md:text-[17px]">
+          <p className="mx-auto mt-3.5 hidden max-w-[600px] text-sm leading-relaxed text-muted-foreground sm:block md:mt-[18px] md:text-[17px]">
             Hermes checks live rates across Solana protocols and builds the deposit for the route you pick. You sign it
             in your wallet. Funds never touch Hermes.
           </p>
-          {/* Phone: one fact per line. Wider: one row with diamonds between. */}
-          <ul className="mt-5 flex flex-col items-center gap-1.5 text-[13px] font-medium sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-[18px] sm:gap-y-2.5 md:mt-[26px] md:text-sm">
+          <ul className="mt-5 hidden flex-wrap items-center justify-center gap-x-[18px] gap-y-2.5 text-[13px] font-medium sm:flex md:mt-[26px] md:text-sm">
             {facts.map((fact, index) => (
               <li key={fact} className="flex items-center gap-[18px]">
-                {index > 0 && <span className="diamond hidden sm:inline-block" aria-hidden="true" />}
+                {index > 0 && <span className="diamond" aria-hidden="true" />}
                 {fact}
               </li>
             ))}

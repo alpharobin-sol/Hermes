@@ -61,7 +61,7 @@ export function AppHeader() {
             <Wordmark className="h-[22px] md:h-[26px]" />
           </a>
 
-          <nav aria-label="Sections" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Sections" className="hidden items-center gap-1 lg:flex">
             {NAV_ITEMS.map((item) => (
               <a
                 key={item.href}
@@ -81,7 +81,7 @@ export function AppHeader() {
               type="button"
               onClick={() => setSettingsOpen(true)}
               aria-label="Settings"
-              className="hidden size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:grid"
+              className="hidden size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:grid"
             >
               <Settings className="size-[18px]" strokeWidth={1.75} />
             </button>
@@ -91,7 +91,7 @@ export function AppHeader() {
               onClick={() => setMenuOpen(true)}
               aria-label="Open menu"
               aria-expanded={menuOpen}
-              className="grid size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground md:hidden"
+              className="grid size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground lg:hidden"
             >
               <Menu className="size-[18px]" />
             </button>
@@ -108,7 +108,7 @@ export function AppHeader() {
       <div
         onClick={() => setMenuOpen(false)}
         className={cn(
-          "fixed inset-0 z-50 bg-[rgba(43,20,14,0.6)] transition-opacity duration-300 md:hidden",
+          "fixed inset-0 z-50 bg-[rgba(43,20,14,0.6)] transition-opacity duration-300 lg:hidden",
           menuOpen ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       />
@@ -118,7 +118,7 @@ export function AppHeader() {
         aria-label="Menu"
         aria-hidden={!menuOpen}
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-72 flex-col border-l border-frame bg-card transition-transform duration-300 md:hidden",
+          "fixed inset-y-0 right-0 z-50 flex w-72 flex-col border-l border-frame bg-card transition-transform duration-300 lg:hidden",
           menuOpen ? "translate-x-0" : "pointer-events-none translate-x-full"
         )}
       >

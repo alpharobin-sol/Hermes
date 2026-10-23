@@ -14,7 +14,7 @@ import { formatTokenAmount, type Token } from "./tokens"
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
 
-const QUICK_AMOUNTS = ["25%", "50%", "75%", "Max"]
+export const QUICK_AMOUNTS = ["25%", "50%", "75%", "Max"]
 
 interface DepositPanelProps {
   token: Token
@@ -31,6 +31,7 @@ interface DepositPanelProps {
   ratesStatus: "loading" | "error" | "ready"
   onConnect: () => void
   onReview: () => void
+  className?: string
 }
 
 export function DepositPanel({
@@ -48,13 +49,14 @@ export function DepositPanel({
   ratesStatus,
   onConnect,
   onReview,
+  className,
 }: DepositPanelProps) {
   const yearly = route ? numericAmount * route.apy : 0
   const borrowed = route ? borrowedPercent(route) : null
-  const overCap = !!route?.deposit && route.depositCap != null && numericAmount > route.depositCap
+  const overCap = isOverCap(route, numericAmount)
 
   return (
-    <aside aria-label="Deposit" className="plaque min-w-0 flex-[1_1_340px]">
+    <aside aria-label="Deposit" className={cn("plaque min-w-0 flex-[1_1_320px]", className)}>
       <div className="plaque-inner flex flex-col gap-5 p-4 md:p-[22px]">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-roman text-base font-bold tracking-[0.16em]">Deposit</h2>
@@ -121,18 +123,7 @@ export function DepositPanel({
               </button>
             ))}
           </div>
-          {balanceIssue && (
-            <p className="text-xs text-destructive">
-              {balanceIssue === "insufficient"
-                ? `Insufficient ${token.symbol} balance. You have ${formatTokenAmount(token.balance, token.symbol)} ${token.symbol}.`
-                : `Keep ${SOL_FEE_RESERVE} SOL for network fees. You can deposit up to ${formatTokenAmount(spendable, "SOL")} SOL.`}
-            </p>
-          )}
-          {overCap && route?.depositCap != null && (
-            <p className="text-xs text-destructive">
-              While in beta, {route.name} deposits are limited to {route.depositCap.toLocaleString()} {route.token} each.
-            </p>
-          )}
+          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
         </div>
 
         {route && (
@@ -203,6 +194,42 @@ export function DepositPanel({
   )
 }
 
+// Over the beta limit for one deposit into this route
+export function isOverCap(route: YieldRoute | null, amount: number): boolean {
+  return !!route?.deposit && route.depositCap != null && amount > route.depositCap
+}
+
+export function AmountMessages({
+  token,
+  spendable,
+  balanceIssue,
+  route,
+  overCap,
+}: {
+  token: Token
+  spendable: number
+  balanceIssue: BalanceIssue
+  route: YieldRoute | null
+  overCap: boolean
+}) {
+  return (
+    <>
+      {balanceIssue && (
+        <p className="text-xs text-destructive">
+          {balanceIssue === "insufficient"
+            ? `Insufficient ${token.symbol} balance. You have ${formatTokenAmount(token.balance, token.symbol)} ${token.symbol}.`
+            : `Keep ${SOL_FEE_RESERVE} SOL for network fees. You can deposit up to ${formatTokenAmount(spendable, "SOL")} SOL.`}
+        </p>
+      )}
+      {overCap && route?.depositCap != null && (
+        <p className="text-xs text-destructive">
+          While in beta, {route.name} deposits are limited to {route.depositCap.toLocaleString()} {route.token} each.
+        </p>
+      )}
+    </>
+  )
+}
+
 function Note({ children, tone = "warning" }: { children: React.ReactNode; tone?: "warning" | "muted" }) {
   return (
     <p className={cn("flex items-start gap-2.5 text-[13px] leading-relaxed", tone === "warning" ? "text-warning" : "text-muted-foreground")}>
@@ -212,17 +239,18 @@ function Note({ children, tone = "warning" }: { children: React.ReactNode; tone?
   )
 }
 
-function RouteNotes({ route }: { route: YieldRoute }) {
+// compact: the phone card says beta in its fine print, and the dialog shows any rent before signing
+export function RouteNotes({ route, compact = false }: { route: YieldRoute; compact?: boolean }) {
   const borrowed = borrowedPercent(route)
   return (
-    <div className="flex flex-col gap-2">
-      {route.deposit === "beta" && !IS_DEVNET && (
+    <div className="flex flex-col gap-2 empty:hidden">
+      {!compact && route.deposit === "beta" && !IS_DEVNET && (
         <Note>
           Beta route with real funds.
           {route.depositCap != null && ` Up to ${route.depositCap.toLocaleString()} ${route.token} per deposit.`} Start small.
         </Note>
       )}
-      {route.deposit && route.category === "lending" && (
+      {!compact && route.deposit && route.category === "lending" && (
         <Note tone="muted">
           Your first {route.name} deposit pays one-time account rent in SOL. You see the exact amount before you sign.
         </Note>
@@ -240,7 +268,7 @@ function RouteNotes({ route }: { route: YieldRoute }) {
   )
 }
 
-function PrimaryAction({
+export function PrimaryAction({
   route,
   ratesStatus,
   token,
