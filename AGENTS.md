@@ -116,6 +116,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 23 Oct 2026, site audit fixes: robots.txt, sitemap.xml and a canonical URL (www.hermesagg.xyz), headers that stop other sites framing Hermes, the unused Vercel Analytics script removed (it returned 404), the Night wordmark loads up front, clean H1 and Connect text, and the empty Top rated state names how many routes "Show all" opens.
 - 23 Oct 2026, alerts guide: the bell asks for notifications straight from the tap, with a pop-up that shows what to tap and how to allow blocked or hidden prompts per browser.
 - 23 Oct 2026, phone alerts: web push for watched routes (rate drop, better route, reserve nearly all borrowed, left Top rated), a bell per route, an off switch in Settings, a web app manifest so iPhones can add Hermes to the Home Screen.
 - 23 Oct 2026, Top rated (first shipped as Sleep Well): the first screen shows only routes scoring 80 or more, with a toggle to All routes and a "What can go wrong" line per route. Replaces the Low / Moderate / High risk filter.

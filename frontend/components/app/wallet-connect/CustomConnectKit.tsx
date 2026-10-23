@@ -38,10 +38,10 @@ export function CustomConnectButton({ className }: Props) {
         {connected ? (
           <span>{short}</span>
         ) : (
-          <>
-            <span className="lg:hidden">Connect</span>
-            <span className="hidden lg:inline">Connect wallet</span>
-          </>
+          // One label, so its text reads "Connect wallet" and not "ConnectConnect wallet"
+          <span>
+            Connect<span className="hidden lg:inline"> wallet</span>
+          </span>
         )}
       </button>
 

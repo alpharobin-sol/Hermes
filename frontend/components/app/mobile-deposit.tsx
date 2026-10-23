@@ -20,6 +20,7 @@ import {
   bestApyRoute,
   listedRoutes,
   safetyText,
+  showAllLabel,
   type SortBy,
   type View,
 } from "./safety"
@@ -179,7 +180,14 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             onSort={onSort}
           />
         ) : (
-          <BestRoute route={route} routes={routes} token={token.symbol} ratesStatus={ratesStatus} onView={onView} />
+          <BestRoute
+            route={route}
+            routes={routes}
+            totalForToken={totalForToken}
+            token={token.symbol}
+            ratesStatus={ratesStatus}
+            onView={onView}
+          />
         )}
 
         {/* Where the numbers come from, like a swap app's rate line */}
@@ -242,12 +250,14 @@ const BEST_TAG =
 function BestRoute({
   route,
   routes,
+  totalForToken,
   token,
   ratesStatus,
   onView,
 }: {
   route: YieldRoute | null
   routes: YieldRoute[]
+  totalForToken: number
   token: string
   ratesStatus: "loading" | "error" | "ready"
   onView: (view: View) => void
@@ -290,7 +300,7 @@ function BestRoute({
             <>
               No {token} route is top rated right now.{" "}
               <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                Switch to All routes
+                {showAllLabel(totalForToken, token)}
               </button>
             </>
           )}
@@ -348,7 +358,7 @@ function RouteChoices({
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             No {token} route is top rated right now.{" "}
             <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-              Switch to All routes
+              {showAllLabel(totalForToken, token)}
             </button>
           </p>
         )}
