@@ -34,3 +34,8 @@ services:
       # Hermes's own rate history: Supabase Postgres, Session pooler connection string. Without it history is off.
       - key: DATABASE_URL
         sync: false
+      # Optional: fixed keys for phone alerts. Without them Hermes creates a pair once and keeps it in the database.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false

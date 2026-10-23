@@ -21,7 +21,9 @@ src/
 │   ├── rates.ts                # live rates from DefiLlama, Kamino and Jupiter Lend
 │   ├── yields.ts               # joins the registry with live rates and Safety Scores
 │   ├── safety.ts               # Safety Score: size, track record, outflows, exit
-│   ├── history.ts              # Hermes's own rate history in Postgres (DATABASE_URL)
+│   ├── db.ts                   # Postgres pool and tables (DATABASE_URL)
+│   ├── history.ts              # Hermes's own rate history
+│   ├── alerts.ts               # phone alerts (web push) for watched routes
 │   ├── cache.ts                # TTL cache with a stale fallback, shared by rates and scores
 │   ├── jupiter.ts              # Jupiter swap API client
 │   ├── deposit.ts              # quotes every path for a deposit and builds the best one
@@ -68,6 +70,12 @@ The risk tier follows the score: low at 80 and above, moderate from 60, high bel
 ## History
 
 With `DATABASE_URL` set (Supabase Postgres in production, Session pooler string), Hermes records every route's APY, TVL, deposits in its own token, token value and withdrawable share every 10 minutes in `rate_snapshots`, and keeps 90 days. It feeds the Safety Score's outflows and INF's APY. It is never in the quote path, and if the database is down everything else keeps working. `GET /health` shows whether history is on and when it last recorded.
+
+## Alerts
+
+Phone alerts through web push. `GET /api/alerts/key` returns the public key a browser subscribes with. `POST /api/alerts/subscribe { subscription, routes }` stores the device's push endpoint and keys with the route ids it watches (the full list, replacing the last one), and sends a first notification to a new device. `POST /api/alerts/unsubscribe { endpoint }` forgets the device.
+
+Every 10 minutes the API checks watched routes against its history and sends at most one alert per device, route and kind a day: `apy-drop` (down 20% or more and at least half a point in a day), `better-route` (a top rated route for the same token paying a point or more above), `exit-tight` (5% or less of a lending reserve withdrawable), `left-top-rated` (Safety Score below 80, from 80 or more a day ago). A device the push service reports gone is forgotten. Tables: `push_subscriptions`, `alert_log`, `app_settings` (the VAPID keys, created once unless `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` are set). Needs `DATABASE_URL`.
 
 ## Endpoints
 

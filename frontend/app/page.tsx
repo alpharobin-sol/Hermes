@@ -136,6 +136,10 @@ const faqs = [
     answer: "The view Hermes opens with. It shows only routes with a Safety Score of 80 or more, and leaves out lending reserves where almost nothing can be withdrawn right now. Each route says plainly what can go wrong before you sign. Top rated means fewer surprises, not no risk. Tap All routes to compare everything.",
   },
   {
+    question: "Can Hermes alert me when a route changes?",
+    answer: "Yes, on your phone or computer. Tap the bell under a route and allow notifications. Hermes tells you when its rate falls, a better top rated route opens, a lending reserve is nearly all borrowed, or it leaves Top rated, at most once a day per kind. On iPhone, add Hermes to your Home Screen first (Share, then Add to Home Screen). Hermes keeps only your device's notification address and the routes you watch, never your wallet. Turn alerts off any time in Settings.",
+  },
+  {
     question: "Does Hermes charge a fee?",
     answer: "Not today. You pay the protocol's own fees and Solana network fees, and swap routes can include price impact, which Hermes shows before you sign.",
   },

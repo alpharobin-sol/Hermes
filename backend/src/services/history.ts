@@ -1,5 +1,5 @@
-import { Pool } from 'pg';
 import { logger } from '../utils/logger';
+import { dbReady, pool } from './db';
 
 /**
  * HERMES HISTORY
@@ -16,6 +16,7 @@ export interface Snapshot {
   deposits?: number; // in the route's token (SOL for LSTs), so price moves don't count
   tokenValue?: number; // LSTs: SOL per token, the value APY compounds on
   withdrawable?: number; // lending: share that can be withdrawn right now
+  safetyScore?: number; // the route's Safety Score, for alerts when it falls
 }
 
 export interface HistoryPoint {
@@ -26,67 +27,8 @@ export interface HistoryPoint {
 const SNAPSHOT_EVERY_MS = 10 * 60 * 1000;
 const KEEP_DAYS = 90;
 
-// The connection string's own sslmode would override the options below, so it is dropped here
-function connectionString(url: string): string {
-  const parsed = new URL(url);
-  parsed.searchParams.delete('sslmode');
-  return parsed.toString();
-}
-
-function createPool(): Pool | null {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  const local = ['localhost', '127.0.0.1'].includes(new URL(url).hostname);
-  const pool = new Pool({
-    connectionString: connectionString(url),
-    max: 3,
-    connectionTimeoutMillis: 10_000,
-    idleTimeoutMillis: 30_000,
-    // Encrypted. Supabase's pooler signs with its own CA, so the chain is not checked against Node's list.
-    ssl: local ? false : { rejectUnauthorized: false },
-  });
-  pool.on('error', (error) => logger.warn(`History database error: ${error.message}`));
-  return pool;
-}
-
-const pool = createPool();
-let ready: Promise<boolean> | null = null;
-let failedAt = 0;
 let lastSnapshotAt = 0;
 let lastPruneAt = 0;
-
-/**
- * Create the table once. False when history is off or the database can't be reached; it retries after a minute.
- */
-function ensureReady(): Promise<boolean> {
-  if (!pool || Date.now() - failedAt < 60 * 1000) return Promise.resolve(false);
-  if (!ready) {
-    ready = pool
-      .query(
-        `create table if not exists rate_snapshots (
-          route_id text not null,
-          taken_at timestamptz not null,
-          apy double precision not null,
-          tvl_usd double precision not null,
-          deposits double precision,
-          token_value double precision,
-          withdrawable double precision,
-          primary key (route_id, taken_at)
-        )`
-      )
-      .then(() => {
-        logger.info('History database ready');
-        return true;
-      })
-      .catch((error) => {
-        logger.warn(`History database unavailable: ${error.message}`);
-        failedAt = Date.now();
-        ready = null;
-        return false;
-      });
-  }
-  return ready;
-}
 
 export function historyEnabled(): boolean {
   return pool !== null;
@@ -100,21 +42,30 @@ export function lastSnapshot(): string | null {
  * Record a snapshot of every route when one is due (every 10 minutes), and prune past 90 days once a day
  */
 export async function recordSnapshots(collect: () => Promise<Snapshot[]>): Promise<void> {
-  if (!pool || Date.now() - lastSnapshotAt < SNAPSHOT_EVERY_MS || !(await ensureReady())) return;
+  if (!pool || Date.now() - lastSnapshotAt < SNAPSHOT_EVERY_MS || !(await dbReady())) return;
 
   const rows = await collect();
   if (rows.length === 0) return;
   const takenAt = new Date();
   const values: unknown[] = [];
   const placeholders = rows.map((row, i) => {
-    values.push(row.routeId, takenAt, row.apy, row.tvlUsd, row.deposits ?? null, row.tokenValue ?? null, row.withdrawable ?? null);
-    const base = i * 7;
-    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
+    values.push(
+      row.routeId,
+      takenAt,
+      row.apy,
+      row.tvlUsd,
+      row.deposits ?? null,
+      row.tokenValue ?? null,
+      row.withdrawable ?? null,
+      row.safetyScore ?? null
+    );
+    const base = i * 8;
+    return `(${Array.from({ length: 8 }, (_, k) => `$${base + k + 1}`).join(', ')})`;
   });
 
   try {
     await pool.query(
-      `insert into rate_snapshots (route_id, taken_at, apy, tvl_usd, deposits, token_value, withdrawable)
+      `insert into rate_snapshots (route_id, taken_at, apy, tvl_usd, deposits, token_value, withdrawable, safety_score)
        values ${placeholders.join(', ')} on conflict do nothing`,
       values
     );
@@ -137,7 +88,7 @@ export async function recordSnapshots(collect: () => Promise<Snapshot[]>): Promi
  * A route's deposits since a time, oldest first. Null when history is off or unreachable.
  */
 export async function depositHistory(routeId: string, since: Date): Promise<HistoryPoint[] | null> {
-  if (!(await ensureReady())) return null;
+  if (!(await dbReady())) return null;
   try {
     const result = await pool!.query(
       `select taken_at, deposits from rate_snapshots
@@ -155,7 +106,7 @@ export async function depositHistory(routeId: string, since: Date): Promise<Hist
  * The route's token value from the snapshot closest to `target`, no newer than `newest`. Null when there is none.
  */
 export async function tokenValueNear(routeId: string, target: Date, newest: Date): Promise<HistoryPoint | null> {
-  if (!(await ensureReady())) return null;
+  if (!(await dbReady())) return null;
   try {
     const result = await pool!.query(
       `select taken_at, token_value from rate_snapshots
@@ -167,6 +118,34 @@ export async function tokenValueNear(routeId: string, target: Date, newest: Date
     return row ? { at: new Date(row.taken_at).getTime(), value: Number(row.token_value) } : null;
   } catch (error) {
     logger.warn(`Could not read token value history for ${routeId}: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
+}
+
+export interface PastReading {
+  at: number; // ms timestamp
+  apy: number;
+  safetyScore: number | null;
+}
+
+/**
+ * The route's reading from the snapshot closest to `target`, within 3 hours of it. Null when there is none.
+ */
+export async function readingNear(routeId: string, target: Date): Promise<PastReading | null> {
+  if (!(await dbReady())) return null;
+  try {
+    const result = await pool!.query(
+      `select taken_at, apy, safety_score from rate_snapshots
+       where route_id = $1 and taken_at between $2::timestamptz - interval '3 hours' and $2::timestamptz + interval '3 hours'
+       order by abs(extract(epoch from taken_at - $2::timestamptz)) limit 1`,
+      [routeId, target]
+    );
+    const row = result.rows[0];
+    return row
+      ? { at: new Date(row.taken_at).getTime(), apy: Number(row.apy), safetyScore: row.safety_score === null ? null : Number(row.safety_score) }
+      : null;
+  } catch (error) {
+    logger.warn(`Could not read history for ${routeId}: ${error instanceof Error ? error.message : error}`);
     return null;
   }
 }

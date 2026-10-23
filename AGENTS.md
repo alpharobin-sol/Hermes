@@ -50,6 +50,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 - Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF reads Sanctum Infinity's pool on chain; its APY comes from Hermes's own history once that is a day old, DefiLlama until then.
 - Top rated is the first screen (named "Sleep Well" in the capstone, renamed by the owner on 23 Oct): only routes with a Safety Score of 80 or more and risk level low (so no lending reserve 95% or more borrowed or held back). A toggle shows All routes. The rate board and the phone card list the top 3 routes in the current sort (plus the selected route if it sits further down), and "Show all" opens the rest. Every route has a plain "What can go wrong" line in the panel, the phone card and the deposit dialog. On 23 Oct, 8 of 12 SOL routes are top rated and no USDC or USDT route is. Code: `frontend/components/app/safety.tsx`.
+- Phone alerts: web push, no app or Telegram needed. A bell under each route ("Alert me about Jito") turns alerts on for that route on this device, Settings turns them all off. Every 10 minutes the API checks watched routes against its own history and sends at most one alert per device, route and kind a day: APY down 20% or more and at least half a point in a day, a top rated route for the same token paying a point or more above, 5% or less of a lending reserve withdrawable, or the Safety Score falling below 80. Android works in Chrome. iPhone needs Hermes added to the Home Screen (iOS 16.4+), and the site says so. Stored: the device's push endpoint and keys and the watched route ids, no wallet. VAPID keys are created once and kept in the database (or `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`). Needs `DATABASE_URL`, and alerts only go out while the API is awake. Code: `backend/src/services/alerts.ts`, `frontend/components/app/alerts.tsx`, `frontend/public/sw.js`.
 - Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Hermes's own history once it covers two weeks, Kamino or DefiLlama history until then) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
 ## Roadmap
@@ -81,12 +82,13 @@ Portfolio and signals
 
 - [ ] Portfolio: what the connected wallet holds in each route and what it has earned
 - [ ] In-app withdrawals
-- [ ] Alerts: a rate drop, a better route, a reserve nearly all borrowed, a score drop
+- [x] Alerts: a rate drop, a better route, a reserve nearly all borrowed, a score drop (web push to phones, bell per route)
+- [ ] Alerts by Telegram, and alerts for a connected wallet's positions
 - [ ] One-click move: Hermes proposes, the user signs
 
 Later
 
-- [ ] Keep the API awake (owner deferred, 23 Oct): an UptimeRobot ping on `/health` every 5 minutes, or Render's Starter plan. Free Render sleeps after 15 idle minutes, so the first visit waits and history pauses.
+- [ ] Keep the API awake (owner deferred, 23 Oct; needed now for alerts to go out on time): an UptimeRobot ping on `/health` every 5 minutes, or Render's Starter plan. Free Render sleeps after 15 idle minutes, so the first visit waits, history pauses and alerts wait.
 - [ ] Hermes fee
 - [ ] Lift the beta cap
 - [ ] LP routes, labeled with impermanent loss
@@ -114,6 +116,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 23 Oct 2026, phone alerts: web push for watched routes (rate drop, better route, reserve nearly all borrowed, left Top rated), a bell per route, an off switch in Settings, a web app manifest so iPhones can add Hermes to the Home Screen.
 - 23 Oct 2026, Top rated (first shipped as Sleep Well): the first screen shows only routes scoring 80 or more, with a toggle to All routes and a "What can go wrong" line per route. Replaces the Low / Moderate / High risk filter.
 - 23 Oct 2026, Jupiter Lend: SOL, USDC and USDT deposits into Jupiter Lend Earn for jl tokens in the wallet, beta. The Safety Score's exit part reads how much can be withdrawn right now.
 - 23 Oct 2026, four more LSTs: Sanctum Infinity (INF), Bybit (bbSOL), JPool (JSOL) and BlazeStake (bSOL) deposit in-app through Jupiter, beta.

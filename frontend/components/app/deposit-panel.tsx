@@ -11,6 +11,7 @@ import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown, whatCanGoWrong } from "./safety"
+import { RouteAlertToggle } from "./alerts"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -181,6 +182,8 @@ export function DepositPanel({
         )}
 
         {route && <SafetyBreakdown route={route} />}
+
+        {route?.deposit && <RouteAlertToggle route={route} />}
 
         {route && <RouteNotes route={route} />}
 

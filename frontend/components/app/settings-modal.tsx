@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ThemeToggle } from "./ThemeToggle"
+import { AlertsSettings } from "./alerts"
 
 interface SettingsModalProps {
   open: boolean
@@ -13,7 +14,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         <div className="plaque-inner">
           <DialogHeader className="border-b border-hairline p-[18px] pb-3.5 pr-12 text-left">
             <DialogTitle className="font-display text-[26px] font-bold leading-[1.1]">Settings</DialogTitle>
-            <DialogDescription className="sr-only">Choose how Hermes looks.</DialogDescription>
+            <DialogDescription className="sr-only">Choose how Hermes looks and whether it sends alerts.</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-between gap-4 p-[18px]">
             <div>
@@ -21,6 +22,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <div className="mt-1 text-xs text-muted-foreground">Aurora is the default.</div>
             </div>
             <ThemeToggle />
+          </div>
+          <div className="border-t border-hairline">
+            <AlertsSettings />
           </div>
         </div>
       </DialogContent>
