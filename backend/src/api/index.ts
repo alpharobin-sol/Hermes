@@ -5,6 +5,7 @@ import compression from 'compression';
 import { logger } from '../utils/logger';
 import yieldsRouter from './yields';
 import depositRouter from './deposit';
+import { historyEnabled, lastSnapshot } from '../services/history';
 
 export function createApp(): Express {
   const app = express();
@@ -41,6 +42,8 @@ export function createApp(): Express {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      // Hermes's own rate history (DATABASE_URL): whether it is on and when it last recorded
+      history: { enabled: historyEnabled(), lastSnapshot: lastSnapshot() },
     });
   });
   

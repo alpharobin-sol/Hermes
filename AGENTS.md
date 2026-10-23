@@ -22,6 +22,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
 - Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
+- History database: Supabase Postgres (West US, Oregon), `DATABASE_URL` on Render, Session pooler string. Hermes's own rate history, every 10 minutes, 90 days. `/health` shows whether it records.
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
 
@@ -47,8 +48,8 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
   - A direct deposit is built unless a Jupiter swap beats it by 0.01% or more: a direct deposit has no slippage.
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
-- Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF is the one route still on DefiLlama: Sanctum has no working live source.
-- Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Kamino or DefiLlama history until Hermes keeps its own) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
+- Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF reads Sanctum Infinity's pool on chain; its APY comes from Hermes's own history once that is a day old, DefiLlama until then.
+- Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Hermes's own history once it covers two weeks, Kamino or DefiLlama history until then) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
 
 ## Roadmap
 

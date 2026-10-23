@@ -53,6 +53,7 @@ const JUPITER_LEND: Record<InputToken, { receipt: TokenInfo; defillamaPool: stri
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
   | { kind: 'stake-pool'; pool: string } // SPL stake pool account on chain (SPL program or Sanctum's forks)
+  | { kind: 'infinity' } // Sanctum Infinity's pool account on chain (INF)
   | { kind: 'marinade' } // Marinade's API
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana, only where no live source exists
   | { kind: 'kamino'; reserve: string } // Kamino Lend main market reserve
@@ -173,8 +174,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('INF', '5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm'),
     website: 'https://app.sanctum.so',
-    // No live source outside DefiLlama yet: Sanctum's APY API returns 0 and its SOL value lags the market
-    source: { kind: 'defillama', project: 'sanctum-infinity', symbol: 'INF' },
+    source: { kind: 'infinity' },
     trackedSince: '2024-03-25',
     defillamaPool: '3075a746-bdd1-4aac-bcd5-b035abee2622',
     deposit: { 'mainnet-beta': 'beta' },

@@ -3,6 +3,7 @@ import { solanaNetwork } from '../config/runtime';
 import { ROUTES, Category, DepositStatus, InputToken, depositCap, depositStatus } from '../registry/routes';
 import { getRate, refreshRates, SOURCE_LABELS } from './rates';
 import { refreshSafetyInputs, safetyScore, SafetyScore } from './safety';
+import { recordSnapshots, Snapshot } from './history';
 
 export type RiskTier = 'low' | 'moderate' | 'high';
 
@@ -91,7 +92,7 @@ export async function getYieldRoutes(
       risk: riskTier(rate.tvl, locked, safety?.score),
       safety,
       website: route.website,
-      source: SOURCE_LABELS[route.source.kind],
+      source: rate.source ?? SOURCE_LABELS[route.source.kind],
       updatedAt: new Date(rate.updatedAt).toISOString(),
       utilization: rate.utilization ?? null,
       withdrawable: rate.withdrawable ?? null,
@@ -103,14 +104,34 @@ export async function getYieldRoutes(
   return rows.filter((row): row is YieldRoute => row !== null).sort((a, b) => b.apy - a.apy);
 }
 
+// Every route's current rate, for Hermes's own history
+async function collectSnapshots(): Promise<Snapshot[]> {
+  const rows = await Promise.all(
+    ROUTES.map(async (route): Promise<Snapshot | null> => {
+      const rate = await getRate(route.source);
+      if (!rate) return null;
+      return {
+        routeId: route.id,
+        apy: rate.apy,
+        tvlUsd: rate.tvl,
+        deposits: rate.deposits,
+        tokenValue: rate.tokenValue,
+        withdrawable: rate.withdrawable,
+      };
+    })
+  );
+  return rows.filter((row): row is Snapshot => row !== null);
+}
+
 /**
- * Keep the rate and Safety Score caches warm so user requests never wait on a cold fetch
+ * Keep the rate and Safety Score caches warm so user requests never wait on a cold fetch,
+ * and record history every 10 minutes when DATABASE_URL is set
  */
 export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout {
   // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
   const refresh = () =>
     refreshRates()
-      .then(() => refreshSafetyInputs())
+      .then(() => Promise.all([refreshSafetyInputs(), recordSnapshots(collectSnapshots)]))
       .catch((error) => logger.error('Rate refresh failed:', error));
   refresh();
   return setInterval(refresh, intervalMs);
