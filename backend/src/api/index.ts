@@ -5,6 +5,7 @@ import compression from 'compression';
 import { logger } from '../utils/logger';
 import yieldsRouter from './yields';
 import depositRouter from './deposit';
+import alertsRouter from './alerts';
 import { historyEnabled, lastSnapshot } from '../services/history';
 
 export function createApp(): Express {
@@ -50,6 +51,7 @@ export function createApp(): Express {
   // API routes
   app.use('/api/yields', yieldsRouter);
   app.use('/api/deposit', depositRouter);
+  app.use('/api/alerts', alertsRouter);
   
   // 404 handler
   app.use((_req: Request, res: Response) => {

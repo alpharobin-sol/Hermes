@@ -13,6 +13,7 @@ import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { whatCanGoWrong } from "./safety"
+import { RouteAlertToggle } from "./alerts"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -348,6 +349,9 @@ export function DepositDialog({
                   : `Deposit confirmed. Your ${quote?.outputToken.symbol} is in your wallet and earning yield.`}
               </Notice>
             )}
+
+            {/* Right after a deposit is when a user most wants to hear if the route changes */}
+            {status === "success" && <RouteAlertToggle route={route} />}
 
             {status === "unconfirmed" && (
               <Notice tone="warning">

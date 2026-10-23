@@ -117,6 +117,7 @@ async function collectSnapshots(): Promise<Snapshot[]> {
         deposits: rate.deposits,
         tokenValue: rate.tokenValue,
         withdrawable: rate.withdrawable,
+        safetyScore: safetyScore(route, rate)?.score,
       };
     })
   );
@@ -131,7 +132,9 @@ export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout
   // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
   const refresh = () =>
     refreshRates()
-      .then(() => Promise.all([refreshSafetyInputs(), recordSnapshots(collectSnapshots)]))
+      // Snapshots after the score inputs, so each one carries the route's Safety Score
+      .then(() => refreshSafetyInputs())
+      .then(() => recordSnapshots(collectSnapshots))
       .catch((error) => logger.error('Rate refresh failed:', error));
   refresh();
   return setInterval(refresh, intervalMs);

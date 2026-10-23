@@ -23,6 +23,7 @@ import {
   type SortBy,
   type View,
 } from "./safety"
+import { RouteAlertToggle } from "./alerts"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -193,6 +194,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
         )}
 
         {route && <SafetyBreakdown route={route} />}
+
+        {route?.deposit && <RouteAlertToggle route={route} />}
 
         {route && <RouteNotes route={route} compact />}
 

@@ -6,6 +6,7 @@ import "./globals.css"
 import "./styles/wallet-adapter.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import AppLayout from "@/components/app/layout/app-layout"
+import { AlertsProvider } from "@/components/app/alerts"
 
 // Cormorant Garamond for headlines, Cinzel (Roman capitals) for rates and labels, Inter for sentences
 const cormorant = Cormorant_Garamond({
@@ -29,6 +30,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Hermes - Yield Aggregator for Solana",
   description: "Compare live Solana yields across liquid staking and lending, then deposit from your own wallet.",
+  appleWebApp: { capable: true, title: "Hermes", statusBarStyle: "default" },
   icons: {
     icon: [
       { url: "/brand/favicon-32.png", type: "image/png", sizes: "32x32" },
@@ -49,7 +51,9 @@ export default function RootLayout({
       <body className={`${cormorant.variable} ${cinzel.variable} ${inter.variable}`}>
         {/* Aurora is the default. Night is a choice in Settings, not taken from the system setting. */}
         <ThemeProvider defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-          <AppLayout>{children}</AppLayout>
+          <AlertsProvider>
+            <AppLayout>{children}</AppLayout>
+          </AlertsProvider>
         </ThemeProvider>
         <Analytics />
       </body>
