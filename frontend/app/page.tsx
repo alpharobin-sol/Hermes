@@ -4,6 +4,7 @@ import Image from "next/image"
 
 import { YieldPanel } from "@/components/app/yield-panel"
 import { DiamondRule } from "@/components/app/layout/meander"
+import { NetworkPill } from "@/components/app/layout/network-pill"
 import {
   Accordion,
   AccordionContent,
@@ -42,7 +43,9 @@ function Hero() {
       <div className="plaque relative mx-2 -mt-6 border-gilt sm:mx-auto sm:max-w-[840px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
         {/* Phones get the headline only, so the deposit card comes right after it */}
         <div className="plaque-inner px-4 pb-4 pt-4 text-center sm:px-6 sm:pb-7 sm:pt-6 md:px-10 md:pb-10 md:pt-9">
-          <p className="eyebrow mb-2 text-[11px] sm:mb-2.5 md:mb-3.5 md:text-[13px]">Live Solana yields</p>
+          {/* The header has no room for the network on phones and tablets, so it shows here */}
+          <NetworkPill detail className="mb-2.5 h-7 px-2.5 text-[11px] md:mb-3.5 lg:hidden" />
+          <p className="eyebrow mb-2.5 hidden md:mb-3.5 lg:block">Live Solana yields</p>
           <h1 className="font-display text-[28px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
             Compare Solana yields.
             <br />
