@@ -6,14 +6,51 @@ const WATCHED_KEY = "hermes.alerts.routes"
 
 export type AlertsSupport = "supported" | "needs-home-screen" | "unsupported"
 
+function isIos(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+}
+
 // iPhones and iPads only allow web push for sites added to the Home Screen (iOS 16.4 and later)
 export function alertsSupport(): AlertsSupport {
   if (typeof window === "undefined") return "unsupported"
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
   const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true
-  if (ios && !standalone) return "needs-home-screen"
+  if (isIos() && !standalone) return "needs-home-screen"
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported"
   return "supported"
+}
+
+export type Platform = "android" | "iphone" | "firefox" | "mac-safari" | "desktop"
+
+// Which steps to show for allowing notifications: each browser hides the setting in a different place
+export function platform(): Platform {
+  if (typeof navigator === "undefined") return "desktop"
+  const ua = navigator.userAgent
+  if (/Android/i.test(ua)) return "android"
+  if (isIos()) return "iphone"
+  if (/Firefox\//.test(ua)) return "firefox"
+  if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome\/|Chromium\/|Edg\//.test(ua)) return "mac-safari"
+  return "desktop"
+}
+
+export function notificationPermission(): NotificationPermission | null {
+  return typeof window !== "undefined" && "Notification" in window ? Notification.permission : null
+}
+
+/**
+ * Ask the browser to allow notifications. Call it first thing in a tap handler, before any other await:
+ * Safari only asks from a tap, and Chrome may hide the prompt or show a quiet one when the tap is lost.
+ */
+export function askPermission(): Promise<NotificationPermission> {
+  return Notification.requestPermission()
+}
+
+// blocked: the browser refuses notifications for Hermes, so the user has to allow them in its settings
+export class AlertsError extends Error {
+  blocked: boolean
+  constructor(message: string, blocked = false) {
+    super(message)
+    this.blocked = blocked
+  }
 }
 
 export function readWatched(): string[] {
@@ -68,10 +105,12 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
  * Returns the routes Hermes now watches for this device.
  */
 export async function watchRoutes(routes: string[]): Promise<string[]> {
+  // Ask before any other await, so the prompt still counts as coming from the tap
+  if (routes.length > 0 && Notification.permission !== "granted" && (await askPermission()) !== "granted") {
+    throw new AlertsError("Notifications are blocked for Hermes in this browser.", true)
+  }
   let subscription = await currentSubscription()
   if (!subscription) {
-    const permission = await Notification.requestPermission()
-    if (permission !== "granted") throw new Error("Notifications are blocked. Allow them for Hermes in your browser settings.")
     const keyRes = await fetch(getFullUrl("/api/alerts/key"))
     const key = await keyRes.json().catch(() => ({}))
     if (!keyRes.ok || !key?.publicKey) throw new Error(key?.error || "Alerts are off right now.")
@@ -82,9 +121,10 @@ export async function watchRoutes(routes: string[]): Promise<string[]> {
     } catch (error) {
       // Browsers word these differently. Private windows and some browsers refuse push altogether.
       const blocked = error instanceof DOMException && (error.name === "NotAllowedError" || /permission/i.test(error.message))
-      throw new Error(
-        blocked
-          ? "This browser won't allow alerts here. Allow notifications for Hermes in its settings, or try Chrome outside a private window."
+      if (blocked) throw new AlertsError("This browser won't allow alerts here. Private tabs can't get alerts.", true)
+      throw new AlertsError(
+        (navigator as any).brave
+          ? "Brave needs Google push on: Settings, Privacy and security, Use Google services for push messaging. Then try again."
           : "This browser couldn't turn on alerts. Try again, or use Chrome on Android."
       )
     }
