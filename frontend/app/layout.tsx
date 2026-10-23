@@ -1,28 +1,29 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Cormorant_Garamond, Geist_Mono, Outfit } from "next/font/google"
+import { Cinzel, Cormorant_Garamond, Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import "./styles/wallet-adapter.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import AppLayout from "@/components/app/layout/app-layout"
 
-
-
-const cormorantGaramond = Cormorant_Garamond({
+// Cormorant Garamond for headlines, Cinzel (Roman capitals) for rates and labels, Inter for sentences
+const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["400", "500", "600", "700"],
+  variable: "--font-cormorant",
+  weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
 })
 
-const outfit = Outfit({
+const cinzel = Cinzel({
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-cinzel",
+  weight: ["500", "600", "700"],
 })
 
-const geistMono = Geist_Mono({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-inter",
 })
 
 export const metadata: Metadata = {
@@ -30,20 +31,10 @@ export const metadata: Metadata = {
   description: "Compare live Solana yields across liquid staking and lending, then deposit from your own wallet.",
   icons: {
     icon: [
-      {
-        url: "/brand/hermes-icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/brand/hermes-icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/brand/hermes-icon.svg",
-        type: "image/svg+xml",
-      },
+      { url: "/brand/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/brand/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
-    apple: "/brand/hermes-apple-icon.png",
+    apple: "/brand/apple-icon.png",
   },
 }
 
@@ -53,10 +44,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${cormorantGaramond.variable} ${outfit.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider>
-          <AppLayout>{children}</AppLayout></ThemeProvider>
+    // next-themes sets the theme class on <html> before hydration
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${cormorant.variable} ${cinzel.variable} ${inter.variable}`}>
+        {/* Aurora is the default. Night is a choice in Settings, not taken from the system setting. */}
+        <ThemeProvider defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+          <AppLayout>{children}</AppLayout>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

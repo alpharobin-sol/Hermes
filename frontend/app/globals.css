@@ -1,115 +1,118 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@tailwind utilities;
-
-/*  */
-
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================= */
-/* LIGHT THEME – your existing beautiful light mode (unchanged) */
+/* AURORA: the default theme. Plaster and gold from Reni's Aurora fresco, teal from the logo. */
+/* Every text pair below passes 4.5:1. Gilt, frame and hairline are for ornament only, never text. */
 /* ============================================= */
 :root {
-  /* UI SCALE — controls global app size */
-  --ui-scale: 1;
+  --background: #f6ead0; /* plaster */
+  --foreground: #2b140e; /* umber */
 
-  --background: oklch(0.97 0.002 260);
-  --backgroundm: oklch(0.95 0.002 260 / 0.6);
+  --card: #fcf5e6; /* vellum */
+  --card-foreground: #2b140e;
+  --popover: #fcf5e6;
+  --popover-foreground: #2b140e;
 
-  --foreground: oklch(0.16 0.01 260);
+  --primary: #1ab5b7; /* logo teal: fills only */
+  --primary-foreground: #2b140e; /* 6.9:1 on teal */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.01 260);
+  --secondary: #efddb8; /* sky gold: active tabs, medallions */
+  --secondary-foreground: #2b140e;
 
-  --popover: oklch(0.98 0.002 260);
-  --popover-foreground: oklch(0.16 0.01 260);
+  --muted: #f2e0ba;
+  --muted-foreground: #6b4a36; /* sienna: labels, sources. 7.3:1 on vellum */
 
-  --primary: oklch(0.56 0.15 195);
-  --primary-foreground: oklch(0.99 0.002 260);
+  --accent: #f2e0ba; /* selected route */
+  --accent-foreground: #2b140e;
 
-  --secondary: oklch(0.94 0.004 260);
-  --secondary-foreground: oklch(0.22 0.012 260);
+  --ink: #086668; /* teal text: best rate, links. 6.2:1 on vellum */
+  --ornament: #8e3b1f; /* terracotta: eyebrows, numerals */
 
-  --muted: oklch(0.92 0.004 260);
-  --muted-foreground: oklch(0.48 0.01 260);
+  --success: #456028; /* olive: low risk */
+  --warning: #865408; /* ochre: moderate risk, beta */
+  --destructive: #a33a22; /* vermilion: high risk, errors */
+  --warning-surface: #f7e3b8;
+  --warning-line: #d9b26a;
+  --destructive-surface: #f6dccf;
+  --destructive-line: #e3a898;
+  --ink-surface: #ddefe9;
+  --ink-line: #8ccfc8;
 
-  --accent: oklch(0.58 0.13 95);
-  --accent-foreground: oklch(0.14 0.01 260);
+  --gilt: #b99467; /* frames, rules, ornament */
+  --frame: #cdb185;
+  --hairline: #e3cfa8;
+  --row-line: #eadbbe;
+  --plate: #f8eeda;
+  --beta-dot: #c27a1a;
+  --placeholder: #9c7b61;
 
-  --success: oklch(0.56 0.14 142);
-  --warning: oklch(0.66 0.16 75);
-  --destructive: oklch(0.58 0.22 27);
+  --border: #dcc59c;
+  --input: #cdb185;
+  --ring: #086668;
 
-  --border: oklch(0.88 0.002 260);
-  --input: oklch(0.94 0.002 260);
-  --ring: var(--primary);
-
-  --radius: 0.625rem;
-
-  --sidebar: oklch(0.96 0.002 260);
-  --sidebar-foreground: oklch(0.16 0.01 260);
-  --sidebar-border: oklch(0.9 0.002 260);
+  --radius: 0.25rem;
 }
 
 /* ============================================= */
-/* DARK THEME – Sweet, milky, premium & noticeable cards */
+/* NIGHT: the theme toggle. Umber night, gold and parchment. */
 /* ============================================= */
 .dark {
-  /* Base background — deeper & calmer */
-  --background: oklch(0.095 0.012 260);
-  --backgroundm: oklch(0.13 0.014 260 / 0.4);
+  --background: #160b08;
+  --foreground: #f7e6c4; /* parchment */
 
-  --foreground: oklch(0.94 0.01 260);
+  --card: #21130e;
+  --card-foreground: #f7e6c4;
+  --popover: #21130e;
+  --popover-foreground: #f7e6c4;
 
-  /* Cards float above background */
-  --card: oklch(0.16 0.014 260);
-  --card-foreground: oklch(0.94 0.01 260);
+  --primary: #1ab5b7;
+  --primary-foreground: #2b140e;
 
-  --popover: oklch(0.165 0.014 260);
-  --popover-foreground: oklch(0.94 0.01 260);
+  --secondary: #2c1a13;
+  --secondary-foreground: #f7e6c4;
 
-  /* Primary — slightly toned down for long sessions */
-  --primary: oklch(0.64 0.16 195);
-  --primary-foreground: oklch(0.1 0.012 260);
+  --muted: #2c1a13;
+  --muted-foreground: #c7a988; /* sand. 8.1:1 on surface */
 
-  /* Secondary layers */
-  --secondary: oklch(0.2 0.016 260);
-  --secondary-foreground: oklch(0.9 0.01 260);
+  --accent: #2e2310;
+  --accent-foreground: #f7e6c4;
 
-  --muted: oklch(0.22 0.018 260);
-  --muted-foreground: oklch(0.6 0.02 260);
+  --ink: #3fd0d2;
+  --ornament: #f2c585; /* gold */
 
-  /* Accent — softer, less neon */
-  --accent: oklch(0.6 0.12 95);
-  --accent-foreground: oklch(0.1 0.012 260);
+  --success: #a9c08a;
+  --warning: #e9a84e;
+  --destructive: #f08a6b;
+  --warning-surface: #2e2310;
+  --warning-line: #5a4416;
+  --destructive-surface: #2e1712;
+  --destructive-line: #6b2e22;
+  --ink-surface: #14282a;
+  --ink-line: #1d5557;
 
-  --success: oklch(0.58 0.14 142);
-  --warning: oklch(0.66 0.16 75);
-  --destructive: oklch(0.6 0.2 25);
+  --gilt: #6b4a36; /* bronze */
+  --frame: #6b4a36;
+  --hairline: #45291e;
+  --row-line: #3a2318;
+  --plate: #1c100b;
+  --beta-dot: #e9a84e;
+  --placeholder: #8e755e;
 
-  /* Borders almost invisible — premium feel */
-  --border: oklch(0.24 0.014 260);
-  --input: oklch(0.22 0.014 260);
-  --ring: var(--primary);
-
-  /* Sidebar pushed back visually */
-  --sidebar: oklch(0.115 0.013 260);
-  --sidebar-foreground: oklch(0.9 0.01 260);
-  --sidebar-border: oklch(0.22 0.014 260);
+  --border: #45291e;
+  --input: #6b4a36;
+  --ring: #3fd0d2;
 }
 
 @theme inline {
-  /* Greek god tech aesthetic: classical elegance + modern tech */
-  --font-display: "Cormorant Garamond", serif;
-  --font-body: "Outfit", sans-serif;
-  --font-mono: "Geist Mono", monospace;
-  --font-heroic: "Audiowide", monospace;
-  --font-sans: var(--font-body);
+  /* Cormorant Garamond for headlines, Cinzel (Roman capitals) for rates and labels, Inter for sentences */
+  --font-display: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-roman: var(--font-cinzel), Cinzel, Georgia, serif;
+  --font-sans: var(--font-inter), Inter, system-ui, sans-serif;
 
-  /* These now correctly respect the new dark values */
   --color-background: var(--background);
-  --color-backgroundm: var(--backgroundm);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -123,559 +126,100 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-
+  --color-ink: var(--ink);
+  --color-ornament: var(--ornament);
   --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-
   --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-
+  --color-destructive: var(--destructive);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-line: var(--warning-line);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-destructive-line: var(--destructive-line);
+  --color-ink-surface: var(--ink-surface);
+  --color-ink-line: var(--ink-line);
+  --color-gilt: var(--gilt);
+  --color-frame: var(--frame);
+  --color-hairline: var(--hairline);
+  --color-row-line: var(--row-line);
+  --color-plate: var(--plate);
+  --color-beta-dot: var(--beta-dot);
+  --color-placeholder: var(--placeholder);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
-  /* Sidebar colors – now also respect the new dark values */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
-/* Make cards really pop in dark mode – this is the key part */
-.dark .bg-card,
-.dark [data-card],
-.dark .card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px oklch(0 0 0 / 0.12), 0 2px 8px oklch(0 0 0 / 0.08),
-    inset 0 1px 0 oklch(1 0 0 / 0.08); /* soft inner highlight */
-  backdrop-filter: blur(12px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dark .bg-card:hover,
-.dark .card:hover {
-  box-shadow: 0 12px 40px oklch(0 0 0 / 0.18), 0 4px 12px oklch(0 0 0 / 0.12),
-    inset 0 1px 0 oklch(1 0 0 / 0.12), 0 0 20px var(--primary) / 0.12; /* subtle colored glow on hover */
-  transform: translateZ(-2px);
-}
-
-/* Optional: even more premium glass card variant */
-.glass-card {
-  background: var(--background);
-  border: 1px solid var(--primary);
-  backdrop-filter: blur(16px);
-  /* box-shadow: 
-    inset 0 1px 0 oklch(1 0 0 / 0.15),
-    0 8px 32px oklch(0 0 0 / 0.15); */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-variant-numeric: tabular-nums;
   }
-}
-
-/* Refined glow effects and utilities for better visibility and modern aesthetic */
-@layer utilities {
-  /* Quick utility classes */
-  /* Greek god tech typography utilities - blend classical power with modern tech */
-
-  /* Heroic: Audiowide for divine, mythological tech headings */
-  .text-heroic {
-    font-family: var(--font-heroic, "Audiowide", monospace);
-    font-size: 1rem;
-    font-weight: 400;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  /* Epic: Cormorant Garamond for powerful, classical display */
-  .text-epic {
-    font-family: var(--font-display, "Cormorant Garamond", serif);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  /* Tech: Outfit for modern, cutting-edge labels and UI text */
-  .text-tech {
-    font-family: var(--font-body, "Outfit", sans-serif);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-  }
-
-  /* Divine text gradient - classical + modern */
-  .text-divine {
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Primary glow - uses primary color from theme */
-  .glow-primary {
-    box-shadow: 0 0 20px var(--primary) / 0.25, 0 0 40px var(--primary) / 0.08;
-  }
-
-  /* Gold/accent glow - uses accent color from theme */
-  .glow-gold {
-    box-shadow: 0 0 20px var(--accent) / 0.25, 0 0 40px var(--accent) / 0.08;
-  }
-
-  /* Success glow - uses success color for positive states */
-  .glow-success {
-    box-shadow: 0 0 20px var(--success) / 0.25, 0 0 40px var(--success) / 0.08;
-  }
-
-  /* Warning glow - uses warning color for alerts */
-  .glow-warning {
-    box-shadow: 0 0 20px var(--warning) / 0.25, 0 0 40px var(--warning) / 0.08;
-  }
-
-  /* Destructive glow - uses destructive color for errors */
-  .glow-destructive {
-    box-shadow: 0 0 20px var(--destructive) / 0.25,
-      0 0 40px var(--destructive) / 0.08;
-  }
-
-  /* Border glow - inset and outset glow on borders */
-  .border-glow {
-    border-color: var(--primary) / 0.4;
-    box-shadow: inset 0 0 20px var(--primary) / 0.05,
-      0 0 15px var(--primary) / 0.08;
-  }
-
-  .border-glow-accent {
-    border-color: var(--accent) / 0.4;
-    box-shadow: inset 0 0 20px var(--accent) / 0.05,
-      0 0 15px var(--accent) / 0.08;
-  }
-
-  /* Text gradient - uses primary and accent colors */
-  .text-gradient {
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Grid background - LIGHT THEME */
-  .bg-grid {
-    background-image: linear-gradient(var(--primary) 1px, transparent 1px),
-      linear-gradient(90deg, var(--primary) 1px, transparent 1px);
-    background-size: 40px 40px;
-    /* opacity: 0.02; */
-  }
-
-  /* Banner */
-  .banner-base {
-    @apply bg-primary/10 border border-primary/20 rounded-md p-4 md:p-5;
-  }
-
-  /* Soft card glow for modern milky aesthetic */
-  .card-glow {
-    box-shadow: 0 4px 20px var(--primary) / 0.08,
-      inset 0 1px 0 var(--foreground) / 0.1;
-  }
-
-  .card-glow-accent {
-    box-shadow: 0 4px 20px var(--accent) / 0.08,
-      inset 0 1px 0 var(--foreground) / 0.1;
-  }
-
-  button:hover,
-  [role="button"]:hover,
-  a:hover {
+  button:not(:disabled),
+  [role="button"],
+  a {
     cursor: pointer;
   }
-
-  /* Keyframes for futuristic border animations */
-  @keyframes scan {
-    0%,
-    100% {
-      left: 0%;
-      opacity: 0;
-    }
-    10% {
-      opacity: 1;
-    }
-    50% {
-      left: 50%;
-      opacity: 1;
-    }
-    90% {
-      opacity: 1;
-    }
-    100% {
-      left: 100%;
-      opacity: 0;
-    }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
-
-  @keyframes packet-left {
-    0% {
-      left: 0%;
-      opacity: 0;
-    }
-    5% {
-      opacity: 1;
-    }
-    45% {
-      left: 50%;
-      opacity: 1;
-    }
-    50% {
-      left: 50%;
-      opacity: 0;
-    }
-    100% {
-      left: 50%;
-      opacity: 0;
-    }
-  }
-
-  @keyframes packet-right {
-    0% {
-      right: 0%;
-      opacity: 0;
-    }
-    5% {
-      opacity: 1;
-    }
-    45% {
-      right: 50%;
-      opacity: 1;
-    }
-    50% {
-      right: 50%;
-      opacity: 0;
-    }
-    100% {
-      right: 50%;
-      opacity: 0;
-    }
+  ::placeholder {
+    color: var(--placeholder);
   }
 }
 
 @layer components {
-  /* === TYPOGRAPHY SYSTEM === */
-
-  /* Display - Large headings (H1) */
-  .text-display {
-    @apply text-3xl sm:text-4xl font-bold tracking-tight;
-    font-family: "Outfit", system-ui, sans-serif;
+  /* Double-rule frame, like an inscription plaque: an outer frame, a 4px mat, an inner hairline */
+  .plaque {
+    @apply rounded-[4px] border border-frame bg-card p-1;
+  }
+  .plaque-inner {
+    @apply rounded-[2px] border border-hairline;
   }
 
-  /* Title - Section headings (H2) */
-  .text-title {
-    @apply text-xl sm:text-2xl font-semibold tracking-tight;
-    font-family: "Outfit", system-ui, sans-serif;
+  /* Small Roman capitals over a section */
+  .eyebrow {
+    @apply font-roman text-[13px] font-semibold tracking-[0.22em] text-ornament;
   }
 
-  /* Heading - Card/panel headings (H3) */
-  .text-heading {
-    @apply text-xs sm:text-sm capitalize tracking-wide text-foreground;
-    font-family: "Outfit", system-ui, sans-serif;
-
-    /* font-size: 0.75rem; */
-    font-weight: 700;
-    letter-spacing: 0.12em;
+  /* Column heads, field labels */
+  .label-roman {
+    @apply font-roman text-[11px] font-semibold tracking-[0.14em] text-muted-foreground;
   }
 
-  /* Body - Regular text */
-  .text-body {
-    @apply text-sm sm:text-base font-normal;
-    font-family: "Outfit", system-ui, sans-serif;
+  /* Round mark for a protocol, like the medallions on the banner */
+  .medallion {
+    @apply grid size-10 shrink-0 place-items-center rounded-full border border-gilt bg-secondary font-roman text-base font-bold text-foreground;
   }
 
-  /* Caption - Small descriptive text */
-  .text-caption {
-    @apply text-xs font-normal text-muted-foreground;
-    font-family: "Outfit", system-ui, sans-serif;
-
-    font-size: 0.75rem;
-    letter-spacing: 0.09em;
+  .btn-teal {
+    @apply inline-flex items-center justify-center gap-2 rounded-[4px] bg-primary font-sans font-semibold text-primary-foreground transition-[filter] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-frame {
+    @apply inline-flex items-center justify-center gap-2 rounded-[4px] border border-frame bg-transparent font-sans font-semibold text-foreground transition-colors hover:border-gilt hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50;
   }
 
-  /* Label - Uppercase labels, tags */
-  .text-label {
-    @apply text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground;
-    font-family: "Geist Mono", monospace;
-
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
+  /* Rotated square used as a bullet and divider ornament */
+  .diamond {
+    @apply inline-block size-1.5 rotate-45 bg-gilt;
   }
-
-  /* Mono - Numbers, values, data */
-  .text-mono {
-    @apply font-mono text-sm tracking-wide;
-    font-family: "Geist Mono", monospace;
-
-    letter-spacing: 0.15em;
-  }
-
-  /* Mono Large - Large numbers */
-  .text-mono-lg {
-    @apply font-mono text-lg sm:text-xl font-bold;
-    font-family: "Geist Mono", monospace;
-  }
-
-  /* Mono XL - Hero numbers */
-  .text-mono-xl {
-    @apply font-mono text-2xl sm:text-3xl font-bold;
-    font-family: "Geist Mono", monospace;
-  }
-
-  /* Brand Logo */
-  .text-brand {
-    @apply text-lg font-bold tracking-tight;
-    font-family: "Outfit", system-ui, sans-serif;
-  }
-
-  /* Nav Items */
-  .text-nav {
-    @apply text-xs font-medium uppercase tracking-wider;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .nav-link {
-    @apply relative py-4 px-4 font-mono text-xs font-medium uppercase tracking-wider transition-all rounded-sm;
-  }
-
-  .nav-link-active {
-    @apply bg-primary/10 text-primary;
-  }
-
-  .nav-link-inactive {
-    @apply text-muted-foreground hover:bg-secondary hover:text-foreground;
-  }
-
-  /* === CARD SYSTEM === */
-
-  .card-base {
-    @apply relative rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden;
-  }
-
-  .card-interactive {
-    @apply relative border border-border/50 bg-card/80 backdrop-blur-sm;
-    @apply transition-all duration-200;
-    @apply hover:border-primary/30 hover:bg-card;
-  }
-
-  .card-featured {
-    @apply relative border border-border/50 bg-card/80 backdrop-blur-sm;
-    @apply border-primary/30 bg-card;
-  }
-
-  /* Card header */
-  .card-header {
-    @apply border-b border-border/50 bg-secondary/30 px-3 py-2.5 sm:px-4 sm:py-3;
-  }
-
-  /* Card body */
-  .card-body {
-    @apply p-3 sm:p-4;
-  }
-
-  /* Card footer */
-  .card-footer {
-    @apply border-t border-border/30 p-3 sm:p-4;
-  }
-
-  /* === CORNER ACCENTS === */
-
-  .corner-accents {
-    @apply relative;
-  }
-
-  .corner-accents::before,
-  .corner-accents::after {
-    content: "";
-    @apply absolute w-2 h-2 border-primary transition-opacity;
-  }
-
-  .corner-accents::before {
-    @apply top-0 left-0 border-t-2 border-l-2;
-  }
-
-  .corner-accents::after {
-    @apply bottom-0 right-0 border-b-2 border-r-2;
-  }
-
-  /* === BUTTON VARIANTS === */
-
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5;
-    @apply px-3 py-1.5 sm:px-4 sm:py-2;
-    @apply bg-primary text-primary-foreground;
-    @apply text-xs sm:text-sm font-medium;
-    @apply transition-all duration-200;
-    @apply hover:bg-primary/90;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5;
-    @apply px-3 py-1.5 sm:px-4 sm:py-2;
-    @apply border border-border/50 bg-transparent text-foreground;
-    @apply text-xs sm:text-sm font-medium;
-    @apply transition-all duration-200;
-    @apply hover:border-primary/50 hover:text-primary;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-1.5;
-    @apply px-2 py-1 sm:px-3 sm:py-1.5;
-    @apply bg-transparent text-muted-foreground;
-    @apply text-xs sm:text-sm font-medium;
-    @apply transition-all duration-200;
-    @apply hover:bg-secondary hover:text-foreground;
-    font-family: "Geist Mono", monospace;
-  }
-
-  /* === BADGE VARIANTS === */
-
-  .badge-base {
-    @apply inline-flex items-center gap-1;
-    @apply px-1.5 py-0.5 sm:px-2 sm:py-1;
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-wide;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .badge-primary {
-    @apply inline-flex items-center gap-1;
-    @apply px-1.5 py-0.5 sm:px-2 sm:py-1;
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-wide;
-    font-family: "Geist Mono", monospace;
-    @apply bg-primary text-primary-foreground;
-  }
-
-  .badge-success {
-    @apply inline-flex items-center gap-1;
-    @apply px-1.5 py-0.5 sm:px-2 sm:py-1;
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-wide;
-    font-family: "Geist Mono", monospace;
-    @apply bg-success/20 text-success;
-  }
-
-  .badge-warning {
-    @apply inline-flex items-center gap-1;
-    @apply px-1.5 py-0.5 sm:px-2 sm:py-1;
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-wide;
-    font-family: "Geist Mono", monospace;
-    @apply bg-warning/20 text-warning;
-  }
-
-  .badge-destructive {
-    @apply inline-flex items-center gap-1;
-    @apply px-1.5 py-0.5 sm:px-2 sm:py-1;
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-wide;
-    font-family: "Geist Mono", monospace;
-    @apply bg-destructive/20 text-destructive;
-  }
-
-  /* === STAT DISPLAY === */
-
-  .stat-group {
-    @apply flex flex-col gap-0.5;
-  }
-
-  .stat-label {
-    @apply text-[10px] sm:text-xs font-medium uppercase tracking-widest text-muted-foreground;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .stat-value {
-    @apply font-mono text-sm text-foreground;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .stat-value-lg {
-    @apply font-mono text-lg sm:text-xl font-bold text-primary;
-    font-family: "Geist Mono", monospace;
-  }
-
-  /* === INPUT SYSTEM === */
-
-  .input-base {
-    @apply w-full bg-transparent outline-none;
-    @apply text-foreground placeholder:text-muted-foreground/50;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .input-lg {
-    @apply w-full bg-transparent outline-none;
-    @apply text-foreground placeholder:text-muted-foreground/50;
-    font-family: "Geist Mono", monospace;
-    @apply text-2xl sm:text-3xl font-bold;
-  }
-
-  .input-wrapper {
-    @apply bg-secondary/30 p-1.5 px-3;
-    @apply focus-within:border-primary/50;
-    @apply transition-colors duration-200;
-  }
-
-  /* === RISK METER === */
-
-  .risk-bar {
-    @apply h-1.5 w-3.5 transition-all duration-300;
-  }
-
-  .risk-low {
-    @apply bg-success;
-  }
-
-  .risk-moderate {
-    @apply bg-warning;
-  }
-
-  .risk-high {
-    @apply bg-destructive;
-  }
-
-  .risk-inactive {
-    @apply bg-muted/30;
-  }
-
-  /* === LOADING ANIMATION === */
 
   @keyframes scan {
-    0%,
-    100% {
-      left: 0%;
+    0% {
+      left: -10%;
       opacity: 0;
     }
-    10% {
-      opacity: 1;
-    }
-    50% {
-      left: 50%;
-      opacity: 1;
-    }
-    90% {
+    20% {
       opacity: 1;
     }
     100% {
@@ -683,54 +227,7 @@
       opacity: 0;
     }
   }
-
   .animate-scan {
-    animation: scan 2s infinite linear;
+    animation: scan 1.6s infinite linear;
   }
-
-  @keyframes pulse-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.2);
-    }
-    50% {
-      box-shadow: 0 0 20px 2px hsl(var(--primary) / 0.15);
-    }
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  /* === QUICK AMOUNT BUTTONS === */
-
-  .quick-btn {
-    @apply px-2 py-0.5;
-    @apply text-[10px] font-medium text-muted-foreground;
-    @apply bg-muted/30 border border-border;
-    @apply transition-colors duration-200;
-    @apply hover:text-primary hover:bg-primary/10 hover:border-primary/30;
-    font-family: "Geist Mono", monospace;
-  }
-
-  .quick-btn-active {
-    @apply bg-primary text-primary-foreground shadow-sm;
-  }
-
-  /* === DARK MODE CARD ENHANCEMENT === */
-
-  .dark .card-interactive:hover {
-    box-shadow: 0 12px 40px hsl(0 0% 0% / 0.18), 0 4px 12px hsl(0 0% 0% / 0.12),
-      inset 0 1px 0 hsl(0 0% 100% / 0.08);
-  }
-}
-
-/* Hide scrollbar but keep scrolling */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none; /* IE & Edge */
-  scrollbar-width: none; /* Firefox */
 }

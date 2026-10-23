@@ -1,73 +1,40 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MoonStar, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 
-interface ThemeToggleProps {
-  className?: string
-}
+const THEMES = [
+  { value: "light", label: "Aurora" },
+  { value: "dark", label: "Night" },
+]
 
-export function ThemeToggle({ className }: ThemeToggleProps) {
-  const [isDark, setIsDark] = useState(true)
-
-  useEffect(() => {
-    const root = document.documentElement
-    const stored = localStorage.getItem("theme")
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-    const dark = stored === "dark" || (!stored && prefersDark)
-    setIsDark(dark)
-    root.classList.toggle("dark", dark)
-  }, [])
-
-  const handleToggle = () => {
-    const newDark = !isDark
-    setIsDark(newDark)
-    document.documentElement.classList.toggle("dark", newDark)
-    localStorage.setItem("theme", newDark ? "dark" : "light")
-  }
+export function ThemeToggle({ className }: { className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme()
+  // The stored theme is only known in the browser, so render no selection until mounted
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   return (
-    <button
-      onClick={handleToggle}
-      role="switch"
-      aria-checked={isDark}
-      aria-label="Toggle dark mode"
-      className={cn(
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ",
-        className
-      )}
-    >
-      <div className="relative flex items-center justify-center w-14 h-7   bg-primary/10 text-primary border border-primary/30
-          hover:bg-primary/20 hover:border-primary/50 transition-all overflow-hidden transition-colors duration-300 rounded-sm">
-        {/* Sharp corner accents */}
-        <div className="absolute top-0 left-0 w-1 h-1 border-t-2 border-l-2 border-primary/60" />
-        <div className="absolute top-0 right-0 w-1 h-1 border-t-2 border-r-2 border-primary/60" />
-        <div className="absolute bottom-0 left-0 w-1 h-1 border-b-2 border-l-2 border-primary/60" />
-        <div className="absolute bottom-0 right-0 w-1 h-1 border-b-2 border-r-2 border-primary/60" />
-
-        {/* Moon */}
-        <MoonStar
-          size={18}
-          strokeWidth={0}
-          fill="currentColor"
-          className={cn(
-            "absolute text-foreground transition-all duration-300",
-            isDark ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"
-          )}
-        />
-
-        {/* Sun */}
-        <Sun
-          size={36}
-          strokeWidth={0}
-          fill="currentColor"
-          className={cn(
-            "absolute text-primary transition-all duration-300",
-            !isDark ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
-          )}
-        />
-      </div>
-    </button>
+    <div role="radiogroup" aria-label="Theme" className={cn("flex gap-0.5 rounded-[4px] border border-border p-[3px]", className)}>
+      {THEMES.map((theme) => {
+        const active = mounted && resolvedTheme === theme.value
+        return (
+          <button
+            key={theme.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => setTheme(theme.value)}
+            className={cn(
+              "h-9 rounded-[2px] px-3.5 text-[13px] font-medium transition-colors",
+              active ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {theme.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { VersionedTransaction } from "@solana/web3.js"
-import { AlertCircle, ArrowDown, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
+import { AlertCircle, AlertTriangle, ArrowDown, Check, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,6 +11,7 @@ import { DepositAPI, type DepositQuote } from "@/lib/api/deposit-api"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
+import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, formatApy } from "./rate-board"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -33,9 +34,6 @@ function base64ToBytes(base64: string): Uint8Array {
 function formatTokenAmount(value: string | number): string {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 6 })
 }
-
-// Above this share borrowed, a lending reserve may not have liquidity for withdrawals
-const HIGH_UTILIZATION = 0.95
 
 function hostOf(url: string): string {
   try {
@@ -170,220 +168,242 @@ export function DepositDialog({
 
   const isBusy = status === "quoting" || status === "signing" || status === "confirming"
 
+  // The path Hermes built, and the ones it quoted and passed over, so the choice can be checked
+  const pickedLabel = quote
+    ? quote.method === "jupiter-swap"
+      ? `Jupiter${quote.routeLabels.length > 0 ? ` via ${quote.routeLabels.join(" → ")}` : ""}`
+      : quote.routeLabels.length > 0
+        ? quote.routeLabels.join(" → ")
+        : `${route.name}, direct`
+    : ""
+  const compared = quote?.compared ?? []
+
   return (
     <Dialog open={open} onOpenChange={(next) => !isBusy && onOpenChange(next)}>
-      <DialogContent className="border-border/50 bg-card p-0 gap-0 max-w-sm">
-        <DialogHeader className="border-b border-border/50 p-4">
-          <DialogTitle className="font-mono text-sm uppercase tracking-wider text-foreground">
-            Deposit into {route.name}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Hermes builds the transaction. You sign it in your wallet. Funds never touch Hermes.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="p-4 space-y-4">
-          {/* You pay */}
-          <div className="border border-border/50 bg-secondary/30 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">You deposit</div>
-            <div className="font-mono text-lg text-foreground">
-              {formatTokenAmount(amount)} {route.token}
+      <DialogContent className="max-w-[452px] gap-0 rounded-[4px] border-gilt bg-card p-[5px] shadow-[0_24px_64px_rgba(0,0,0,0.45)] sm:max-w-[452px] [&>[data-slot=dialog-close]]:right-5 [&>[data-slot=dialog-close]]:top-5">
+        <div className="plaque-inner max-h-[calc(100dvh-4rem)] overflow-y-auto">
+          <DialogHeader className="flex-row items-start gap-3 border-b border-hairline p-[18px] pb-3.5 pr-12 text-left">
+            <Medallion route={route} className="size-11 text-[17px]" />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <DialogTitle className="font-display text-[26px] font-bold leading-[1.1]">Deposit into {route.name}</DialogTitle>
+              <DialogDescription className="text-[13px] text-muted-foreground">
+                {CATEGORY_LABELS[route.category]}
+                {route.receipt && ` · get ${route.receipt}`} · {formatApy(route)} APY
+              </DialogDescription>
             </div>
-          </div>
+          </DialogHeader>
 
-          <div className="flex justify-center -my-2">
-            <ArrowDown className="w-4 h-4 text-muted-foreground" />
-          </div>
-
-          {/* You receive */}
-          <div className="border border-border/50 bg-secondary/30 p-3">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">You receive</div>
-            {quote?.position ? (
-              <>
-                <div className="font-mono text-lg text-primary">
-                  {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol} in {quote.position}
-                </div>
-                <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                  A position in your own {quote.position} account, not a token in your wallet. Manage or withdraw it at{" "}
-                  {hostOf(route.website)}.
-                </div>
-              </>
-            ) : quote ? (
-              <div className="font-mono text-lg text-primary">
-                ~{formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol}
+          <div className="flex flex-col gap-4 p-[18px]">
+            {/* You deposit, you receive */}
+            <div className="relative flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1 rounded-[2px] border border-border bg-background px-4 py-3.5">
+                <span className="label-roman text-[10px]">You deposit</span>
+                <span className="text-2xl font-semibold">
+                  {formatTokenAmount(amount)} {route.token}
+                </span>
               </div>
-            ) : status === "quoting" ? (
-              <div className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching quote...
-              </div>
-            ) : (
-              <div className="font-mono text-sm text-muted-foreground">—</div>
-            )}
-          </div>
-
-          {/* Quote details */}
-          {quote && (
-            <div className="space-y-1.5 font-mono text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">APY</span>
-                <span className="text-foreground">{formatPercent(route.apy * 100)}</span>
-              </div>
-              {route.safety && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Safety Score</span>
-                  <span className="text-foreground">{route.safety.score}/100</span>
-                </div>
-              )}
-              {quote.method === "jupiter-swap" ? (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Minimum received</span>
-                    <span className="text-foreground">
-                      {formatTokenAmount(quote.minOutAmount)} {quote.outputToken.symbol}
+              <div className="flex flex-col gap-1 rounded-[2px] border border-gilt bg-accent px-4 py-3.5">
+                <span className="label-roman text-[10px]">You receive</span>
+                {quote?.position ? (
+                  <>
+                    <span className="text-2xl font-semibold text-ink">
+                      {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol} in {quote.position}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Price impact</span>
-                    <span className={cn(quote.priceImpactPct > 0.5 ? "text-warning" : "text-foreground")}>
-                      {quote.priceImpactPct < 0.01 ? "<0.01%" : formatPercent(quote.priceImpactPct)}
+                    <span className="text-xs leading-relaxed text-muted-foreground">
+                      A position in your own {quote.position} account, not a token in your wallet. Manage or withdraw it at{" "}
+                      {hostOf(route.website)}.
                     </span>
+                  </>
+                ) : quote ? (
+                  <>
+                    <span className="text-2xl font-semibold text-ink">
+                      ≈ {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol}
+                    </span>
+                    {route.category === "liquid-staking" && (
+                      <span className="text-xs text-muted-foreground">Sits in your own wallet and earns staking yield.</span>
+                    )}
+                  </>
+                ) : status === "quoting" ? (
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" /> Fetching quote...
+                  </span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
+              <span
+                aria-hidden="true"
+                className="absolute left-1/2 top-1/2 -ml-[15px] -mt-[15px] grid size-[30px] rotate-45 place-items-center border border-gilt bg-card"
+              >
+                <ArrowDown className="size-[13px] -rotate-45 text-muted-foreground" strokeWidth={2.25} />
+              </span>
+            </div>
+
+            {/* Paths Hermes compared */}
+            {quote && compared.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="label-roman">Hermes checked {compared.length + 1} paths</p>
+                <div className="overflow-hidden rounded-[2px] border border-border">
+                  <div className="flex items-center gap-2.5 bg-ink-surface px-3.5 py-2.5">
+                    <Check className="size-4 shrink-0 text-ink" strokeWidth={2.25} />
+                    <span className="min-w-0 flex-1 text-[13px] font-medium">{pickedLabel}</span>
+                    <span className="text-[13px] font-semibold text-ink">{formatTokenAmount(quote.outAmount)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Slippage</span>
-                    <span className="text-foreground">{formatPercent(quote.slippageBps / 100)}</span>
-                  </div>
-                </>
-              ) : quote.position ? (
-                <>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-muted-foreground">Rate</span>
-                    <span className="text-foreground text-right">Variable, set by borrowing demand</span>
-                  </div>
-                  {quote.setupCostSol && Number(quote.setupCostSol) > 0 && (
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Account setup</span>
-                      <span className="text-warning text-right">
-                        {formatTokenAmount(quote.setupCostSol)} SOL one-time rent
+                  {compared.map((other) => (
+                    <div key={other.method} className="flex items-center gap-2.5 border-t border-border px-3.5 py-2.5">
+                      <span className="w-4 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 text-[13px] text-muted-foreground">
+                        {other.label ?? (other.method === "jupiter-swap" ? "Jupiter" : route.name)}
                       </span>
+                      <span className="text-[13px] text-muted-foreground">{formatTokenAmount(other.outAmount)}</span>
                     </div>
-                  )}
-                </>
-              ) : (
-                // Direct deposits mint at the protocol's rate. It can shift slightly if an epoch update runs first.
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Rate</span>
-                  <span className="text-foreground text-right">{route.name} rate, no slippage</span>
+                  ))}
                 </div>
-              )}
-              {quote.routeLabels.length > 0 && (
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Route</span>
-                  <span className="text-foreground text-right">
-                    {quote.method === "jupiter-swap" ? "Jupiter via " : ""}
-                    {quote.routeLabels.join(" → ")}
-                  </span>
-                </div>
-              )}
-              {/* The paths Hermes quoted and passed over, so the choice can be checked */}
-              {quote.compared?.map((other) => (
-                <div key={other.method} className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Also checked</span>
-                  <span className="text-muted-foreground text-right">
-                    {formatTokenAmount(other.outAmount)} {quote.outputToken.symbol} via{" "}
-                    {other.label ?? (other.method === "jupiter-swap" ? "Jupiter" : route.name)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Hermes builds the path that gives you more {quote.outputToken.symbol}.
+                </p>
+              </div>
+            )}
 
-          {typeof route.utilization === "number" && route.utilization >= HIGH_UTILIZATION && status !== "success" && (
-            <p className="text-[11px] leading-relaxed text-warning">
-              {Math.min(100, Math.round(route.utilization * 100))}% of this {route.token} reserve is borrowed. Withdrawals
-              may have to wait until borrowers repay or new deposits arrive.
-            </p>
-          )}
+            {/* Quote details */}
+            {quote && (
+              <dl className="m-0 flex flex-col gap-2 text-[13px]">
+                {quote.method === "jupiter-swap" ? (
+                  <>
+                    <Row label="Minimum received">
+                      {formatTokenAmount(quote.minOutAmount)} {quote.outputToken.symbol}
+                    </Row>
+                    <Row label="Price impact" className={cn(quote.priceImpactPct > 0.5 && "text-warning")}>
+                      {quote.priceImpactPct < 0.01 ? "<0.01%" : formatPercent(quote.priceImpactPct)}
+                    </Row>
+                    <Row label="Slippage">{formatPercent(quote.slippageBps / 100)}</Row>
+                  </>
+                ) : quote.position ? (
+                  <>
+                    <Row label="Rate">Variable, set by borrowing demand</Row>
+                    {quote.setupCostSol && Number(quote.setupCostSol) > 0 && (
+                      <Row label="Account setup" className="text-warning">
+                        {formatTokenAmount(quote.setupCostSol)} SOL one-time rent
+                      </Row>
+                    )}
+                  </>
+                ) : (
+                  // Direct deposits mint at the protocol's rate. It can shift slightly if an epoch update runs first.
+                  <Row label="Rate">{route.name} rate, no slippage</Row>
+                )}
+                {compared.length === 0 && quote.routeLabels.length > 0 && <Row label="Route">{pickedLabel}</Row>}
+                {route.safety && <Row label="Safety Score">{route.safety.score}/100</Row>}
+                <Row label="Hermes fee">None</Row>
+              </dl>
+            )}
 
-          {!IS_DEVNET && route.deposit === "beta" && status !== "success" && status !== "error" && (
-            <p className="text-[11px] leading-relaxed text-warning">
-              Beta: this deposit route is new in Hermes and uses real funds.
-              {typeof route.depositCap === "number" && ` Deposits are limited to ${route.depositCap} ${route.token} each for now.`} Start
-              with a small amount.
-            </p>
-          )}
+            {typeof route.utilization === "number" && route.utilization >= HIGH_UTILIZATION && status !== "success" && (
+              <Notice tone="warning">
+                {Math.min(100, Math.round(route.utilization * 100))}% of this {route.token} reserve is borrowed. Withdrawals
+                may have to wait until borrowers repay or new deposits arrive.
+              </Notice>
+            )}
 
-          {IS_DEVNET && status !== "success" && (
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Devnet: uses test SOL only. If your wallet warns about this transaction, switch it to Devnet (Phantom:
-              Settings → Developer Settings → Testnet Mode).
-            </p>
-          )}
+            {!IS_DEVNET && route.deposit === "beta" && status !== "success" && status !== "error" && (
+              <Notice tone="warning">
+                Beta: this deposit route is new in Hermes and uses real funds.
+                {typeof route.depositCap === "number" &&
+                  ` Deposits are limited to ${route.depositCap.toLocaleString()} ${route.token} each for now.`}{" "}
+                Start with a small amount.
+              </Notice>
+            )}
 
-          {/* Status */}
-          {status === "error" && error && (
-            <div className="flex items-start gap-2 border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+            {IS_DEVNET && status !== "success" && (
+              <Notice tone="plain">
+                Devnet: uses test SOL only. If your wallet warns about this transaction, switch it to Devnet (Phantom:
+                Settings → Developer Settings → Testnet Mode).
+              </Notice>
+            )}
 
-          {status === "success" && (
-            <div className="flex items-start gap-2 border border-primary/30 bg-primary/5 p-3 text-xs text-primary">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>
+            {/* Status */}
+            {status === "error" && error && <Notice tone="error">{error}</Notice>}
+
+            {status === "success" && (
+              <Notice tone="success">
                 {quote?.position
                   ? `Deposit confirmed. Your ${quote.outputToken.symbol} is supplied to ${quote.position} and earning yield. Manage or withdraw it at ${hostOf(route.website)}.`
                   : `Deposit confirmed. Your ${quote?.outputToken.symbol} is in your wallet and earning yield.`}
-              </span>
-            </div>
-          )}
+              </Notice>
+            )}
 
-          {status === "unconfirmed" && (
-            <div className="flex items-start gap-2 border border-warning/30 bg-warning/5 p-3 text-xs text-warning">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Transaction sent, but Hermes could not confirm it yet. Check Solscan before depositing again.</span>
-            </div>
-          )}
+            {status === "unconfirmed" && (
+              <Notice tone="warning">
+                Transaction sent, but Hermes could not confirm it yet. Check Solscan before depositing again.
+              </Notice>
+            )}
 
-          {signature && (
-            <a
-              href={explorerTxUrl(signature)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-primary"
-            >
-              View on Solscan <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
+            {signature && (
+              <a
+                href={explorerTxUrl(signature)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-ink"
+              >
+                View on Solscan <ExternalLink className="size-3" />
+              </a>
+            )}
 
-          {/* Action */}
-          {status === "success" || status === "unconfirmed" ? (
-            <button
-              onClick={() => onOpenChange(false)}
-              className="w-full py-2.5 font-mono text-xs font-medium border border-border/50 text-foreground hover:border-primary/50 hover:text-primary transition-all"
-            >
-              Done
-            </button>
-          ) : (
-            <button
-              onClick={handleConfirm}
-              disabled={!quote || isBusy || !publicKey}
-              className="w-full flex items-center justify-center gap-2 py-2.5 font-mono text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {(status === "signing" || status === "confirming") && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {status === "signing"
-                ? "Approve in wallet..."
-                : status === "confirming"
-                  ? progress
-                    ? `Sending ${progress.current} of ${progress.total}...`
-                    : "Confirming..."
-                  : status === "error" && quote
-                    ? "Try again"
-                    : "Confirm deposit"}
-            </button>
-          )}
+            {/* Action */}
+            {status === "success" || status === "unconfirmed" ? (
+              <button type="button" onClick={() => onOpenChange(false)} className="btn-frame h-[52px] w-full text-[15px]">
+                Done
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={!quote || isBusy || !publicKey}
+                className="btn-teal h-[52px] w-full text-[15px]"
+              >
+                {(status === "signing" || status === "confirming") && <Loader2 className="size-4 animate-spin" />}
+                {status === "signing"
+                  ? "Approve in wallet..."
+                  : status === "confirming"
+                    ? progress
+                      ? `Sending ${progress.current} of ${progress.total}...`
+                      : "Confirming..."
+                    : status === "error" && quote
+                      ? "Try again"
+                      : "Confirm deposit"}
+              </button>
+            )}
+            <p className="-mt-1 text-center text-xs leading-relaxed text-muted-foreground">
+              Hermes builds the transaction. You sign it in your wallet. Funds never touch Hermes.
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function Row({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn("m-0 text-right font-medium", className)}>{children}</dd>
+    </div>
+  )
+}
+
+const NOTICE_TONES = {
+  warning: "border-warning-line bg-warning-surface text-warning",
+  error: "border-destructive-line bg-destructive-surface text-destructive",
+  success: "border-ink-line bg-ink-surface text-ink",
+  plain: "border-frame bg-secondary text-foreground",
+}
+
+function Notice({ tone, children }: { tone: keyof typeof NOTICE_TONES; children: React.ReactNode }) {
+  const Icon = tone === "success" ? CheckCircle2 : tone === "error" ? AlertCircle : AlertTriangle
+  return (
+    <div className={cn("flex items-start gap-2.5 rounded-[2px] border px-3.5 py-3 text-[13px] leading-relaxed", NOTICE_TONES[tone])}>
+      <Icon className="mt-0.5 size-4 shrink-0" />
+      <span>{children}</span>
+    </div>
   )
 }
