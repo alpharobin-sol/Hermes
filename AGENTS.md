@@ -135,6 +135,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, swap build and CORS hardening: the Jupiter swap transaction is checked before the user signs it (the user is the only signer, so no co-signer is slipped in; the amount received is held to the quote minimum on-chain by Jupiter). The API no longer sends Access-Control-Allow-Credentials with a wildcard origin; credentials are allowed only once CORS_ORIGIN names the sites.
 - 24 Oct 2026, live quotes: type an amount and every route quotes it at once, refreshed every 15 seconds with a live dot and countdown. Rows show what you get, the entry cost against pool value and the 1-year earnings after it, with "Best quote" on the top one.
 - 24 Oct 2026, depeg, validator spread and incidents: the liquid staking exit part measures what a 10,000-token sale returns against the token's pool value, so a depeg lowers the score. Validator spread and incidents are deductions shown in the Why panel. Binance and Jupiter (one validator holds 80% and 87%) and Drift (one validator, and its team's Drift Trade drained of $295M in Apr 2026) leave Top rated.
 - 24 Oct 2026, plain labels: the route type on the phone card and desktop panel opens a three-line explainer (what it is, yield from, getting out), hidden until tapped. Code: `frontend/components/app/route-type.tsx`.

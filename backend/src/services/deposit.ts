@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import Decimal from 'decimal.js';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
 import { logger } from '../utils/logger';
 import { solanaNetwork, SolanaNetwork } from '../config/runtime';
 import { getRoute, depositCap, depositStatus, DirectDeposit, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
@@ -374,6 +374,11 @@ export class DepositService {
       throw new DepositError(describeSimulationError(simulationError), 422);
     }
 
+    // The swap routes through many programs, so its instructions can't be allow-listed the way a single-protocol
+    // deposit can. What Hermes can check: the user is the only signer, so no co-signer is slipped in, and the
+    // amount received is held to the quote's minimum on-chain by Jupiter's own swap instruction.
+    assertUserOnlySigner(swapTransaction, userPublicKey);
+
     logger.info(`Built swap deposit: ${quote.inAmount} ${quote.inputToken.symbol} -> ${quote.outputToken.symbol}`);
 
     return {
@@ -500,6 +505,25 @@ function directLabel(route: RouteConfig): string {
 
 function toLamports(amount: string | number): Decimal {
   return new Decimal(amount).mul(1e9).floor();
+}
+
+// A deposit transaction the user signs must need the user's signature and no one else's. The swap provider's
+// response is not signed by Hermes, so this check stops a transaction that asks the wallet to authorize a co-signer.
+export function assertUserOnlySigner(swapTransaction: string | undefined, userPublicKey: string): void {
+  if (!swapTransaction) {
+    throw new DepositError('The swap provider is unavailable. Try again shortly.', 503);
+  }
+  let transaction: VersionedTransaction;
+  try {
+    transaction = VersionedTransaction.deserialize(Buffer.from(swapTransaction, 'base64'));
+  } catch {
+    throw new DepositError('The swap provider returned an unreadable transaction. Try again shortly.', 502);
+  }
+  const user = new PublicKey(userPublicKey);
+  if (transaction.message.header.numRequiredSignatures !== 1 || !transaction.message.staticAccountKeys[0].equals(user)) {
+    logger.warn(`Jupiter swap for ${userPublicKey} returned a transaction with unexpected signers`);
+    throw new DepositError('The swap provider returned an unexpected transaction. Try again shortly.', 502);
+  }
 }
 
 // The amount cut to the token's decimals, in UI units

@@ -18,7 +18,8 @@ export function createApp(): Express {
   app.use(cors({
     // Comma-separated list, e.g. "https://www.hermesagg.xyz,https://hermes-three-beta.vercel.app"
     origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : '*',
-    credentials: true,
+    // Credentials can't go with a wildcard origin. Only allow them once CORS_ORIGIN names the sites.
+    credentials: !!process.env.CORS_ORIGIN,
   }));
   
   // Compression
