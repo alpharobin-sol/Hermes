@@ -65,10 +65,11 @@ export interface YieldRoute {
 
 export class YieldAPI {
   // Routes for one deposit token, or for every token when `token` is left out
-  static async getRoutes(token?: string, opts?: { signal?: AbortSignal }): Promise<YieldRoute[]> {
+  // revalidate: on the server, let Next reuse the answer for this many seconds. The browser always asks fresh.
+  static async getRoutes(token?: string, opts?: { signal?: AbortSignal; revalidate?: number }): Promise<YieldRoute[]> {
     const query = token ? `?token=${encodeURIComponent(token)}` : "";
     const res = await fetch(getFullUrl(`/api/yields${query}`), {
-      cache: "no-cache",
+      ...(opts?.revalidate != null ? { next: { revalidate: opts.revalidate } } : { cache: "no-cache" as RequestCache }),
       signal: opts?.signal,
     });
 

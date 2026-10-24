@@ -32,14 +32,15 @@ function updatedLabel(routes: YieldRoute[]): string | null {
   return `${oldest.toISOString().slice(11, 16)} UTC`
 }
 
-export function YieldPanel() {
+// initialRoutes: live rates rendered on the server, so the page arrives with routes instead of a loading state
+export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | null }) {
   const { balances, isConnected, refresh: refreshBalances } = useTokenBalances()
   const { publicKey } = useWallet()
   const { setVisible: setWalletModalVisible } = useWalletModal()
   const { setIsLoading } = useLoading()
 
-  const [routes, setRoutes] = useState<YieldRoute[]>([])
-  const [loading, setLoading] = useState(true)
+  const [routes, setRoutes] = useState<YieldRoute[]>(initialRoutes ?? [])
+  const [loading, setLoading] = useState(!initialRoutes?.length)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -55,8 +56,29 @@ export function YieldPanel() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const mobileCardRef = useRef<HTMLElement>(null)
 
+  // Rates refresh every minute, like a live swap quote, without the loading state. A failed refresh keeps the
+  // last rates.
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshRates = () => {
+    setRefreshing(true)
+    return YieldAPI.getRoutes()
+      .then((data) => {
+        setRoutes(data)
+        setError(null)
+      })
+      .catch(() => {})
+      .finally(() => setRefreshing(false))
+  }
+
   // Every route, once. Rates show before an amount is typed. Amount and view are applied here.
+  // Rates from the server refresh quietly on load instead of showing the loading state again.
+  const quietFirstLoad = useRef(!!initialRoutes?.length)
   useEffect(() => {
+    if (quietFirstLoad.current) {
+      quietFirstLoad.current = false
+      refreshRates()
+      return
+    }
     const controller = new AbortController()
     setLoading(true)
     setIsLoading(true)
@@ -79,23 +101,11 @@ export function YieldPanel() {
     return () => controller.abort()
   }, [reloadKey, setIsLoading])
 
-  // Rates refresh every minute, like a live swap quote, without the loading state. A failed refresh keeps the
-  // last rates. Paused while the deposit dialog is open, so the route under review never changes or drops out.
+  // The minute refresh pauses while the deposit dialog is open, so the route under review never changes or drops out
   const reviewOpenRef = useRef(false)
   useEffect(() => {
     reviewOpenRef.current = reviewOpen
   }, [reviewOpen])
-  const [refreshing, setRefreshing] = useState(false)
-  const refreshRates = () => {
-    setRefreshing(true)
-    return YieldAPI.getRoutes()
-      .then((data) => {
-        setRoutes(data)
-        setError(null)
-      })
-      .catch(() => {})
-      .finally(() => setRefreshing(false))
-  }
   useEffect(() => {
     const timer = setInterval(() => {
       if (reviewOpenRef.current || document.hidden) return
