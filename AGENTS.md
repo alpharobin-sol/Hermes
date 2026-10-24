@@ -88,7 +88,8 @@ Routes
 - [ ] Rate checks against each protocol's app for the beta routes
 - [x] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
 - [x] Jupiter Lend
-- [ ] Save and MarginFi
+- [ ] More stablecoin routes. Research 24 Oct (live checks, simulated deposits): next are Kamino's Steakhouse USDC vault (Kamino's transaction API builds deposit and withdraw, share token can land in the wallet) and Project 0, formerly MarginFi (USDC and USDT banks, two raw instructions, about 98% borrowed today). Lulo Protected USDC after an API key. Save later (low yield, shrinking). Not: Drift (drained Apr 2026), Loopscale (co-signed transactions, thin exits), Solstice (backing reports unhealthy).
+- No geo-blocking (owner, 24 Oct): Hermes does not block US users, so routes that exclude US persons stay out (Maple syrupUSDC, OnRe ONyc, Ondo USDY, Perena USD*).
 
 Smart router
 
@@ -137,6 +138,7 @@ Open decisions for the owner
 - 24 Oct 2026, live quotes: type an amount and every route quotes it at once, refreshed every 15 seconds with a live dot and countdown. Rows show what you get, the entry cost against pool value and the 1-year earnings after it, with "Best quote" on the top one.
 - 24 Oct 2026, depeg, validator spread and incidents: the liquid staking exit part measures what a 10,000-token sale returns against the token's pool value, so a depeg lowers the score. Validator spread and incidents are deductions shown in the Why panel. Binance and Jupiter (one validator holds 80% and 87%) and Drift (one validator, and its team's Drift Trade drained of $295M in Apr 2026) leave Top rated.
 - 24 Oct 2026, plain labels: the route type on the phone card and desktop panel opens a three-line explainer (what it is, yield from, getting out), hidden until tapped. Code: `frontend/components/app/route-type.tsx`.
+- 24 Oct 2026, Kamino deposit hardening: the Kamino transaction API response is checked before the user signs it. Only the programs a deposit uses are allowed, no top-level token transfer or approval, wrapped SOL moves only between the user's own accounts, and SOL leaving the wallet beyond the deposit is bounded. A compromised Kamino response can now at worst fail, never move funds the user did not intend. Matches the checks the Jupiter Lend builder already does.
 - 24 Oct 2026, search basics: live rates in the server HTML, a 1200x630 share image for X and Telegram, Open Graph and X card tags, JSON-LD, a keyword title and description, and Search Console codes from Vercel env.
 - 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.
 - 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source and the Why panel explains the score and what it doesn't cover. The footer is the logo, the copyright and the Telegram and X links, nothing else. Longer explanations go in articles and threads. Under the deposit button only the cap shows ("Max 10 SOL per deposit"): the Mainnet beta pill already says real funds.
