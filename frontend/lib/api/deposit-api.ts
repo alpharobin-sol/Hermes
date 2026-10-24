@@ -75,10 +75,31 @@ export interface RouteQuote {
   error: string | null; // why this route can't quote right now
 }
 
+// A Jupiter swap the browser quotes itself (Jupiter limits requests per IP, and the API's IP is shared)
+export interface SwapToQuote {
+  inputMint: string;
+  inputDecimals: number;
+  outputMint: string;
+  outputSymbol: string;
+  outputDecimals: number;
+  rawAmount: string;
+}
+
+// What the API answers for one route: the direct deposit quote, and a swap to quote in the browser
+export interface ServerRouteQuote {
+  routeId: string;
+  quote: DepositQuote | null;
+  swap: SwapToQuote | null;
+  tokenValue: number | null; // liquid staking: SOL per token in the pool
+  value: string | null;
+  entryCost: number | null;
+  error: string | null;
+}
+
 export class DepositAPI {
-  // Every route for a token at once, like a swap aggregator's quotes
+  // Every route for a token at once, like a swap aggregator's quotes. Swaps come back for the browser to quote.
   static async quoteRoutes(token: string, amount: number, routeIds: string[], opts?: { signal?: AbortSignal }) {
-    return post<RouteQuote[]>("/api/deposit/quotes", { token, amount: String(amount), routeIds }, opts?.signal);
+    return post<ServerRouteQuote[]>("/api/deposit/quotes", { token, amount: String(amount), routeIds }, opts?.signal);
   }
 
   static async getQuote(params: DepositParams, opts?: { signal?: AbortSignal }) {
