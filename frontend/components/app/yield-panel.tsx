@@ -18,11 +18,6 @@ import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 
 const RATE_REFRESH_MS = 60 * 1000
 
-// "A", "A and B", "A, B and C"
-function listOf(items: string[]): string {
-  return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
-}
-
 // Round down so a quick amount never exceeds what the wallet can spend
 function floorTo(value: number, decimals: number): number {
   const factor = 10 ** decimals
@@ -127,7 +122,6 @@ export function YieldPanel() {
   )
   const visibleRoutes = view === "all" ? forToken : forToken.filter(isTopRated)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
-  const sources = listOf([...new Set(forToken.map((route) => route.source))])
 
   const numericAmount = useMemo(() => {
     const parsed = Number.parseFloat(amount.replace(/,/g, ""))
@@ -183,7 +177,7 @@ export function YieldPanel() {
     <section
       id="rates"
       aria-label="Rates"
-      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 lg:pt-10"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-6 pt-3 md:gap-6 md:px-8 md:pb-10 lg:pt-10"
     >
       {/* Phones and tablets: a toolbar over the card, like a swap app's. Desktop shows the network in the header. */}
       <div className="-mb-2 flex basis-full items-center justify-between gap-3 lg:hidden">
@@ -248,8 +242,6 @@ export function YieldPanel() {
         loading={loading}
         error={error}
         onRetry={() => setReloadKey((key) => key + 1)}
-        sources={sources}
-        updatedLabel={updatedLabel(forToken)}
         // On phones and tablets the card lists every route once an amount is typed, so this list steps aside
         className={numericAmount > 0 && !loading && !error ? "max-lg:hidden" : undefined}
       />

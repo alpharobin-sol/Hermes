@@ -218,14 +218,12 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           onConnect={onConnect}
           onReview={onReview}
         />
-        <p className="-mt-0.5 text-center text-xs leading-relaxed text-muted-foreground">
-          {route?.deposit === "beta" && !IS_DEVNET && (
-            <span className="text-warning">
-              Beta, real funds{route.depositCap != null && `, up to ${route.depositCap.toLocaleString()} ${route.token} per deposit`}.{" "}
-            </span>
-          )}
-          You sign in your own wallet.
-        </p>
+        {/* The toolbar's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
+        {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
+          <p className="-mt-0.5 text-center text-xs text-muted-foreground">
+            Max {route.depositCap.toLocaleString()} {route.token} per deposit
+          </p>
+        )}
       </div>
 
       <TokenSheet
