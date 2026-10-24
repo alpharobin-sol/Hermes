@@ -10,7 +10,7 @@ import type { YieldRoute } from "@/lib/api/yield-api"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
 import { HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
-import { SafetyBreakdown, whatCanGoWrong } from "./safety"
+import { SafetyBreakdown } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
 
@@ -223,21 +223,11 @@ function Note({ children, tone = "warning" }: { children: React.ReactNode; tone?
 }
 
 // compact: the dialog shows any rent before signing
-export function RouteNotes({ route, compact = false }: { route: YieldRoute; compact?: boolean }) {
+// Only what the user must know right now. What can go wrong and the one-time rent show in the deposit dialog.
+export function RouteNotes({ route }: { route: YieldRoute }) {
   const borrowed = borrowedPercent(route)
   return (
     <div className="flex flex-col gap-2 empty:hidden">
-      {route.deposit && (
-        <Note tone="muted">
-          <span className="font-medium text-foreground">What can go wrong:</span> {whatCanGoWrong(route)}
-        </Note>
-      )}
-      {/* Lending into an account (Kamino) sets the account up on a first deposit. Tokens like jlUSDC only need a token account. */}
-      {!compact && route.deposit && route.category === "lending" && !route.receipt && (
-        <Note tone="muted">
-          Your first {route.name} deposit pays one-time account rent in SOL. You see the exact amount before you sign.
-        </Note>
-      )}
       {borrowed !== null && route.utilization! >= HIGH_UTILIZATION && (
         <Note>
           {borrowed}% of this {route.token} reserve is borrowed. Withdrawals may have to wait until borrowers repay or new

@@ -190,7 +190,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
 
         {route?.deposit && <RouteAlertToggle route={route} />}
 
-        {route && <RouteNotes route={route} compact />}
+        {route && <RouteNotes route={route} />}
 
         <PrimaryAction
           route={route}
