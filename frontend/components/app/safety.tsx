@@ -154,13 +154,15 @@ export function SortToggle({ value, onChange, compact = false }: { value: SortBy
 }
 
 // What each part of the selected route's score measured, with its points and source. Closed by default.
-export function SafetyBreakdown({ route, className }: { route: YieldRoute; className?: string }) {
+// `withSource` adds where the APY and TVL come from, for the phone card, which has no stats block to say it
+export function SafetyBreakdown({ route, withSource, className }: { route: YieldRoute; withSource?: boolean; className?: string }) {
   const level = riskLevel(route)
+  const source = withSource ? ` APY and TVL from ${route.source}.` : ""
 
   if (!route.safety) {
     return (
       <p className={cn("text-xs leading-relaxed text-muted-foreground", className)}>
-        Not scored right now: some of the data behind the Safety Score is unavailable. The risk level comes from TVL.
+        Not scored right now: some of the data behind the Safety Score is unavailable. The risk level comes from TVL.{source}
       </p>
     )
   }
@@ -216,7 +218,7 @@ export function SafetyBreakdown({ route, className }: { route: YieldRoute; class
             </span>
           </div>
         ))}
-        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs or a sudden depeg.</p>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs or a sudden depeg.{source}</p>
       </div>
     </details>
   )

@@ -7,9 +7,8 @@ import { Check, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { IS_DEVNET } from "@/lib/network"
 import type { YieldRoute } from "@/lib/api/yield-api"
-import { formatUSD } from "@/lib/helpers/formatters"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
-import { CATEGORY_LABELS, Medallion, RISK_LEVELS, borrowedPercent, formatApy, withdrawablePercent } from "./rate-board"
+import { Medallion, formatApy } from "./rate-board"
 import { AmountMessages, PrimaryAction, QUICK_AMOUNTS, RouteNotes, isOverCap, type BalanceIssue } from "./deposit-panel"
 import { formatTokenAmount, type Token } from "./tokens"
 import {
@@ -26,7 +25,7 @@ import {
 } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
-import { LiveBadge, bestQuoteRoute, estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
+import { LiveBadge, bestQuoteRoute, estimatedYear, type LiveQuotes } from "./live-quotes"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -52,18 +51,13 @@ interface MobileDepositProps {
   route: YieldRoute | null
   onSelectRoute: (id: string) => void
   ratesStatus: "loading" | "error" | "ready"
-  updatedLabel: string | null
   onConnect: () => void
   onReview: () => void
   live: LiveQuotes
 }
 
-function riskLabel(route: YieldRoute): string {
-  return RISK_LEVELS.find((level) => level.value === route.risk)?.label ?? route.risk
-}
-
 // Phones and tablets: one card, the way a swap app works. With an amount typed, every route shows in the card,
-// by Safety Score or by what it earns, the best APY marked and the gap to it shown for the rest.
+// by Safety Score or by what it earns, with its score and what it earns in a year. The rest is in the Why panel.
 export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(function MobileDeposit(
   {
     tokens,
@@ -89,7 +83,6 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     route,
     onSelectRoute,
     ratesStatus,
-    updatedLabel,
     onConnect,
     onReview,
     live,
@@ -98,8 +91,6 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
 ) {
   const [tokenSheet, setTokenSheet] = useState(false)
   const overCap = isOverCap(route, numericAmount)
-  const borrowed = route ? borrowedPercent(route) : null
-  const withdrawable = route ? withdrawablePercent(route) : null
   const showRoutes = numericAmount > 0 && ratesStatus === "ready"
 
   return (
@@ -195,18 +186,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           />
         )}
 
-        {/* Where the numbers come from, like a swap app's rate line */}
-        {route && (
-          <p className="px-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            {showRoutes && `${route.name}: `}
-            {safetyText(route)} · {riskLabel(route)} risk · TVL {formatUSD(route.tvl)}
-            {borrowed !== null && ` · ${borrowed}% borrowed`}
-            {withdrawable !== null && ` · ${withdrawable}% withdrawable now`} · from {route.source}
-            {updatedLabel && `, ${updatedLabel}`}
-          </p>
-        )}
-
-        {route && <SafetyBreakdown route={route} />}
+        {route && <SafetyBreakdown route={route} withSource />}
 
         {route?.deposit && <RouteAlertToggle route={route} />}
 
@@ -315,8 +295,8 @@ function BestRoute({
   )
 }
 
-// With an amount: every route in sortBy order with its live quote, what it leaves after a year once the entry
-// cost is taken off, and how far behind the best quote it is
+// With an amount: every route in sortBy order with its Safety Score and what it leaves after a year once the entry
+// cost is taken off. What lands, the entry cost and the APY show in the dialog before signing.
 function RouteChoices({
   live,
   routes,
@@ -350,7 +330,6 @@ function RouteChoices({
   const quoted = bestQuoteRoute(routes, amount, live)
   const best = quoted ?? bestApyRoute(routes)
   const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
-  const bestYearly = best ? estimatedYear(best, amount, live.byRoute[best.id]) : 0
   const hidden = totalForToken - routes.length
 
   return (
@@ -380,7 +359,8 @@ function RouteChoices({
           const isBest = r === best
           const quote = live.byRoute[r.id]
           const yearly = estimatedYear(r, amount, quote)
-          const line = quoteLine(r, quote)
+          // A route that can't take this amount right now (over a cap, price impact) says so instead of a yearly figure
+          const noQuote = !!quote && !quote.quote
           return (
             <button
               key={r.id}
@@ -404,26 +384,18 @@ function RouteChoices({
                   <span className="font-display text-[19px] font-bold leading-[1.1]">{r.name}</span>
                   {isBest && <span className={BEST_TAG}>{quoted ? "Best quote" : "Best APY"}</span>}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {r.receipt ?? CATEGORY_LABELS[r.category]} · {safetyText(r)}
-                </span>
-                {line ? (
-                  <span className={cn("text-[11px]", quote?.quote ? "text-foreground" : "text-warning")}>{line}</span>
-                ) : (
-                  r.deposit &&
-                  live.status === "loading" && <span aria-hidden="true" className="mt-0.5 h-3 w-36 animate-pulse rounded-[2px] bg-hairline" />
-                )}
+                <span className="text-[11px] text-muted-foreground">{safetyText(r)}</span>
               </span>
-              <span className="flex shrink-0 flex-col items-end gap-0.5">
-                <span className={cn("text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
+              {noQuote ? (
+                <span className="shrink-0 text-[13px] text-muted-foreground" title={quote.error ?? undefined}>
+                  No quote
+                </span>
+              ) : (
+                <span className={cn("shrink-0 text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
                   {yearly < 0 ? "−" : "+"}
                   {formatTokenAmount(Math.abs(yearly), r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
                 </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {formatApy(r)} APY
-                  {!isBest && ` · ${formatTokenAmount(bestYearly - yearly, r.token)} less`}
-                </span>
-              </span>
+              )}
             </button>
           )
         })}
