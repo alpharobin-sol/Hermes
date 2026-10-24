@@ -4,7 +4,7 @@ import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, unpackAccount } from '
 import { logger } from '../utils/logger';
 import { Category, InputToken, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TokenInfo, TOKENS } from '../registry/routes';
 import { cached, Cached } from './cache';
-import { connection, getRate, http, tokenPrices } from './rates';
+import { connection, getRate, http, solPrice, tokenPrices } from './rates';
 import { createJupiterClient } from './jupiter';
 import { getYieldRoutes } from './yields';
 
@@ -49,7 +49,7 @@ export interface Position {
 export interface Portfolio {
   address: string;
   positions: Position[];
-  totalUsd: number; // positions with a USD value
+  totalUsd: number | null; // null when a position's value can't be priced right now, never a short total
   earnedUsd: number | null; // positions with a known earned, null when none
   prices: Partial<Record<InputToken, number>>; // USD, for the wallet's own SOL, USDC and USDT too
   unavailable: string[]; // sources that didn't answer, so their positions are missing
@@ -424,11 +424,17 @@ async function readPortfolio(address: string): Promise<Portfolio> {
     ['Kamino', kamino(address)],
     ['Jupiter Lend', jupiterLend(address)],
   ];
-  const [settled, routes, prices] = await Promise.all([
+  const [settled, routes, fetched] = await Promise.all([
     Promise.allSettled(sources.map(([, promise]) => promise)),
     getYieldRoutes(undefined, true),
     tokenPrices.get(),
   ]);
+  // Jupiter refuses some price calls from a shared IP. SOL falls back to the price the rates already use.
+  const prices = new Map(fetched ?? []);
+  if (!prices.has('SOL')) {
+    const sol = await solPrice.get();
+    if (sol) prices.set('SOL', sol);
+  }
 
   const unavailable: string[] = [];
   const found: Found[] = [];
@@ -442,7 +448,7 @@ async function readPortfolio(address: string): Promise<Portfolio> {
 
   const positions = found.map(({ route, ...rest }): Position => {
     const live = routes.find((r) => r.id === route.id);
-    const price = prices?.get(route.token) ?? null;
+    const price = prices.get(route.token) ?? null;
     return {
       ...rest,
       name: route.name,
@@ -458,12 +464,13 @@ async function readPortfolio(address: string): Promise<Portfolio> {
   positions.sort((a, b) => (b.valueUsd ?? 0) - (a.valueUsd ?? 0));
 
   const known = positions.filter((p) => p.earnedUsd !== null);
+  const unpriced = positions.some((p) => p.value !== null && p.valueUsd === null);
   return {
     address,
     positions,
-    totalUsd: positions.reduce((sum, p) => sum + (p.valueUsd ?? 0), 0),
+    totalUsd: unpriced ? null : positions.reduce((sum, p) => sum + (p.valueUsd ?? 0), 0),
     earnedUsd: known.length ? known.reduce((sum, p) => sum + p.earnedUsd!, 0) : null,
-    prices: Object.fromEntries(prices ?? []),
+    prices: Object.fromEntries(prices),
     unavailable,
     history: historyRpc !== null,
     updatedAt: new Date().toISOString(),
@@ -473,8 +480,8 @@ async function readPortfolio(address: string): Promise<Portfolio> {
 const answers = new Map<string, { at: number; portfolio: Promise<Portfolio> }>();
 
 /**
- * The wallet's positions in Hermes's routes. Kept 60 seconds per wallet. An answer with a missing source or an
- * earned that didn't load isn't kept, so the next request tries again.
+ * The wallet's positions in Hermes's routes. Kept 60 seconds per wallet. An answer with a missing source, a missing
+ * price or an earned that didn't load isn't kept, so the next request tries again.
  */
 export function getPortfolio(address: string): Promise<Portfolio> {
   const now = Date.now();
@@ -488,7 +495,8 @@ export function getPortfolio(address: string): Promise<Portfolio> {
   answers.set(address, { at: now, portfolio });
   portfolio.then(
     (result) => {
-      if (result.unavailable.length || result.positions.some((p) => p.earnedNote === RETRY_NOTE)) answers.delete(address);
+      const retry = result.unavailable.length || result.totalUsd === null || result.positions.some((p) => p.earnedNote === RETRY_NOTE);
+      if (retry) answers.delete(address);
     },
     () => answers.delete(address)
   );

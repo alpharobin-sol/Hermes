@@ -99,9 +99,12 @@ export function PortfolioPage() {
 function WalletBalances({ prices }: { prices: Portfolio["prices"] | null }) {
   const { balances } = useTokenBalances()
   const known = BASE_TOKENS.filter((token) => typeof balances[token.symbol] === "number")
-  const totalUsd = prices
-    ? known.reduce((sum, token) => sum + balances[token.symbol] * (prices[token.symbol as keyof Portfolio["prices"]] ?? 0), 0)
-    : null
+  // No total unless every token held has a price: a short total would read as less money
+  const priced = (symbol: string) => prices?.[symbol as keyof Portfolio["prices"]]
+  const totalUsd =
+    prices && known.every((token) => !balances[token.symbol] || priced(token.symbol))
+      ? known.reduce((sum, token) => sum + balances[token.symbol] * (priced(token.symbol) ?? 0), 0)
+      : null
 
   return (
     <section aria-label="In your wallet" className="flex flex-col gap-3">
