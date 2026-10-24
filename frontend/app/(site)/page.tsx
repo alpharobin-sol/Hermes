@@ -154,9 +154,9 @@ const ROADMAP = [
     body: "Live quotes for any amount, the deposit built for the route you pick, and withdrawals from Portfolio.",
   },
   {
-    status: "Next",
+    status: "Live",
     title: "Signals and moves",
-    body: "Phone alerts are live. Next: alerts for your own positions, Telegram, and one-click moves you sign once.",
+    body: "Phone alerts and moves are live: Hermes proposes a better top rated route and you sign. Next: alerts for your own positions, and Telegram.",
   },
   {
     status: "Later",
@@ -202,6 +202,11 @@ const FAQS = [
     question: "How do I withdraw?",
     answer:
       "Open Portfolio, tap Withdraw under a position and sign. Staking tokens swap back to SOL at the market price, and Hermes shows the exit cost first. Lending pays your token back when the reserve has room.",
+  },
+  {
+    question: "Can Hermes move my funds to a better route?",
+    answer:
+      "Hermes proposes, you sign. In Portfolio, Hermes proposes a move under a position when a top rated route for the same token pays at least half a point more today. Tap Move to see the cost, what the new route earns in a year at today's rates and how long it takes to make the cost back. A staking token to a staking token is one swap. A move with lending in it is two steps you sign one after the other, and if the second fails the funds wait in your wallet.",
   },
   {
     question: "Can Hermes alert me?",
