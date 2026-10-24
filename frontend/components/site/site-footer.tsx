@@ -3,12 +3,13 @@ import Link from "next/link"
 import { Meander } from "@/components/app/layout/meander"
 import { SocialLinks } from "@/components/app/layout/social-links"
 import { Wordmark } from "@/components/app/layout/wordmark"
+import { LaunchApp } from "./launch-app"
 
 const COLUMNS = [
   {
     title: "Product",
     links: [
-      { href: "/app", label: "Open app" },
+      { href: "/app", label: "Launch app" },
       { href: "/portfolio", label: "Portfolio" },
       { href: "/docs", label: "Docs" },
     ],
@@ -43,9 +44,7 @@ export function SiteFooter() {
           <p className="max-w-[340px] font-display text-[28px] font-semibold leading-[1.1]">Your guide to Solana yield.</p>
           <div className="flex flex-wrap items-center gap-3">
             <SocialLinks />
-            <Link href="/app" className="btn-teal h-11 px-5 text-sm">
-              Open app
-            </Link>
+            <LaunchApp className="h-11 px-5 text-sm" />
           </div>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-3 gap-6 sm:gap-8">

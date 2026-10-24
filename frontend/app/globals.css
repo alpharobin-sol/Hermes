@@ -187,6 +187,18 @@
     @apply rounded-[2px] border border-hairline;
   }
 
+  /* An arched top, like the fresco's frame. --arch sets the curve; a plaque's inner frame follows it 4px in and
+     clips what it holds. Comes after .plaque so it wins the top corners. */
+  .arch {
+    border-top-left-radius: var(--arch, 80px);
+    border-top-right-radius: var(--arch, 80px);
+  }
+  .arch > .plaque-inner {
+    border-top-left-radius: calc(var(--arch, 80px) - 4px);
+    border-top-right-radius: calc(var(--arch, 80px) - 4px);
+    overflow: hidden;
+  }
+
   /* Small Roman capitals over a section */
   .eyebrow {
     @apply font-roman text-[13px] font-semibold tracking-[0.22em] text-ornament;

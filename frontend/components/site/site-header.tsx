@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { Wordmark } from "@/components/app/layout/wordmark"
+import { LaunchApp } from "./launch-app"
 
 // The landing page's header, like Gloam's: the logo, the page's sections and Docs, and one way into the app.
 // No wallet here: the app is where you connect.
@@ -30,9 +31,7 @@ export function SiteHeader() {
             ))}
           </ul>
         </nav>
-        <Link href="/app" className="btn-teal h-11 px-5 text-sm">
-          Open app
-        </Link>
+        <LaunchApp className="h-11 px-5 text-sm" />
       </div>
     </header>
   )
