@@ -24,6 +24,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { HeroBoard, type BoardColumn } from "@/components/site/hero-board"
 import { ScoreShowcase, type ShowcaseRoute } from "@/components/site/score-showcase"
 import { LiveDot } from "@/components/site/live-dot"
+import { LaunchApp } from "@/components/site/launch-app"
 import banner from "@/public/brand/aurora-banner.jpg"
 import mark from "@/public/brand/hermes-mark.png"
 
@@ -285,7 +286,7 @@ function Hero({ routes }: { routes: YieldRoute[] | null }) {
         />
       </figure>
 
-      <div className="plaque relative mx-1 -mt-6 border-gilt shadow-[0_30px_70px_-45px_rgba(43,20,14,0.6)] sm:mx-auto sm:max-w-[1040px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
+      <div className="plaque arch relative mx-1 -mt-6 border-gilt [--arch:36px] md:[--arch:64px] shadow-[0_30px_70px_-45px_rgba(43,20,14,0.6)] sm:mx-auto sm:max-w-[1040px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
         <div className={cn("plaque-inner grid", columns.length > 0 && "lg:grid-cols-[minmax(0,1.12fr)_minmax(0,1fr)]")}>
           <div className={cn("px-5 pb-7 pt-5 sm:px-8 sm:pb-8 sm:pt-7 lg:px-10 lg:pb-10 lg:pt-9", columns.length === 0 && "text-center")}>
             <NetworkPill className="h-7 px-2.5 text-[11px]" />
@@ -302,10 +303,8 @@ function Hero({ routes }: { routes: YieldRoute[] | null }) {
               for the one you pick.
             </p>
             <div className={cn("mt-6 flex flex-wrap items-center gap-3 md:mt-7", columns.length === 0 && "justify-center")}>
-              <Link href="/app" className="btn-teal h-12 px-6 text-[15px]">
-                Open app
-              </Link>
-              <Link href="#how" className="btn-frame h-12 px-6 text-[15px]">
+              <LaunchApp className="h-12 flex-1 whitespace-nowrap px-3 text-[15px] sm:flex-none sm:px-6" />
+              <Link href="#how" className="btn-frame h-12 flex-1 whitespace-nowrap px-3 text-[15px] sm:flex-none sm:px-6">
                 How it works
               </Link>
             </div>
@@ -416,7 +415,7 @@ function LiveNumbers({ routes }: { routes: YieldRoute[] }) {
 
   return (
     <section aria-label="Hermes in numbers" className="reveal mx-auto max-w-[1200px] px-4 pt-16 md:px-8 md:pt-24">
-      <div className="dark rounded-[4px] border border-gilt bg-card p-1 text-foreground md:p-1.5">
+      <div className="dark arch rounded-b-[4px] border border-gilt bg-card p-1 text-foreground [--arch:32px] md:p-1.5 md:[--arch:56px]">
         <div className="plaque-inner grid grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <div key={stat.label} className={cn("flex flex-col gap-3 border-hairline p-5 md:flex-row md:items-center md:gap-4 md:p-7", borders[index])}>
@@ -473,9 +472,9 @@ function HowItWorks({ routes }: { routes: YieldRoute[] | null }) {
       <SectionHead eyebrow="How it works" title="Four steps, one signature" intro="No account and no sign-up. Connect a wallet when you are ready to deposit." />
       <ol className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((step) => (
-          <li key={step.numeral} className="plaque flex">
+          <li key={step.numeral} className="plaque arch flex [--arch:96px]">
             <div className="plaque-inner flex w-full flex-col">
-              <div className="h-[184px] overflow-hidden border-b border-hairline bg-plate p-4">{step.visual}</div>
+              <div className="h-[232px] overflow-hidden border-b border-hairline bg-plate px-5 pb-4 pt-14">{step.visual}</div>
               <div className="flex flex-1 flex-col gap-1.5 p-4 md:p-5">
                 <span aria-hidden="true" className="font-roman text-[22px] font-semibold leading-none text-ornament">
                   {step.numeral}
@@ -577,7 +576,7 @@ function ScoreVisual({ route }: { route: YieldRoute }) {
 function SignVisual() {
   return (
     <div aria-hidden="true" className="flex h-full items-center justify-center">
-      <div className="w-full max-w-[236px] rounded-[6px] border border-frame bg-card p-3 shadow-[0_16px_30px_-20px_rgba(43,20,14,0.5)]">
+      <div className="w-full max-w-[212px] rounded-[6px] border border-frame bg-card p-3 shadow-[0_16px_30px_-20px_rgba(43,20,14,0.5)]">
         <div className="flex items-center gap-2 text-xs font-semibold">
           <span className="grid size-6 place-items-center rounded-full bg-secondary">
             <Wallet className="size-3.5" />
@@ -634,8 +633,8 @@ function SafetyScore({ routes }: { routes: YieldRoute[] | null }) {
   return (
     <section id="safety" className="reveal mx-auto max-w-[1200px] scroll-mt-24 px-4 pt-20 md:px-8 md:pt-32">
       <div className={cn("grid gap-4", top && "lg:grid-cols-2")}>
-        <div className="plaque">
-          <div className="plaque-inner h-full p-6 md:p-10">
+        <div className="plaque arch [--arch:80px] md:[--arch:120px]">
+          <div className="plaque-inner h-full px-6 pb-6 pt-12 md:px-10 md:pb-10 md:pt-16">
             <span className="eyebrow-pill">
               <span className="diamond" aria-hidden="true" />
               Safety Score
@@ -665,7 +664,7 @@ function SafetyScore({ routes }: { routes: YieldRoute[] | null }) {
           </div>
         </div>
         {top && (
-          <div className="relative flex items-center justify-center overflow-hidden rounded-[4px] border border-frame bg-plate px-4 py-10 md:px-10 md:py-14">
+          <div className="arch relative flex items-center justify-center overflow-hidden rounded-b-[4px] border border-frame bg-plate px-4 pb-10 pt-16 [--arch:80px] md:px-10 md:pb-14 md:pt-20 md:[--arch:120px]">
             <Image src={banner} alt="" fill sizes="(min-width: 1024px) 560px, 100vw" className="object-cover object-[78%_50%] opacity-25 blur-[3px]" />
             <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-plate via-plate/70 to-plate/30" />
             <div className="relative flex w-full justify-center">
@@ -681,7 +680,7 @@ function SafetyScore({ routes }: { routes: YieldRoute[] | null }) {
 function Alerts() {
   return (
     <section id="alerts" className="reveal mx-auto grid max-w-[1200px] scroll-mt-24 items-center gap-10 px-4 pt-20 md:px-8 md:pt-32 lg:grid-cols-2 lg:gap-16">
-      <div className="order-2 rounded-[4px] border border-frame bg-secondary/60 p-4 sm:p-6 md:p-8 lg:order-1">
+      <div className="arch order-2 rounded-b-[4px] border border-frame bg-secondary/60 px-4 pb-4 pt-14 [--arch:80px] sm:px-6 sm:pb-6 md:px-8 md:pb-8 md:pt-20 md:[--arch:120px] lg:order-1">
         <ul aria-label="What alerts cover" className="m-0 flex list-none flex-col gap-3 p-0">
           {ALERT_KINDS.map((kind, index) => (
             <li
@@ -744,14 +743,12 @@ function Audiences() {
       />
       <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {AUDIENCES.map((audience) => (
-          <li key={audience.title} className="plaque">
-            <div className="plaque-inner flex h-full flex-col gap-2 p-5">
-              <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:gap-4">
-                <span className="medallion size-11" aria-hidden="true">
-                  <audience.icon className="size-5" />
-                </span>
-                <h3 className="font-display text-[23px] font-bold leading-tight">{audience.title}</h3>
-              </div>
+          <li key={audience.title} className="plaque arch [--arch:96px]">
+            <div className="plaque-inner flex h-full flex-col items-center gap-2 px-5 pb-6 pt-8 text-center">
+              <span className="medallion mb-2 size-12" aria-hidden="true">
+                <audience.icon className="size-5" />
+              </span>
+              <h3 className="font-display text-[23px] font-bold leading-tight">{audience.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{audience.body}</p>
             </div>
           </li>
@@ -796,19 +793,17 @@ function Roadmap() {
       />
       <ol className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {ROADMAP.map((stage, index) => (
-          <li key={stage.title} className="plaque">
-            <div className="plaque-inner flex h-full flex-col gap-2 p-5">
-              <span className="flex items-center justify-between">
-                <span aria-hidden="true" className="font-roman text-[22px] font-semibold leading-none text-ornament">
-                  {["I", "II", "III", "IV"][index]}
-                </span>
-                <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-frame px-2.5 text-[11px] font-semibold">
-                  <span className={cn("size-1.5 rounded-full", STATUS_DOT[stage.status])} aria-hidden="true" />
-                  {stage.status}
-                </span>
+          <li key={stage.title} className="plaque arch [--arch:96px]">
+            <div className="plaque-inner flex h-full flex-col items-center gap-2 px-5 pb-6 pt-8 text-center">
+              <span aria-hidden="true" className="font-roman text-[24px] font-semibold leading-none text-ornament">
+                {["I", "II", "III", "IV"][index]}
               </span>
-              <h3 className="mt-2 font-display text-[23px] font-bold leading-tight">{stage.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{stage.body}</p>
+              <h3 className="mt-1 font-display text-[23px] font-bold leading-tight">{stage.title}</h3>
+              <span className="inline-flex h-6 items-center gap-1.5 rounded-full border border-frame px-2.5 text-[11px] font-semibold">
+                <span className={cn("size-1.5 rounded-full", STATUS_DOT[stage.status])} aria-hidden="true" />
+                {stage.status}
+              </span>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{stage.body}</p>
             </div>
           </li>
         ))}
@@ -862,11 +857,9 @@ function ClosingCall() {
           <p className="max-w-[460px] text-[15px] leading-relaxed text-muted-foreground md:text-[17px]">
             Live rates, a score on every route, and a deposit you sign yourself. Start small.
           </p>
-          <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <Link href="/app" className="btn-teal h-12 px-7 text-[15px]">
-              Open app
-            </Link>
-            <Link href="/docs" className="btn-frame h-12 px-7 text-[15px]">
+          <div className="mt-2 flex w-full max-w-[420px] justify-center gap-3">
+            <LaunchApp className="h-12 flex-1 whitespace-nowrap px-3 text-[15px] sm:flex-none sm:px-7" />
+            <Link href="/docs" className="btn-frame h-12 flex-1 whitespace-nowrap px-3 text-[15px] sm:flex-none sm:px-7">
               Read the Docs
             </Link>
           </div>

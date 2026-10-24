@@ -32,7 +32,7 @@ export function HeroBoard({ columns, total }: { columns: BoardColumn[]; total: n
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
-        <span className="label-roman flex items-center gap-2">
+        <span className="label-roman flex items-center gap-2 whitespace-nowrap">
           <LiveDot />
           Top rated now
         </span>
