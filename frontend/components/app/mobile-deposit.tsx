@@ -25,6 +25,7 @@ import {
   type View,
 } from "./safety"
 import { RouteAlertToggle } from "./alerts"
+import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -260,6 +261,7 @@ function BestRoute({
   ratesStatus: "loading" | "error" | "ready"
   onView: (view: View) => void
 }) {
+  const [explainType, setExplainType] = useState(false)
   return (
     <div className="flex flex-col gap-2 rounded-[4px] border border-gilt bg-accent px-3.5 py-3">
       <span className="label-roman">Into</span>
@@ -273,7 +275,7 @@ function BestRoute({
                 {bestApyRoute(routes)?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
               </span>
               <span className="text-xs text-muted-foreground">
-                {CATEGORY_LABELS[route.category]}
+                <RouteTypeButton route={route} open={explainType} onToggle={() => setExplainType((open) => !open)} />
                 {route.receipt && ` · get ${route.receipt}`}
               </span>
             </span>
@@ -282,6 +284,7 @@ function BestRoute({
               <span className="text-[11px] text-muted-foreground">APY</span>
             </span>
           </span>
+          {explainType && <RouteTypeExplainer route={route} />}
           {routes.length > 1 && (
             <span className="border-t border-frame pt-2 text-xs text-muted-foreground">
               Type an amount to compare all {routes.length} routes.
