@@ -198,9 +198,12 @@ export function DepositPanel({
           onConnect={onConnect}
           onReview={onReview}
         />
-        <p className="-mt-1.5 text-center text-xs leading-relaxed text-muted-foreground">
-          Hermes builds the transaction. You sign it in your wallet. Funds never touch Hermes.
-        </p>
+        {/* The header's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
+        {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
+          <p className="-mt-1.5 text-center text-xs text-muted-foreground">
+            Max {route.depositCap.toLocaleString()} {route.token} per deposit
+          </p>
+        )}
       </div>
     </aside>
   )
@@ -251,7 +254,7 @@ function Note({ children, tone = "warning" }: { children: React.ReactNode; tone?
   )
 }
 
-// compact: the phone card says beta in its fine print, and the dialog shows any rent before signing
+// compact: the dialog shows any rent before signing
 export function RouteNotes({ route, compact = false }: { route: YieldRoute; compact?: boolean }) {
   const borrowed = borrowedPercent(route)
   return (
@@ -259,12 +262,6 @@ export function RouteNotes({ route, compact = false }: { route: YieldRoute; comp
       {route.deposit && (
         <Note tone="muted">
           <span className="font-medium text-foreground">What can go wrong:</span> {whatCanGoWrong(route)}
-        </Note>
-      )}
-      {!compact && route.deposit === "beta" && !IS_DEVNET && (
-        <Note>
-          Beta route with real funds.
-          {route.depositCap != null && ` Up to ${route.depositCap.toLocaleString()} ${route.token} per deposit.`} Start small.
         </Note>
       )}
       {/* Lending into an account (Kamino) sets the account up on a first deposit. Tokens like jlUSDC only need a token account. */}
