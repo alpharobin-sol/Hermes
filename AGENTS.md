@@ -32,7 +32,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
-- The app opens on the tool, the way a swap app works (Titan is the reference): no hero and no section links in the header. The header holds the logo, the network (desktop), Settings and the wallet. The Aurora hero, the headline and section links belong to the landing page, coming next.
+- The app opens on the tool, the way a swap app works (Titan is the reference): no hero and no section links in the header. The header holds the logo, the network (desktop), Settings and the wallet. The Aurora hero, the headline, section links, how it works and the FAQ belong to the landing page, coming next.
 - Phones and tablets (under 1024px): one deposit card comes first. Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists the routes in the current sort with what each earns and the gap to the best APY, and the list below steps aside. The token opens as a bottom sheet. A toolbar sits over the card there, the way Titan puts its mode chip over the swap card: the network pill (Mainnet beta) on the left, a refresh button for the rates on the right. On desktop the network shows in the header.
 - Hero art (landing page): `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
@@ -60,7 +60,7 @@ From the vision deck, the Turbine tutor's feedback and the capstone research. Ti
 
 Landing page (next, owner's call on 24 Oct)
 
-- [ ] A landing page apart from the app, with what the app dropped on 23 Oct: the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill), the facts line (Non-custodial, No Hermes fee today, Beta: real funds, capped per deposit), section links (How it works, Questions), how it works and the FAQ. The removed hero is in git: `frontend/app/page.tsx` at commit 8c8a3ea.
+- [ ] A landing page apart from the app, with what the app dropped on 23 Oct: the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill), the facts line (Non-custodial, No Hermes fee today, Beta: real funds, capped per deposit), section links (How it works, Questions), how it works and the FAQ. The removed code is in git: the hero in `frontend/app/page.tsx` at commit 8c8a3ea, how it works and the FAQ in the same file at 1f5322b.
 
 Trust and curation (the wedge)
 
@@ -114,13 +114,14 @@ Open decisions for the owner
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
 - Show where every number comes from. Each part of the Safety Score shows its points, what it measured and its source.
 - If it does not serve comparing Solana yields, depositing from your own wallet, or (later) opt-in automation, it waits.
-- One page for the app: the rate board with its deposit panel, then how it works and the FAQ until the landing page takes them. Rates show before an amount is typed.
+- One page for the app: the rate board with its deposit panel, nothing else. Explaining Hermes is the landing page's job. Rates show before an amount is typed.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
 - Commit to a branch and merge through a PR. Run `npm run build` in `backend` and `frontend` before pushing.
 
 ## Shipped
 
+- 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone.
 - 23 Oct 2026, app opens on the tool: the hero and the header's section links (Rates, How it works, Questions) are off the app and wait for the landing page. Phones get Settings in the header instead of a menu, and a toolbar over the deposit card with the network and a rate refresh.
 - 23 Oct 2026, site audit fixes: robots.txt, sitemap.xml and a canonical URL (www.hermesagg.xyz), headers that stop other sites framing Hermes, Vercel Web Analytics turned on (its script returned 404 while it was off), the Night wordmark loads up front, clean H1 and Connect text, and the empty Top rated state names how many routes "Show all" opens.
 - 23 Oct 2026, alerts guide: the bell asks for notifications straight from the tap, with a pop-up that shows what to tap and how to allow blocked or hidden prompts per browser.
