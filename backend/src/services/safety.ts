@@ -414,6 +414,19 @@ function incidentDeductions(route: RouteConfig): SafetyDeduction[] {
 }
 
 /**
+ * Whether the deductions that apply to this route have their data loaded. A deduction that applies but hasn't
+ * loaded would be left off, scoring the route as if a known incident or a concentrated validator weren't counted.
+ * So an applicable-but-unloaded deduction leaves the route unscored, the same as a missing part, rather than
+ * showing a score that is too high. A route with no such deduction (no incidents, no validator list) is unaffected.
+ */
+export function deductionsReady(route: RouteConfig): boolean {
+  const spread = validatorSpread(route);
+  if (spread && !spread.peek()) return false;
+  if (route.incidents.length > 0 && !hacks.peek()) return false;
+  return true;
+}
+
+/**
  * The route's Safety Score from its live rate and the cached history, or null while any part is missing.
  * Never fetches: refreshSafetyInputs keeps the history warm.
  */
@@ -421,7 +434,8 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
   const trackedSince = Date.parse(route.trackedSince);
   const outflow = outflows(route)?.peek();
   const exit = exitPart(route, rate);
-  if (!Number.isFinite(trackedSince) || !outflow || !exit) return null;
+  // Deductions gate the score too, or a route could be served before its penalty loads and look safer than it is
+  if (!Number.isFinite(trackedSince) || !outflow || !exit || !deductionsReady(route)) return null;
 
   const years = (Date.now() - trackedSince) / (365 * DAY_MS);
   const unit = route.token;
