@@ -17,7 +17,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 ## Canonical
 
 - Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`)
-- API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`)
+- API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`). An UptimeRobot monitor (owner's account) pings `/health` every 5 minutes so it never sleeps. The free plan's 750 hours a month cover this one service awake all month.
 - Repo: `alpharobin-sol/Hermes`
 - Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
@@ -93,7 +93,7 @@ Portfolio and signals
 
 Later
 
-- [ ] Keep the API awake (owner deferred, 23 Oct; needed now for alerts to go out on time): an UptimeRobot ping on `/health` every 5 minutes, or Render's Starter plan. Free Render sleeps after 15 idle minutes, so the first visit waits, history pauses and alerts wait.
+- [x] Keep the API awake: an UptimeRobot ping on `/health` every 5 minutes (24 Oct). Free Render sleeps after 15 idle minutes, so without it the first visit waits, history pauses and alerts wait.
 - [ ] Hermes fee
 - [ ] Lift the beta cap
 - [ ] LP routes, labeled with impermanent loss
@@ -121,6 +121,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.
 - 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source and the Why panel explains the score and what it doesn't cover. The footer is the logo, the copyright and the Telegram and X links, nothing else. Longer explanations go in articles and threads. Under the deposit button only the cap shows ("Max 10 SOL per deposit"): the Mainnet beta pill already says real funds.
 - 23 Oct 2026, app opens on the tool: the hero and the header's section links (Rates, How it works, Questions) are off the app and wait for the landing page. Phones get Settings in the header instead of a menu, and a toolbar over the deposit card with the network and a rate refresh.
 - 23 Oct 2026, site audit fixes: robots.txt, sitemap.xml and a canonical URL (www.hermesagg.xyz), headers that stop other sites framing Hermes, Vercel Web Analytics turned on (its script returned 404 while it was off), the Night wordmark loads up front, clean H1 and Connect text, and the empty Top rated state names how many routes "Show all" opens.
