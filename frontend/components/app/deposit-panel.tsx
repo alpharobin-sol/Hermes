@@ -7,14 +7,12 @@ import { AlertTriangle, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { IS_DEVNET } from "@/lib/network"
 import type { YieldRoute } from "@/lib/api/yield-api"
-import { formatUSD } from "@/lib/helpers/formatters"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
 import { HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown, whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
-import { estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -37,11 +35,9 @@ interface DepositPanelProps {
   onConnect: () => void
   onReview: () => void
   className?: string
-  live: LiveQuotes
 }
 
 export function DepositPanel({
-  live,
   token,
   amount,
   onAmount,
@@ -58,11 +54,6 @@ export function DepositPanel({
   onReview,
   className,
 }: DepositPanelProps) {
-  // From the route's live quote once it is in, so the entry cost is taken off
-  const yearly = route ? estimatedYear(route, numericAmount, live.byRoute[route.id]) : 0
-  const line = route && numericAmount > 0 ? quoteLine(route, live.byRoute[route.id]) : null
-  const borrowed = route ? borrowedPercent(route) : null
-  const withdrawable = route ? withdrawablePercent(route) : null
   const overCap = isOverCap(route, numericAmount)
   const [explainType, setExplainType] = useState(false)
 
@@ -137,57 +128,24 @@ export function DepositPanel({
           <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
         </div>
 
+        {/* The route, like the phone card: what it is and its APY. The rest is in the Why panel and the dialog. */}
         {route && (
-          <div className="flex flex-col gap-4 rounded-[2px] border border-frame bg-accent p-4">
+          <div className="flex flex-col gap-3 rounded-[2px] border border-frame bg-accent p-4">
             <div className="flex items-center gap-3">
               <Medallion route={route} className="bg-card" />
-              <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
                 <span className="text-xs text-muted-foreground">
                   <RouteTypeButton route={route} open={explainType} onToggle={() => setExplainType((open) => !open)} />
                   {route.receipt && ` · get ${route.receipt}`}
                 </span>
               </span>
+              <span className="flex shrink-0 flex-col items-end">
+                <span className="font-roman text-[22px] font-bold leading-tight text-ink">{formatApy(route)}</span>
+                <span className="text-[11px] text-muted-foreground">APY</span>
+              </span>
             </div>
             {explainType && <RouteTypeExplainer route={route} />}
-            <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5">
-              <div className="flex flex-col gap-1">
-                <dt className="label-roman text-[10px]">APY</dt>
-                <dd className="m-0 font-roman text-[22px] font-bold text-ink">{formatApy(route)}</dd>
-              </div>
-              <div className="flex flex-col gap-1">
-                <dt className="label-roman text-[10px]">Est. yearly</dt>
-                <dd className="m-0 pt-1 text-[15px] font-medium">
-                  {numericAmount > 0 ? `${formatTokenAmount(yearly, route.token)} ${route.token}` : "—"}
-                </dd>
-              </div>
-              <div className="flex flex-col gap-1">
-                <dt className="label-roman text-[10px]">TVL</dt>
-                <dd className="m-0 text-[15px] font-medium">{formatUSD(route.tvl)}</dd>
-              </div>
-              {borrowed !== null ? (
-                <div className="flex flex-col gap-1" title="Share of the reserve that is borrowed">
-                  <dt className="label-roman text-[10px]">Borrowed</dt>
-                  <dd className={cn("m-0 text-[15px] font-medium", route.utilization! >= HIGH_UTILIZATION && "text-warning")}>
-                    {borrowed}%
-                  </dd>
-                </div>
-              ) : withdrawable !== null ? (
-                <div className="flex flex-col gap-1" title="Share of the reserve that can be withdrawn right now">
-                  <dt className="label-roman text-[10px]">Withdrawable now</dt>
-                  <dd className={cn("m-0 text-[15px] font-medium", exitTight(route) && "text-warning")}>{withdrawable}%</dd>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <dt className="label-roman text-[10px]">Est. monthly</dt>
-                  <dd className="m-0 text-[15px] font-medium">
-                    {numericAmount > 0 ? `${formatTokenAmount(yearly / 12, route.token)} ${route.token}` : "—"}
-                  </dd>
-                </div>
-              )}
-            </dl>
-            <p className="-mt-1 text-[11px] text-muted-foreground">Rate and TVL from {route.source}.</p>
-            {line && <p className="-mt-2 text-[11px] text-foreground">{line}</p>}
           </div>
         )}
 

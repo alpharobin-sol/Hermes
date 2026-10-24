@@ -238,7 +238,6 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         route={loading || error ? null : selectedRoute}
         onSelectRoute={setSelectedId}
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
-        updatedLabel={updatedLabel(forToken)}
         onConnect={() => setWalletModalVisible(true)}
         onReview={handleReview}
       />
@@ -267,7 +266,6 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       />
 
       <DepositPanel
-        live={live}
         token={selectedToken}
         amount={amount}
         onAmount={setAmount}
