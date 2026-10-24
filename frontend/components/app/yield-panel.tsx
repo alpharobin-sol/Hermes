@@ -177,7 +177,7 @@ export function YieldPanel() {
     <section
       id="rates"
       aria-label="Rates"
-      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 lg:pt-10"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-6 pt-3 md:gap-6 md:px-8 md:pb-10 lg:pt-10"
     >
       {/* Phones and tablets: a toolbar over the card, like a swap app's. Desktop shows the network in the header. */}
       <div className="-mb-2 flex basis-full items-center justify-between gap-3 lg:hidden">
