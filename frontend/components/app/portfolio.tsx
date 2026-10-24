@@ -33,7 +33,7 @@ export interface Position {
 export interface Portfolio {
   address: string
   positions: Position[]
-  totalUsd: number
+  totalUsd: number | null // null when a value couldn't be priced right now
   earnedUsd: number | null
   prices: Partial<Record<"SOL" | "USDC" | "USDT", number>> // USD
   unavailable: string[]
@@ -113,12 +113,23 @@ export function PortfolioSection({
 
       {portfolio ? (
         <div className="flex flex-col gap-0.5">
-          <span className="text-[34px] font-semibold leading-tight text-foreground">{formatUsd(portfolio.totalUsd)}</span>
+          <span className="text-[34px] font-semibold leading-tight text-foreground">
+            {portfolio.totalUsd !== null ? formatUsd(portfolio.totalUsd) : "—"}
+          </span>
           <span className="text-[13px] text-muted-foreground">
-            {portfolio.prices.SOL ? `≈ ${formatTokenAmount(portfolio.totalUsd / portfolio.prices.SOL, "SOL")} SOL` : null}
+            {portfolio.totalUsd === null ? (
+              <>
+                Prices didn&apos;t load, so the total is missing.{" "}
+                <button type="button" onClick={onRefresh} className="font-medium underline underline-offset-2">
+                  Try again
+                </button>
+              </>
+            ) : portfolio.prices.SOL ? (
+              `≈ ${formatTokenAmount(portfolio.totalUsd / portfolio.prices.SOL, "SOL")} SOL`
+            ) : null}
             {portfolio.earnedUsd !== null && (
               <>
-                {portfolio.prices.SOL ? " · " : null}
+                {portfolio.totalUsd !== null && portfolio.prices.SOL ? " · " : null}
                 <span className={portfolio.earnedUsd >= 0 ? "text-success" : "text-warning"}>
                   {portfolio.earnedUsd >= 0 ? "+" : ""}
                   {formatUsd(portfolio.earnedUsd)} earned
