@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { cached } from './cache';
 import { KAMINO_MAIN_MARKET, RateSource, ROUTES, TOKENS } from '../registry/routes';
 import { tokenValueNear } from './history';
+import { jupiterBase, jupiterHeaders } from './jupiter';
 
 /**
  * Live APY and TVL for every route in the registry, read from the chain or the protocol itself:
@@ -63,8 +64,9 @@ export const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://
 export const solPrice = cached(
   'SOL price from Jupiter',
   async () => {
-    const response = await http.get(process.env.JUPITER_PRICE_API_URL || 'https://lite-api.jup.ag/price/v3', {
+    const response = await http.get(process.env.JUPITER_PRICE_API_URL || jupiterBase('price/v3'), {
       params: { ids: TOKENS.SOL.mint },
+      headers: process.env.JUPITER_PRICE_API_URL ? undefined : jupiterHeaders(),
     });
     const price = Number(response.data?.[TOKENS.SOL.mint]?.usdPrice);
     if (!(price > 0)) throw new Error('no SOL price');
@@ -224,7 +226,9 @@ const kaminoRates = rateSource('Kamino', async () => {
 
 // Keyed by token mint
 const jupiterLendRates = rateSource('Jupiter Lend', async () => {
-  const response = await http.get(`${process.env.JUPITER_LEND_API_URL || 'https://lite-api.jup.ag/lend/v1'}/earn/tokens`);
+  const response = await http.get(`${process.env.JUPITER_LEND_API_URL || jupiterBase('lend/v1')}/earn/tokens`, {
+    headers: process.env.JUPITER_LEND_API_URL ? undefined : jupiterHeaders(),
+  });
   const tokens: any[] = Array.isArray(response.data) ? response.data : [];
   const rates: RateMap = new Map();
   const now = Date.now();

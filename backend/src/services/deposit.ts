@@ -81,7 +81,7 @@ export class DepositService {
   private connections: Partial<Record<SolanaNetwork, Connection>> = {};
 
   constructor() {
-    this.client = createJupiterClient();
+    this.client = createJupiterClient('swap/v1', process.env.JUPITER_API_URL);
   }
 
   /**
