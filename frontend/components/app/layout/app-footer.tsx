@@ -18,10 +18,6 @@ export function AppFooter() {
           </span>
         </div>
 
-        <p className="order-last w-full text-[13px] text-muted-foreground sm:order-none sm:w-auto">
-          Hermes never holds funds. Rates change and are not guaranteed.
-        </p>
-
         <div className="flex items-center gap-2">
           <a
             href="https://t.me/+gYZPiesNgH85YzE8"
