@@ -25,6 +25,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - History database: Supabase Postgres (West US, Oregon), `DATABASE_URL` on Render, Session pooler string. Hermes's own rate history, every 10 minutes, 90 days. `/health` shows whether it records.
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
+- Search: the page renders live rates on the server (Next ISR, every 60 seconds; the browser refreshes on load), so crawlers and link previews see real routes and APYs. Title, description, Open Graph and X card tags and JSON-LD (Organization, WebSite, WebApplication) are in `frontend/app/layout.tsx`. Share image: `frontend/app/opengraph-image.jpg` and `twitter-image.jpg` (1200x630, made from the hero). Search Console codes go in `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION` on Vercel. "Hermes" alone is a crowded name, so the alternate names Hermes Agg and HermesAgg and the X account tie this Hermes to hermesagg.xyz.
 
 ## Brand
 
@@ -61,6 +62,14 @@ From the vision deck, the Turbine tutor's feedback and the capstone research. Ti
 Landing page (next, owner's call on 24 Oct)
 
 - [ ] A landing page apart from the app, with what the app dropped on 23 Oct: the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill), the facts line (Non-custodial, No Hermes fee today, Beta: real funds, capped per deposit), section links (How it works, Questions), how it works and the FAQ. The removed code is in git: the hero in `frontend/app/page.tsx` at commit 8c8a3ea, how it works and the FAQ in the same file at 1f5322b.
+
+Search and growth
+
+- [x] Crawlable rates, share image, structured data, search tags
+- [ ] Google Search Console and Bing Webmaster: verify hermesagg.xyz, submit the sitemap (owner)
+- [ ] Landing page copy and its FAQ with FAQPage structured data
+- [ ] A page per route (for example "JitoSOL APY today") with its live rate, Safety Score and what can go wrong: Hermes's own data for searches no one else answers live (owner's call)
+- [ ] Links in: Solana ecosystem directories, X threads and articles that link to hermesagg.xyz (owner)
 
 Trust and curation (the wedge)
 
@@ -121,6 +130,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, search basics: live rates in the server HTML, a 1200x630 share image for X and Telegram, Open Graph and X card tags, JSON-LD, a keyword title and description, and Search Console codes from Vercel env.
 - 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.
 - 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source and the Why panel explains the score and what it doesn't cover. The footer is the logo, the copyright and the Telegram and X links, nothing else. Longer explanations go in articles and threads. Under the deposit button only the cap shows ("Max 10 SOL per deposit"): the Mainnet beta pill already says real funds.
 - 23 Oct 2026, app opens on the tool: the hero and the header's section links (Rates, How it works, Questions) are off the app and wait for the landing page. Phones get Settings in the header instead of a menu, and a toolbar over the deposit card with the network and a rate refresh.

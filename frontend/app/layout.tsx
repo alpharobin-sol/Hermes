@@ -28,11 +28,38 @@ const inter = Inter({
   variable: "--font-inter",
 })
 
+const TITLE = "Hermes: Compare Live Solana Staking and Lending APYs"
+const DESCRIPTION =
+  "Compare live Solana staking and lending APYs, from JitoSOL and mSOL to Kamino and Jupiter Lend. Safety Score on every route. Deposit from your own wallet."
+const X_HANDLE = "@Hermes_agg"
+
+// The share image (opengraph-image.jpg, twitter-image.jpg) sits next to this file, and Next adds its tags.
+// Search Console codes come from the environment, so the owner can paste them into Vercel without a code change.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   alternates: { canonical: "/" },
-  title: "Hermes - Yield Aggregator for Solana",
-  description: "Compare live Solana yields across liquid staking and lending, then deposit from your own wallet.",
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: "Hermes",
+  category: "finance",
+  keywords: [
+    "Solana yield",
+    "Solana staking APY",
+    "liquid staking Solana",
+    "JitoSOL APY",
+    "mSOL APY",
+    "Kamino Lend",
+    "Jupiter Lend",
+    "USDC yield Solana",
+    "Solana yield aggregator",
+    "Safety Score",
+  ],
+  openGraph: { type: "website", url: "/", siteName: "Hermes", title: TITLE, description: DESCRIPTION, locale: "en_US" },
+  twitter: { card: "summary_large_image", site: X_HANDLE, creator: X_HANDLE, title: TITLE, description: DESCRIPTION },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION } : undefined,
+  },
   appleWebApp: { capable: true, title: "Hermes", statusBarStyle: "default" },
   icons: {
     icon: [
@@ -41,6 +68,42 @@ export const metadata: Metadata = {
     ],
     apple: "/brand/apple-icon.png",
   },
+}
+
+// Who Hermes is, for search engines: the organization, the site and the app. "Hermes" alone is a crowded name,
+// so the alternate names and the X account tie this Hermes to hermesagg.xyz.
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Hermes",
+      alternateName: ["Hermes Agg", "HermesAgg"],
+      url: SITE_URL,
+      logo: `${SITE_URL}/brand/icon-192.png`,
+      sameAs: ["https://x.com/Hermes_agg", "https://t.me/+gYZPiesNgH85YzE8"],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Hermes",
+      alternateName: "Hermes Agg",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "WebApplication",
+      name: "Hermes",
+      url: SITE_URL,
+      description: DESCRIPTION,
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web",
+      // Hermes charges no fee today
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
 }
 
 export default function RootLayout({
@@ -52,6 +115,7 @@ export default function RootLayout({
     // next-themes sets the theme class on <html> before hydration
     <html lang="en" suppressHydrationWarning>
       <body className={`${cormorant.variable} ${cinzel.variable} ${inter.variable}`}>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }} />
         {/* Aurora is the default. Night is a choice in Settings, not taken from the system setting. */}
         <ThemeProvider defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <AlertsProvider>
