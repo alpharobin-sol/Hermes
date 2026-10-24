@@ -5,6 +5,7 @@ import { Check, Wallet } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useWalletName } from "./use-wallet-name"
 
 interface Props {
   className?: string
@@ -15,6 +16,8 @@ export function CustomConnectButton({ className }: Props) {
   const [open, setOpen] = useState(false)
 
   const short = publicKey ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}` : ""
+  // The wallet's SNS or AllDomains name when it has one, the short address otherwise
+  const name = useWalletName(connected ? publicKey : null)
 
   // The provider's autoConnect connects once the selection lands. Calling connect() here would race it.
   const handleSelectWallet = (walletName: string) => {
@@ -32,11 +35,12 @@ export function CustomConnectButton({ className }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
+        title={connected ? publicKey?.toBase58() : undefined}
         className={cn(connected ? "btn-frame" : "btn-teal", "h-11 whitespace-nowrap px-3.5 text-sm md:px-[18px]", className)}
       >
-        <Wallet className="size-4" strokeWidth={2} />
+        <Wallet className="size-4 shrink-0" strokeWidth={2} />
         {connected ? (
-          <span>{short}</span>
+          <span className="max-w-[9rem] truncate md:max-w-[14rem]">{name ?? short}</span>
         ) : (
           // One label, so its text reads "Connect wallet" and not "ConnectConnect wallet"
           <span>
@@ -53,7 +57,7 @@ export function CustomConnectButton({ className }: Props) {
                 {connected ? "Wallet connected" : "Connect your wallet"}
               </DialogTitle>
               <DialogDescription className="text-[13px] text-muted-foreground">
-                {connected ? short : "Hermes never sees your keys. You sign every deposit in your wallet."}
+                {connected ? (name ? `${name} · ${short}` : short) : "Hermes never sees your keys. You sign every deposit in your wallet."}
               </DialogDescription>
             </DialogHeader>
 
