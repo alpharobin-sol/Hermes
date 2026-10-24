@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { PublicKey } from '@solana/web3.js';
-import { primaryName } from '../services/names';
+import { walletName } from '../services/names';
 
 const router = Router();
 
 /**
  * GET /api/names/:address
- * The wallet's main AllDomains name ("duke.abc"), or null when it has none
+ * The name the wallet goes by: its SNS primary name ("alpharobin") or AllDomains main domain ("fatcat.wen"),
+ * or null when it has neither
  */
 router.get('/:address', async (req: Request, res: Response) => {
   let address: string;
@@ -15,9 +16,9 @@ router.get('/:address', async (req: Request, res: Response) => {
   } catch {
     return res.status(400).json({ success: false, error: 'Invalid wallet address' });
   }
-  const name = await primaryName(address);
+  const found = await walletName(address);
   res.set('Cache-Control', 'public, max-age=300');
-  return res.json({ success: true, name });
+  return res.json({ success: true, name: found?.name ?? null, service: found?.service ?? null });
 });
 
 export default router;

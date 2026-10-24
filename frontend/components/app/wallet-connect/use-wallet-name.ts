@@ -5,8 +5,9 @@ import type { PublicKey } from "@solana/web3.js"
 
 import { getFullUrl } from "@/lib/api/yield-api"
 
-// The connected wallet's main AllDomains name ("duke.abc"), or null while loading or when it has none.
-// The API reads it on chain and keeps it for an hour.
+// The name the connected wallet goes by, the way Titan shows it: its SNS primary name ("alpharobin") or its
+// AllDomains main domain ("fatcat.wen"). Null while loading or when it has neither. The API reads it on chain
+// and keeps it for an hour.
 export function useWalletName(publicKey: PublicKey | null): string | null {
   const [name, setName] = useState<string | null>(null)
   const address = publicKey?.toBase58()
