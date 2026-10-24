@@ -69,3 +69,15 @@ Built and simulated on mainnet with real positions, never signed:
 - Jupiter Lend SOL: 0.5 and the whole position pass, SOL arrives unwrapped.
 
 The same checks as the deposits: Kamino's transaction against the deposit allow-list, Jupiter Lend's program only with the user the only signer, the swap with the user the only signer. Each is simulated, and SOL may not leave the wallet beyond the fee and a token account (0.01 SOL).
+
+## Moves (beta, 24 Oct)
+
+A move is a withdrawal and a deposit Hermes already builds, so each half goes through the checks above. Built and simulated on mainnet with real positions, never signed:
+
+- Staking token to staking token, one Jupiter swap: the whole 0.0484 dSOL to mSOL (0.0418 mSOL, worth 0.05918 SOL in its pool against 0.05915 SOL in, so no cost), and 0.02 jupSOL to JitoSOL. The swap has the user as the only signer and the deposit's 1% price impact limit.
+- Kamino Lend SOL to Marinade and to Jupiter Lend SOL, the whole 1.3613 SOL: step 1 is the Kamino withdrawal (simulated, 0.0176 SOL of account rent back). Simulated, the wallet's SOL rises 1.3789 with the fee added back; taking out the closed Kamino account's 0.0176 SOL leaves 1.3613 SOL, the position, which is what step 2 deposits.
+- dSOL to Kamino Lend SOL: step 1 swaps dSOL to SOL (0.0000625 SOL cost, about 0.1% of 0.0591 SOL, made back in about 172 days at today's APYs).
+- Step 2 from real withdrawals by other wallets in the last half hour: Jupiter Lend USDC withdrawals of 33.757367 and 100 USDC were read from their confirmed transactions (one a version 1 transaction) and built into Kamino Lend USDC deposits with each wallet's one-time rent (0.0176 and 0.0298 SOL). Transactions that pay the signer nothing (bots moving funds elsewhere) are refused with a plain reason.
+- Refused: a move to another token, the same route, or more than the target's beta cap (Jupiter Lend USDC to Kamino Lend USDC above 1,000 USDC).
+
+Still to do: an owner move per kind, signed, before moves leave beta.
