@@ -18,6 +18,7 @@ The route is in the registry with a live rate. The site hides view-only routes f
 - [ ] APY and TVL from `/api/yields` checked against the protocol's own app. Write down the date and both numbers.
 - [ ] The website link opens the right page
 - [ ] The route has a Safety Score: its protocol is on DefiLlama and its deposit history has a source in `backend/src/services/safety.ts`. Without both the card says Not scored.
+- [ ] `incidents` in the registry lists the protocol's and its team's names as DefiLlama's hacks list spells them (check https://api.llama.fi/hacks), so a hack lowers the score.
 
 ## 2. Beta
 

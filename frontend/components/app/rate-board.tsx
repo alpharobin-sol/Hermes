@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
+import { LiveBadge, bestQuoteRoute, estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
+import type { RouteQuote } from "@/lib/api/deposit-api"
 import {
   TOP_ROUTES,
   SafetyCell,
@@ -69,6 +71,7 @@ const GRID =
   "lg:grid lg:grid-cols-[minmax(0,1fr)_104px_80px_100px_20px] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_104px_120px_80px_100px_20px]"
 
 interface RateBoardProps {
+  live: LiveQuotes
   tokens: { symbol: string; icon: string; count: number }[]
   token: string
   onToken: (symbol: string) => void
@@ -90,6 +93,7 @@ interface RateBoardProps {
 }
 
 export function RateBoard({
+  live,
   tokens,
   token,
   onToken,
@@ -110,8 +114,10 @@ export function RateBoard({
   className,
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
-  const bestApy = bestApyRoute(routes)
-  const listed = listedRoutes(routes, expanded, selectedId)
+  // The best quote for the amount once quotes are in, the best APY until then
+  const quoted = amount > 0 ? bestQuoteRoute(routes, amount, live) : null
+  const best = quoted ?? bestApyRoute(routes)
+  const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
 
   return (
     <div className={cn("plaque min-w-0 flex-[999_1_600px]", className)}>
@@ -147,6 +153,7 @@ export function RateBoard({
           </div>
 
           <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto">
+            {amount > 0 && <LiveBadge live={live} />}
             <span className="flex items-center gap-2">
               <span className="label-roman whitespace-nowrap text-xs">Sort</span>
               <SortToggle value={sortBy} onChange={onSort} />
@@ -206,7 +213,10 @@ export function RateBoard({
               <RouteRow
                 key={route.id}
                 route={route}
-                best={route === bestApy}
+                best={route === best}
+                bestLabel={quoted ? "Best quote" : "Best APY"}
+                quote={live.byRoute[route.id]}
+                quoting={live.status === "loading"}
                 selected={route.id === selectedId}
                 amount={amount}
                 onSelect={() => onSelect(route.id)}
@@ -241,17 +251,25 @@ export function RateBoard({
 function RouteRow({
   route,
   best,
+  bestLabel,
+  quote,
+  quoting,
   selected,
   amount,
   onSelect,
 }: {
   route: YieldRoute
   best: boolean
+  bestLabel: string
+  quote?: RouteQuote
+  quoting: boolean
   selected: boolean
   amount: number
   onSelect: () => void
 }) {
-  const yearly = amount * route.apy
+  // What the route leaves after a year once the entry cost is taken off, from its live quote
+  const yearly = estimatedYear(route, amount, quote)
+  const line = amount > 0 ? quoteLine(route, quote) : null
   const borrowed = borrowedPercent(route)
   const withdrawable = withdrawablePercent(route)
 
@@ -272,7 +290,7 @@ function RouteRow({
               <span className="font-display text-[21px] font-bold leading-[1.1]">{route.name}</span>
               {best && (
                 <span className="rounded-[2px] border border-ink-line bg-ink-surface px-[7px] py-0.5 font-roman text-[10px] font-bold tracking-[0.1em] text-ink">
-                  Best APY
+                  {bestLabel}
                 </span>
               )}
             </span>
@@ -289,6 +307,13 @@ function RouteRow({
               )}
               <span className="lg:hidden">{` · ${safetyText(route)}`}</span>
             </span>
+            {line ? (
+              <span className={cn("text-[11px]", quote?.quote ? "text-foreground" : "text-warning")}>{line}</span>
+            ) : (
+              amount > 0 &&
+              route.deposit &&
+              quoting && <span aria-hidden="true" className="mt-0.5 h-3 w-40 animate-pulse rounded-[2px] bg-hairline" />
+            )}
           </span>
         </span>
 
@@ -302,7 +327,9 @@ function RouteRow({
 
         {/* Returns at today's APY, in the deposit token */}
         <span className="hidden flex-col gap-0.5 xl:flex">
-          <span className="text-sm font-medium">{amount > 0 ? `+${formatTokenAmount(yearly, route.token)} ${route.token}` : "—"}</span>
+          <span className="text-sm font-medium">
+            {amount > 0 ? `${yearly < 0 ? "−" : "+"}${formatTokenAmount(Math.abs(yearly), route.token)} ${route.token}` : "—"}
+          </span>
           {amount > 0 && <span className="text-[11px] text-muted-foreground">{formatTokenAmount(yearly / 12, route.token)} / mo</span>}
         </span>
 

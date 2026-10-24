@@ -9,6 +9,7 @@ import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances"
 import { useLoading } from "./layout/loading-context"
 import { NetworkPill } from "./layout/network-pill"
+import { useLiveQuotes } from "./live-quotes"
 import { RateBoard } from "./rate-board"
 import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
@@ -138,6 +139,13 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     return isNaN(parsed) || parsed < 0 ? 0 : parsed
   }, [amount])
 
+  // Live quotes for the amount on every route in view that Hermes deposits into. Paused while the dialog is open.
+  const quoteIds = visibleRoutes
+    .filter((route) => route.deposit)
+    .map((route) => route.id)
+    .sort()
+  const live = useLiveQuotes(selectedToken.symbol, numericAmount, quoteIds, reviewOpen)
+
   // Keep some SOL back so the deposit can pay its own fees
   const spendableBalance =
     selectedToken.symbol === "SOL" ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE) : selectedToken.balance
@@ -206,6 +214,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
 
       <MobileDeposit
         ref={mobileCardRef}
+        live={live}
         tokens={tokens}
         token={selectedToken}
         onToken={handleToken}
@@ -235,6 +244,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       />
 
       <RateBoard
+        live={live}
         tokens={tokens.map(({ symbol, icon, count }) => ({ symbol, icon, count }))}
         token={selectedToken.symbol}
         onToken={handleToken}
@@ -257,6 +267,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       />
 
       <DepositPanel
+        live={live}
         token={selectedToken}
         amount={amount}
         onAmount={setAmount}

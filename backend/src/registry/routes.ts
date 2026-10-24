@@ -79,6 +79,8 @@ export interface RouteConfig {
   // First day DefiLlama recorded the protocol's deposits. Fixed, so the Safety Score's track record needs no live fetch.
   trackedSince: string;
   defillamaPool?: string; // DefiLlama pool for deposit history (Safety Score outflows), until Hermes keeps its own
+  // Names in DefiLlama's hacks list for the protocol and the team that runs it. Their incidents lower the Safety Score.
+  incidents: string[];
   deposit: Partial<Record<SolanaNetwork, DepositStatus>>;
 }
 
@@ -89,6 +91,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'jito',
     protocol: 'jito',
+    incidents: ['Jito'],
     name: 'Jito',
     category: 'liquid-staking',
     token: 'SOL',
@@ -103,6 +106,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'marinade',
     protocol: 'marinade',
+    incidents: ['Marinade'],
     name: 'Marinade',
     category: 'liquid-staking',
     token: 'SOL',
@@ -117,6 +121,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'binance',
     protocol: 'binance',
+    incidents: ['Binance', 'Binance Bridge'],
     name: 'Binance',
     category: 'liquid-staking',
     token: 'SOL',
@@ -130,6 +135,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'jupiter',
     protocol: 'jupiter',
+    incidents: ['Jupiter'],
     name: 'Jupiter',
     category: 'liquid-staking',
     token: 'SOL',
@@ -143,6 +149,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'drift',
     protocol: 'drift',
+    incidents: ['Drift Trade'],
     name: 'Drift',
     category: 'liquid-staking',
     token: 'SOL',
@@ -156,6 +163,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'helius',
     protocol: 'helius',
+    incidents: ['Helius'],
     name: 'Helius',
     category: 'liquid-staking',
     token: 'SOL',
@@ -169,6 +177,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'sanctum-infinity',
     protocol: 'sanctum',
+    incidents: ['Sanctum'],
     name: 'Sanctum Infinity',
     category: 'liquid-staking',
     token: 'SOL',
@@ -182,6 +191,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'bybit',
     protocol: 'bybit',
+    incidents: ['Bybit'],
     name: 'Bybit',
     category: 'liquid-staking',
     token: 'SOL',
@@ -195,6 +205,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'jpool',
     protocol: 'jpool',
+    incidents: ['JPool'],
     name: 'JPool',
     category: 'liquid-staking',
     token: 'SOL',
@@ -208,6 +219,7 @@ export const ROUTES: RouteConfig[] = [
   {
     id: 'blazestake',
     protocol: 'blazestake',
+    incidents: ['BlazeStake', 'SolBlaze'],
     name: 'BlazeStake',
     category: 'liquid-staking',
     token: 'SOL',
@@ -224,6 +236,7 @@ export const ROUTES: RouteConfig[] = [
     {
       id: `kamino-${token.toLowerCase()}`,
       protocol: 'kamino',
+      incidents: ['Kamino'],
       name: 'Kamino Lend',
       category: 'lending',
       token,
@@ -237,6 +250,7 @@ export const ROUTES: RouteConfig[] = [
     {
       id: `jupiter-lend-${token.toLowerCase()}`,
       protocol: 'jupiter-lend',
+      incidents: ['Jupiter', 'Jupiter Lend'],
       name: 'Jupiter Lend',
       category: 'lending',
       token,

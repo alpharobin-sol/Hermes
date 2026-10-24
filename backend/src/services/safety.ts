@@ -1,8 +1,10 @@
+import { PublicKey } from '@solana/web3.js';
+import { StakePoolLayout, ValidatorListLayout } from '@solana/spl-stake-pool';
 import { solanaNetwork } from '../config/runtime';
 import { depositStatus, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
 import { cached, Cached } from './cache';
 import { createJupiterClient } from './jupiter';
-import { getRate, http, Rate, SOURCE_LABELS } from './rates';
+import { connection, getRate, http, Rate, SOURCE_LABELS } from './rates';
 import { depositHistory } from './history';
 
 /**
@@ -16,8 +18,17 @@ import { depositHistory } from './history';
  * - Exit: how easily money gets out today.
  *   Lending: the share of deposits that can't be withdrawn right now (borrowed, or held back by a withdrawal limit).
  *   90% or less scores 25, 100% scores 0.
- *   Liquid staking: the price impact of selling 10,000 of the token for SOL on Jupiter. 1% or less scores 25, 5% or more 0.
- * It does not measure smart contract or depeg risk. A route with any part missing has no score.
+ *   Liquid staking: what selling 10,000 of the token for SOL on Jupiter returns, against the token's SOL value in its
+ *   pool. That takes in both a depeg (the market price under the pool value) and price impact. 1% or less below the
+ *   pool value scores 25, 5% or more 0.
+ * Then deductions, shown with the parts:
+ * - Validator spread (liquid staking): the largest validator's share of the stake, from the stake pool's validator list
+ *   on chain (Marinade's through its SDK). 10% or less takes nothing, 50% or more takes 10 points.
+ * - Incidents: hacks in DefiLlama's list under the protocol's or its team's names (the registry's `incidents`).
+ *   In the last year: 25 points if the money was not returned, 5 if it was. One to three years ago: 5 if not returned.
+ *   Older incidents are not shown.
+ * The score never goes below 0. It does not measure smart contract risk or a sudden depeg. A route with any part
+ * missing has no score.
  */
 
 export type SafetyPartKey = 'size' | 'track-record' | 'outflows' | 'exit';
@@ -31,9 +42,20 @@ export interface SafetyPart {
   source: string;
 }
 
+// Points taken off the parts' sum. 0 when the check found nothing to take off, so the line still shows.
+export interface SafetyDeduction {
+  key: 'validator-spread' | 'incident';
+  label: string;
+  points: number; // 0 or less
+  detail: string;
+  source: string;
+  link?: string;
+}
+
 export interface SafetyScore {
-  score: number; // sum of the parts' points, 0 to 100
+  score: number; // the parts' points less the deductions, 0 to 100
   parts: SafetyPart[];
+  deductions: SafetyDeduction[];
 }
 
 const PART_MAX = 25;
@@ -189,19 +211,24 @@ function outflows(route: RouteConfig): Cached<Outflow> | undefined {
   return entry;
 }
 
-// Exit for liquid staking: price impact of selling EXIT_SAMPLE of the token for SOL on Jupiter
+// Exit for liquid staking: a Jupiter quote for selling EXIT_SAMPLE of the token for SOL
+
+interface ExitQuote {
+  outSol: number; // SOL the sale returns
+  impact: number; // share the sale moves the price
+}
 
 const jupiter = createJupiterClient();
-const exitImpacts = new Map<string, Cached<number>>();
+const exitQuotes = new Map<string, Cached<ExitQuote>>();
 
-function swapExit(route: RouteConfig): Cached<number> | undefined {
+function swapExit(route: RouteConfig): Cached<ExitQuote> | undefined {
   const receipt = route.receipt;
   if (route.category !== 'liquid-staking' || !receipt) return undefined;
 
-  let entry = exitImpacts.get(route.id);
+  let entry = exitQuotes.get(route.id);
   if (!entry) {
     entry = cached(
-      `exit price impact for ${route.id}`,
+      `exit quote for ${route.id}`,
       async () => {
         const response = await jupiter.get('/quote', {
           params: {
@@ -212,12 +239,13 @@ function swapExit(route: RouteConfig): Cached<number> | undefined {
           },
         });
         const impact = Math.abs(Number(response.data?.priceImpactPct));
-        if (!Number.isFinite(impact)) throw new Error('no price impact in quote');
-        return impact;
+        const outSol = Number(response.data?.outAmount) / 10 ** TOKENS.SOL.decimals;
+        if (!Number.isFinite(impact) || !(outSol > 0)) throw new Error('no amount or price impact in quote');
+        return { outSol, impact };
       },
       { ttlMs: 30 * 60 * 1000, maxStaleMs: 3 * HOUR_MS, retryAfterMs: 5 * 60 * 1000 }
     );
-    exitImpacts.set(route.id, entry);
+    exitQuotes.set(route.id, entry);
   }
   return entry;
 }
@@ -245,16 +273,144 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
     };
   }
 
-  const impact = swapExit(route)?.peek();
-  if (impact === undefined || !route.receipt) return undefined;
+  const quote = swapExit(route)?.peek();
+  if (!quote || !route.receipt) return undefined;
+  const sale = `Selling ${EXIT_SAMPLE.toLocaleString('en-US')} ${route.receipt.symbol} for SOL`;
+  const small = (share: number) => (share < 0.0001 ? 'less than 0.01%' : formatPercent(share, 2));
+
+  // Without the token's pool value, price impact alone
+  if (!rate.tokenValue) {
+    return { ...base, points: points(quote.impact, 0.05, 0.01), detail: `${sale} moves the price ${small(quote.impact)}.`, source: 'Jupiter' };
+  }
+
+  // Against the pool value, so a depeg counts as well as price impact. (Jupiter's price impact is measured from its
+  // own reference price, so the loss isn't split into the two.)
+  const loss = 1 - quote.outSol / (EXIT_SAMPLE * rate.tokenValue);
+  const pool = route.source.kind === 'marinade' ? "Marinade's pool" : route.source.kind === 'infinity' ? 'the Infinity pool' : 'its stake pool';
   return {
     ...base,
-    points: points(impact, 0.05, 0.01),
-    detail: `Selling ${EXIT_SAMPLE.toLocaleString('en-US')} ${route.receipt.symbol} for SOL moves the price ${
-      impact < 0.0001 ? 'less than 0.01%' : formatPercent(impact, 2)
-    }.`,
-    source: 'Jupiter',
+    points: points(Math.max(0, loss), 0.05, 0.01),
+    detail: `${sale} returns ${loss <= 0 ? 'at least its value' : `${small(loss)} less than its value`} in ${pool}.`,
+    source: route.source.kind === 'marinade' ? "Jupiter, Marinade's API" : 'Jupiter, on chain',
   };
+}
+
+// Validator spread for liquid staking: how many validators hold the pool's stake and the largest one's share.
+// Read from the stake pool's validator list on chain, or Marinade's validator records through its SDK.
+
+interface Spread {
+  validators: number;
+  largest: number; // share of the stake with the largest validator
+}
+
+const spreads = new Map<string, Cached<Spread>>();
+
+function spreadOf(stakes: number[]): Spread {
+  const held = stakes.filter((stake) => stake > 0);
+  const total = held.reduce((sum, stake) => sum + stake, 0);
+  if (total <= 0) throw new Error('no validator stake');
+  return { validators: held.length, largest: Math.max(...held) / total };
+}
+
+async function marinadeSpread(): Promise<Spread> {
+  const { Marinade, MarinadeConfig } = await import('@marinade.finance/marinade-ts-sdk');
+  const state = await new Marinade(new MarinadeConfig({ connection })).getMarinadeState();
+  const { validatorRecords } = await state.getValidatorRecords();
+  return spreadOf(validatorRecords.map((record) => Number(record.activeBalance.toString())));
+}
+
+function validatorSpread(route: RouteConfig): Cached<Spread> | undefined {
+  const source = route.source;
+  if (route.category !== 'liquid-staking' || (source.kind !== 'stake-pool' && source.kind !== 'marinade')) return undefined;
+
+  let entry = spreads.get(route.id);
+  if (!entry) {
+    entry = cached(
+      `validator spread for ${route.id}`,
+      async () => {
+        if (source.kind === 'marinade') return marinadeSpread();
+        const poolAccount = await connection.getAccountInfo(new PublicKey(source.pool));
+        if (!poolAccount) throw new Error('stake pool account not found');
+        const pool = StakePoolLayout.decode(poolAccount.data);
+        const listAccount = await connection.getAccountInfo(pool.validatorList);
+        if (!listAccount) throw new Error('validator list not found');
+        const list = ValidatorListLayout.decode(listAccount.data) as {
+          validators: { activeStakeLamports: unknown; transientStakeLamports: unknown }[];
+        };
+        return spreadOf(list.validators.map((v) => Number(v.activeStakeLamports) + Number(v.transientStakeLamports)));
+      },
+      { ttlMs: 6 * HOUR_MS, maxStaleMs: 2 * DAY_MS, retryAfterMs: 15 * 60 * 1000 }
+    );
+    spreads.set(route.id, entry);
+  }
+  return entry;
+}
+
+const SPREAD_MAX_DEDUCTION = 10;
+
+function spreadDeduction(route: RouteConfig): SafetyDeduction | undefined {
+  const spread = validatorSpread(route)?.peek();
+  if (!spread) return undefined;
+  // The largest validator holding 10% or less takes nothing, 50% or more takes the full 10
+  const share = Math.min(1, Math.max(0, (spread.largest - 0.1) / 0.4));
+  return {
+    key: 'validator-spread',
+    label: 'Validator spread',
+    points: -Math.round(share * SPREAD_MAX_DEDUCTION),
+    detail:
+      spread.validators === 1
+        ? 'All the stake sits with one validator. If it goes down, rewards pause until it is back.'
+        : `${spread.validators} validators hold the stake. The largest holds ${formatPercent(spread.largest)}.`,
+    source: route.source.kind === 'marinade' ? "Marinade's validator records" : 'the stake pool on chain',
+  };
+}
+
+// Incidents: DefiLlama's hacks list, matched by the names in the registry
+
+interface Hack {
+  name: string;
+  date: number; // unix seconds
+  amount: number | null;
+  returnedFunds: number | null;
+  technique: string | null;
+  source: string | null;
+}
+
+const hacks = cached<Hack[]>(
+  'DefiLlama hacks',
+  async () => {
+    const response = await http.get('https://api.llama.fi/hacks');
+    if (!Array.isArray(response.data)) throw new Error('unexpected hacks response');
+    return response.data;
+  },
+  { ttlMs: 6 * HOUR_MS, maxStaleMs: 7 * DAY_MS, retryAfterMs: 15 * 60 * 1000 }
+);
+
+const YEAR_MS = 365 * DAY_MS;
+
+function incidentDeductions(route: RouteConfig): SafetyDeduction[] {
+  const list = hacks.peek();
+  if (!list) return [];
+  const names = new Set(route.incidents.map((name) => name.toLowerCase()));
+  return list
+    .filter((hack) => names.has(String(hack.name).toLowerCase()) && Date.now() - hack.date * 1000 < 3 * YEAR_MS)
+    .sort((a, b) => b.date - a.date)
+    .map((hack) => {
+      const age = Date.now() - hack.date * 1000;
+      const returned = !!hack.amount && (hack.returnedFunds ?? 0) >= hack.amount * 0.9;
+      const points = age < YEAR_MS ? (returned ? -5 : -25) : returned ? 0 : -5;
+      const team = hack.name.toLowerCase() === route.name.toLowerCase() ? '' : ` (${route.name}'s team)`;
+      const taken = hack.amount ? `${formatUsd(hack.amount)} taken` : 'Funds taken';
+      const how = hack.technique ? ` through ${hack.technique.toLowerCase()}` : '';
+      return {
+        key: 'incident' as const,
+        label: 'Incident',
+        points,
+        detail: `${hack.name}${team}, ${monthYear(hack.date * 1000)}: ${taken}${how}. ${returned ? 'Users were paid back.' : 'Not returned.'}`,
+        source: "DefiLlama's hacks list",
+        link: hack.source || 'https://defillama.com/hacks',
+      };
+    });
 }
 
 /**
@@ -300,7 +456,11 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
     exit,
   ];
 
-  return { score: parts.reduce((sum, part) => sum + part.points, 0), parts };
+  const deductions = [spreadDeduction(route), ...incidentDeductions(route)].filter(
+    (deduction): deduction is SafetyDeduction => !!deduction
+  );
+  const total = [...parts, ...deductions].reduce((sum, item) => sum + item.points, 0);
+  return { score: Math.max(0, total), parts, deductions };
 }
 
 let refreshing: Promise<void> | null = null;
@@ -324,6 +484,8 @@ export function refreshSafetyInputs(): Promise<void> {
   refreshing = Promise.all([
     inSequence(routes, (route) => outflows(route)?.get()),
     inSequence(routes, (route) => swapExit(route)?.get()),
+    inSequence(routes, (route) => validatorSpread(route)?.get()),
+    hacks.get(),
   ])
     .then(() => undefined)
     .finally(() => {

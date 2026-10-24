@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
 import { AlertTriangle, ExternalLink } from "lucide-react"
 
@@ -8,10 +9,12 @@ import { IS_DEVNET } from "@/lib/network"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { SOL_FEE_RESERVE } from "@/hooks/use-token-balances"
-import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
+import { HIGH_UTILIZATION, Medallion, borrowedPercent, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown, whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
+import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
+import { estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -34,9 +37,11 @@ interface DepositPanelProps {
   onConnect: () => void
   onReview: () => void
   className?: string
+  live: LiveQuotes
 }
 
 export function DepositPanel({
+  live,
   token,
   amount,
   onAmount,
@@ -53,10 +58,13 @@ export function DepositPanel({
   onReview,
   className,
 }: DepositPanelProps) {
-  const yearly = route ? numericAmount * route.apy : 0
+  // From the route's live quote once it is in, so the entry cost is taken off
+  const yearly = route ? estimatedYear(route, numericAmount, live.byRoute[route.id]) : 0
+  const line = route && numericAmount > 0 ? quoteLine(route, live.byRoute[route.id]) : null
   const borrowed = route ? borrowedPercent(route) : null
   const withdrawable = route ? withdrawablePercent(route) : null
   const overCap = isOverCap(route, numericAmount)
+  const [explainType, setExplainType] = useState(false)
 
   return (
     <aside aria-label="Deposit" className={cn("plaque min-w-0 flex-[1_1_320px]", className)}>
@@ -136,11 +144,12 @@ export function DepositPanel({
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {CATEGORY_LABELS[route.category]}
+                  <RouteTypeButton route={route} open={explainType} onToggle={() => setExplainType((open) => !open)} />
                   {route.receipt && ` · get ${route.receipt}`}
                 </span>
               </span>
             </div>
+            {explainType && <RouteTypeExplainer route={route} />}
             <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-3.5">
               <div className="flex flex-col gap-1">
                 <dt className="label-roman text-[10px]">APY</dt>
@@ -178,6 +187,7 @@ export function DepositPanel({
               )}
             </dl>
             <p className="-mt-1 text-[11px] text-muted-foreground">Rate and TVL from {route.source}.</p>
+            {line && <p className="-mt-2 text-[11px] text-foreground">{line}</p>}
           </div>
         )}
 

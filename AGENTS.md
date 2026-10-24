@@ -34,7 +34,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
 - The app opens on the tool, the way a swap app works (Titan is the reference): no hero and no section links in the header. The header holds the logo, the network (desktop), Settings and the wallet. The Aurora hero, the headline, section links, how it works and the FAQ belong to the landing page, coming next.
-- Phones and tablets (under 1024px): one deposit card comes first. Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists the routes in the current sort with what each earns and the gap to the best APY, and the list below steps aside. The token opens as a bottom sheet. A toolbar sits over the card there, the way Titan puts its mode chip over the swap card: the network pill (Mainnet beta) on the left, a refresh button for the rates on the right. On desktop the network shows in the header.
+- Phones and tablets (under 1024px): one deposit card comes first. Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists the routes in the current sort with their live quotes (below), and the list below steps aside. The token opens as a bottom sheet. A toolbar sits over the card there, the way Titan puts its mode chip over the swap card: the network pill (Mainnet beta) on the left, a refresh button for the rates on the right. On desktop the network shows in the header.
 - Hero art (landing page): `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
 ## Live (23 October 2026)
@@ -51,9 +51,10 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
   - Built and simulated, no real deposit by the owner yet
 - Devnet deposits (test SOL, when both apps are set to devnet): Jito stake pool
 - Live rates come from the chain or the protocol, refreshed every minute on the API and the site: stake pool accounts on chain for JitoSOL, BNSOL, jupSOL, dSOL, hSOL, bbSOL, JSOL and bSOL (priced with Jupiter's SOL price), Marinade's API for mSOL, Kamino's API and Jupiter Lend's API. INF reads Sanctum Infinity's pool on chain; its APY comes from Hermes's own history once that is a day old, DefiLlama until then.
-- Top rated is the first screen (named "Sleep Well" in the capstone, renamed by the owner on 23 Oct): only routes with a Safety Score of 80 or more and risk level low (so no lending reserve 95% or more borrowed or held back). A toggle shows All routes. The rate board and the phone card list the top 3 routes in the current sort (plus the selected route if it sits further down), and "Show all" opens the rest. Every route has a plain "What can go wrong" line in the panel, the phone card and the deposit dialog. On 23 Oct, 8 of 12 SOL routes are top rated and no USDC or USDT route is. Code: `frontend/components/app/safety.tsx`.
+- Live quotes, the way Titan quotes swap venues: type an amount and every route in view quotes it at once through `POST /api/deposit/quotes` (the same quote the deposit is built from). Each row shows what lands ("You get 1.5307 JitoSOL"), the entry cost or the discount against the token's pool value, and what the route leaves after a year at today's APY once the entry cost is taken off. "Best quote" marks the most, and that route stays in view even below the top 3. A live dot and countdown sit over the list; quotes refresh every 15 seconds while the tab is in view and pause while the deposit dialog is open. The API reuses a route's quote for the same amount for 15 seconds. Code: `backend/src/services/route-quotes.ts`, `frontend/components/app/live-quotes.tsx`.
+- Top rated is the first screen (named "Sleep Well" in the capstone, renamed by the owner on 23 Oct): only routes with a Safety Score of 80 or more and risk level low (so no lending reserve 95% or more borrowed or held back). A toggle shows All routes. The rate board and the phone card list the top 3 routes in the current sort (plus the selected route if it sits further down), and "Show all" opens the rest. Every route has a plain "What can go wrong" line in the panel, the phone card and the deposit dialog. On 24 Oct, after the spread and incident deductions, 6 of 12 SOL routes are top rated (Jito, Marinade, JPool, Sanctum Infinity, BlazeStake, Kamino Lend SOL) and Kamino Lend USDC is. Code: `frontend/components/app/safety.tsx`.
 - Phone alerts: web push, no app or Telegram needed. A bell under each route ("Alert me about Jito") turns alerts on for that route on this device, Settings turns them all off. A device's first bell opens a guide (a bottom sheet on phones): what alerts cover, then the browser's prompt, asked straight from the tap so Chrome and Safari show it. If the prompt is hidden, closed or blocked, the guide shows the steps for that browser (Android Chrome, iPhone, Firefox, Safari, other desktop) and carries on by itself once notifications are allowed. iPhones outside the Home Screen and in-app browsers get their own steps. Every 10 minutes the API checks watched routes against its own history and sends at most one alert per device, route and kind a day: APY down 20% or more and at least half a point in a day, a top rated route for the same token paying a point or more above, 5% or less of a lending reserve withdrawable, or the Safety Score falling below 80. Android works in Chrome. iPhone needs Hermes added to the Home Screen (iOS 16.4+), and the site says so. Stored: the device's push endpoint and keys and the watched route ids, no wallet. VAPID keys are created once and kept in the database (or `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`). Needs `DATABASE_URL`, and alerts only go out while the API is awake. Code: `backend/src/services/alerts.ts`, `frontend/components/app/alerts.tsx`, `frontend/public/sw.js`.
-- Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Hermes's own history once it covers two weeks, Kamino or DefiLlama history until then) and exit (borrowed share for lending, Jupiter price impact of selling 10,000 tokens for liquid staking). Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or depegs. Code: `backend/src/services/safety.ts`.
+- Safety Score on every route, 0 to 100, default sort. Four parts, 25 points each: size (TVL), track record (a fixed date per protocol in the registry), 30-day outflows (in tokens, from Hermes's own history once it covers two weeks, Kamino or DefiLlama history until then) and exit (borrowed share for lending; for liquid staking, what selling 10,000 tokens on Jupiter returns against the token's SOL value in its pool, so a depeg counts as well as price impact). Then deductions (owner's call, 24 Oct: they count): validator spread for liquid staking (the largest validator's share of the stake, from each stake pool's validator list on chain or Marinade's records; 10% or less takes nothing, 50% or more takes 10) and incidents from DefiLlama's hacks list, matched by the registry's `incidents` names for the protocol and its team (last year: 25 if not returned, 5 if returned; one to three years: 5 if not returned; older not shown). A scored incident leads the route's "What can go wrong" line. Pick a route to see each part and its source (the Why line under the route). It does not cover smart contract bugs or a sudden depeg. Code: `backend/src/services/safety.ts`.
 
 ## Roadmap
 
@@ -66,7 +67,7 @@ Landing page (next, owner's call on 24 Oct)
 Search and growth
 
 - [x] Crawlable rates, share image, structured data, search tags
-- [ ] Google Search Console and Bing Webmaster: verify hermesagg.xyz, submit the sitemap (owner)
+- [x] Google Search Console and Bing Webmaster: hermesagg.xyz verified, sitemap submitted (owner, 24 Oct)
 - [ ] Landing page copy and its FAQ with FAQPage structured data
 - [ ] A page per route (for example "JitoSOL APY today") with its live rate, Safety Score and what can go wrong: Hermes's own data for searches no one else answers live (owner's call)
 - [ ] Links in: Solana ecosystem directories, X threads and articles that link to hermesagg.xyz (owner)
@@ -76,8 +77,10 @@ Trust and curation (the wedge)
 - [x] Safety Score on every route: 0 to 100 from live data, each part shown with its source
 - [x] Top rated (the capstone's Sleep Well) as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong
 - [ ] Top rated split: one signed deposit spread across two or three top rated routes
-- [ ] Plain labels for new users: staking, lending and LP, and what each can lose
-- [ ] More score inputs: depeg (LST market price vs fair value), validator concentration, incident history with links
+- [x] Plain labels for new users: tap the route type (Liquid staking, Lending) for what it is, where the yield comes from and how you get out. LP gets its own when LP routes arrive.
+- [x] Depeg in the score: liquid staking exit measures the sale against the pool value (24 Oct)
+- [x] Validator spread counts: up to 10 points off when one validator holds most of the stake (24 Oct)
+- [x] Incident history with links: DefiLlama's hacks list, up to 25 points off (24 Oct). Drift's team was drained in Apr 2026, so Drift (dSOL) scores 47.
 
 Routes
 
@@ -85,11 +88,13 @@ Routes
 - [ ] Rate checks against each protocol's app for the beta routes
 - [x] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
 - [x] Jupiter Lend
-- [ ] Save and MarginFi
+- [ ] More stablecoin routes. Research 24 Oct (live checks, simulated deposits): next are Kamino's Steakhouse USDC vault (Kamino's transaction API builds deposit and withdraw, share token can land in the wallet) and Project 0, formerly MarginFi (USDC and USDT banks, two raw instructions, about 98% borrowed today). Lulo Protected USDC after an API key. Save later (low yield, shrinking). Not: Drift (drained Apr 2026), Loopscale (co-signed transactions, thin exits), Solstice (backing reports unhealthy).
+- No geo-blocking (owner, 24 Oct): Hermes does not block US users, so routes that exclude US persons stay out (Maple syrupUSDC, OnRe ONyc, Ondo USDY, Perena USD*).
 
 Smart router
 
-- [ ] Real yield by time horizon: entry and exit costs (price impact, rent, unstake delay) taken off the APY for 1 month, 6 months and 1 year
+- [x] Live quotes for every route at once, best quote marked, 1-year earnings after the entry cost (24 Oct)
+- [ ] Real yield by time horizon: entry and exit costs (price impact, rent, unstake delay) taken off the APY for 1 month, 6 months and 1 year. The 1-year view with entry cost ships with live quotes.
 - [ ] Match routes to the user's risk, time horizon and liquidity needs
 
 Portfolio and signals
@@ -130,6 +135,9 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, live quotes: type an amount and every route quotes it at once, refreshed every 15 seconds with a live dot and countdown. Rows show what you get, the entry cost against pool value and the 1-year earnings after it, with "Best quote" on the top one.
+- 24 Oct 2026, depeg, validator spread and incidents: the liquid staking exit part measures what a 10,000-token sale returns against the token's pool value, so a depeg lowers the score. Validator spread and incidents are deductions shown in the Why panel. Binance and Jupiter (one validator holds 80% and 87%) and Drift (one validator, and its team's Drift Trade drained of $295M in Apr 2026) leave Top rated.
+- 24 Oct 2026, plain labels: the route type on the phone card and desktop panel opens a three-line explainer (what it is, yield from, getting out), hidden until tapped. Code: `frontend/components/app/route-type.tsx`.
 - 24 Oct 2026, Kamino deposit hardening: the Kamino transaction API response is checked before the user signs it. Only the programs a deposit uses are allowed, no top-level token transfer or approval, wrapped SOL moves only between the user's own accounts, and SOL leaving the wallet beyond the deposit is bounded. A compromised Kamino response can now at worst fail, never move funds the user did not intend. Matches the checks the Jupiter Lend builder already does.
 - 24 Oct 2026, search basics: live rates in the server HTML, a 1200x630 share image for X and Telegram, Open Graph and X card tags, JSON-LD, a keyword title and description, and Search Console codes from Vercel env.
 - 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.

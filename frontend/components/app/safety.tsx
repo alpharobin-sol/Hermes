@@ -68,15 +68,23 @@ export function ViewToggle({ value, onChange, compact = false }: { value: View; 
 // "Show all" opens the rest.
 export const TOP_ROUTES = 3
 
-export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId: string | null): YieldRoute[] {
+// The top routes in the current sort, plus the selected route and the best quote when they sit further down
+export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId: string | null, bestId?: string | null): YieldRoute[] {
   if (expanded || routes.length <= TOP_ROUTES) return routes
   const top = routes.slice(0, TOP_ROUTES)
-  const selected = routes.find((route) => route.id === selectedId)
-  return selected && !top.includes(selected) ? [...top, selected] : top
+  const extra = routes.filter((route) => !top.includes(route) && (route.id === selectedId || route.id === bestId))
+  return [...top, ...extra]
 }
 
 // A plain line on how the route can lose money and how to get out, from what Hermes knows about it now
 export function whatCanGoWrong(route: YieldRoute): string {
+  // A recent incident that lowered the score leads the line
+  const incident = route.safety?.deductions?.find((deduction) => deduction.key === "incident" && deduction.points < 0)
+  const lead = incident ? `${incident.detail} ` : ""
+  return lead + baseRisk(route)
+}
+
+function baseRisk(route: YieldRoute): string {
   if (route.category === "lending") {
     const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
     return `Your ${route.token} is lent to borrowers. A withdrawal waits when most of the reserve is borrowed.${now} A bug or bad debt in ${route.name} could lose funds.`
@@ -187,7 +195,28 @@ export function SafetyBreakdown({ route, className }: { route: YieldRoute; class
             </span>
           </div>
         ))}
-        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs and depegs.</p>
+        {route.safety.deductions?.map((deduction, index) => (
+          <div key={`${deduction.key}-${index}`} className="flex flex-col gap-1">
+            <span className="flex items-baseline justify-between gap-3 text-xs">
+              <span className="font-medium text-foreground">{deduction.label}</span>
+              <span className={deduction.points < 0 ? "font-medium text-destructive" : "text-muted-foreground"}>
+                {deduction.points < 0 ? `−${-deduction.points}` : "0"}
+              </span>
+            </span>
+            <span className="text-[11px] leading-relaxed text-muted-foreground">
+              {deduction.detail} Source:{" "}
+              {deduction.link ? (
+                <a href={deduction.link} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  {deduction.source}
+                </a>
+              ) : (
+                deduction.source
+              )}
+              .
+            </span>
+          </div>
+        ))}
+        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs or a sudden depeg.</p>
       </div>
     </details>
   )
