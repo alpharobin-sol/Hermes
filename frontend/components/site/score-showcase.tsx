@@ -1,7 +1,3 @@
-"use client"
-
-import { useState } from "react"
-
 import { cn } from "@/lib/utils"
 import type { SafetyDeduction, SafetyPart } from "@/lib/api/yield-api"
 
@@ -14,40 +10,14 @@ export interface ShowcaseRoute {
   deductions: SafetyDeduction[]
 }
 
-export interface ShowcaseOption {
-  label: string // "Highest score"
-  route: ShowcaseRoute
-}
-
 // Low risk from 80, moderate from 60, the same bands the app uses
 const scoreColor = (score: number) => (score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-destructive")
 
-// A live route's Safety Score, part by part, the way the app's Why panel shows it. The switch flips between the
-// highest and lowest scoring routes, so the score is seen doing its job.
-export function ScoreShowcase({ options }: { options: ShowcaseOption[] }) {
-  const [index, setIndex] = useState(0)
-  const route = options[index]?.route ?? options[0].route
-
+// The top scoring route's Safety Score, part by part, the way the app's Why panel shows it
+export function ScoreShowcase({ route }: { route: ShowcaseRoute }) {
   return (
     <div className="flex w-full max-w-[520px] flex-col items-center gap-4">
-      {options.length > 1 && (
-        <div role="group" aria-label="Route shown" className="flex gap-0.5 rounded-full border border-frame bg-card p-1">
-          {options.map((option, i) => (
-            <button
-              key={option.label}
-              type="button"
-              aria-pressed={i === index}
-              onClick={() => setIndex(i)}
-              className={cn(
-                "h-9 rounded-full px-4 text-[13px] font-semibold transition-colors",
-                i === index ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <span className="label-roman">Top score right now</span>
 
       <div className="plaque w-full shadow-[0_28px_60px_-34px_rgba(43,20,14,0.55)]">
         <div className="plaque-inner">

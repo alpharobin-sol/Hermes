@@ -22,7 +22,7 @@ import { isTopRated, TOP_RATED_MIN_SCORE } from "@/lib/top-rated"
 import { NetworkPill } from "@/components/app/layout/network-pill"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { HeroBoard, type BoardColumn } from "@/components/site/hero-board"
-import { ScoreShowcase, type ShowcaseOption } from "@/components/site/score-showcase"
+import { ScoreShowcase, type ShowcaseRoute } from "@/components/site/score-showcase"
 import { LiveDot } from "@/components/site/live-dot"
 import banner from "@/public/brand/aurora-banner.jpg"
 import mark from "@/public/brand/hermes-mark.png"
@@ -615,30 +615,25 @@ function IconVisual({ icon: Icon }: { icon: LucideIcon }) {
   )
 }
 
-// The highest and lowest scoring routes, for the live breakdown
-function showcase(routes: YieldRoute[]): ShowcaseOption[] {
-  const scored = routes.filter((route) => route.safety).sort(bySafety)
-  if (scored.length === 0) return []
-  const shown = (route: YieldRoute) => ({
-    id: route.id,
-    name: route.name,
-    subtitle: `${route.receipt ?? route.token} · ${TYPE[route.category]}`,
-    score: route.safety!.score,
-    parts: route.safety!.parts,
-    deductions: route.safety!.deductions ?? [],
-  })
-  const high = scored[0]
-  const low = scored[scored.length - 1]
-  const options = [{ label: "Highest score", route: shown(high) }]
-  if (low.id !== high.id) options.push({ label: "Lowest score", route: shown(low) })
-  return options
+// The top scoring route, for the live breakdown
+function topScored(routes: YieldRoute[]): ShowcaseRoute | null {
+  const top = routes.filter((route) => route.safety).sort(bySafety)[0]
+  if (!top?.safety) return null
+  return {
+    id: top.id,
+    name: top.name,
+    subtitle: `${top.receipt ?? top.token} · ${TYPE[top.category]}`,
+    score: top.safety.score,
+    parts: top.safety.parts,
+    deductions: top.safety.deductions ?? [],
+  }
 }
 
 function SafetyScore({ routes }: { routes: YieldRoute[] | null }) {
-  const options = routes ? showcase(routes) : []
+  const top = routes ? topScored(routes) : null
   return (
     <section id="safety" className="reveal mx-auto max-w-[1200px] scroll-mt-24 px-4 pt-20 md:px-8 md:pt-32">
-      <div className={cn("grid gap-4", options.length > 0 && "lg:grid-cols-2")}>
+      <div className={cn("grid gap-4", top && "lg:grid-cols-2")}>
         <div className="plaque">
           <div className="plaque-inner h-full p-6 md:p-10">
             <span className="eyebrow-pill">
@@ -669,12 +664,12 @@ function SafetyScore({ routes }: { routes: YieldRoute[] | null }) {
             </p>
           </div>
         </div>
-        {options.length > 0 && (
+        {top && (
           <div className="relative flex items-center justify-center overflow-hidden rounded-[4px] border border-frame bg-plate px-4 py-10 md:px-10 md:py-14">
             <Image src={banner} alt="" fill sizes="(min-width: 1024px) 560px, 100vw" className="object-cover object-[78%_50%] opacity-25 blur-[3px]" />
             <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t from-plate via-plate/70 to-plate/30" />
             <div className="relative flex w-full justify-center">
-              <ScoreShowcase options={options} />
+              <ScoreShowcase route={top} />
             </div>
           </div>
         )}
