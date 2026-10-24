@@ -85,11 +85,26 @@ export class DepositService {
   }
 
   /**
-   * Quote a deposit without building a transaction
+   * Quote a deposit without building a transaction. `swap: false` leaves out the Jupiter swap path, for callers
+   * that quote the swap themselves (the site's live quotes, from the visitor's browser).
    */
-  async getQuote(request: DepositRequest): Promise<DepositQuote> {
+  async getQuote(request: DepositRequest, opts?: { swap?: boolean }): Promise<DepositQuote> {
     const route = this.resolveRoute(request);
-    return (await this.bestCandidate(route, request)).quote;
+    return (await this.bestCandidate(route, request, opts)).quote;
+  }
+
+  /**
+   * Check a route and amount can be deposited (route known, deposits open, amount within the beta cap)
+   */
+  checkRoute(request: DepositRequest): RouteConfig {
+    return this.resolveRoute(request);
+  }
+
+  /**
+   * Whether the route has a direct deposit path (not a Jupiter swap) on this network
+   */
+  hasDirect(route: RouteConfig): boolean {
+    return !!route.direct && directAvailable(route.direct, solanaNetwork());
   }
 
   /**
@@ -133,7 +148,7 @@ export class DepositService {
   /**
    * Quote every path the route has on this network and keep the one that returns the most
    */
-  private async bestCandidate(route: RouteConfig, request: DepositRequest): Promise<Candidate> {
+  private async bestCandidate(route: RouteConfig, request: DepositRequest, opts?: { swap?: boolean }): Promise<Candidate> {
     const network = solanaNetwork();
     const paths: Promise<Candidate>[] = [];
 
@@ -141,7 +156,7 @@ export class DepositService {
       paths.push(this.quoteDirect(route, request, network));
     }
     // Jupiter has no devnet routes
-    if (network === 'mainnet-beta' && route.receipt) paths.push(this.quoteSwap(route, request));
+    if (network === 'mainnet-beta' && route.receipt && opts?.swap !== false) paths.push(this.quoteSwap(route, request));
 
     if (paths.length === 0) {
       throw new DepositError(`${route.name} has no deposit path on ${network}`, 422);
