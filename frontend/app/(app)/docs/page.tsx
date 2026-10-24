@@ -155,10 +155,24 @@ export default function Docs() {
             <Section id="quotes">
               <p>
                 Type an amount and every route quotes it at once, refreshed every 15 seconds. Each row shows what the
-                deposit earns in a year at today&apos;s APY, after the entry cost. The entry cost is the price impact,
-                or the gap between what you pay and what the tokens are worth.
+                deposit leaves you over 1 month, 6 months or 1 year at today&apos;s APY, after the entry cost and the
+                exit cost. Pick the length with 1M, 6M and 1Y over the routes.
               </p>
-              <p>Best quote marks the route that leaves you the most.</p>
+              <List>
+                <li>
+                  The entry cost is the price impact, or the gap between what you pay and what the tokens are worth in
+                  their pool.
+                </li>
+                <li>
+                  The exit cost is what selling a staking token back to SOL loses against its pool value at
+                  today&apos;s price, from a Jupiter quote for 10 tokens. Lending leaves at face value, so it has none.
+                </li>
+                <li>
+                  The shorter the time, the more the costs weigh. A staking token with a high exit cost can leave you
+                  with less after a month than you put in, and still come out ahead after a year.
+                </li>
+              </List>
+              <p>Best quote marks the route that leaves you the most over the length you picked. The deposit dialog shows all three.</p>
               <p>APY is today&apos;s rate. It changes, and it is not a promise of returns.</p>
             </Section>
 

@@ -25,7 +25,7 @@ import {
 } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
-import { LiveBadge, bestQuoteRoute, estimatedYear, type LiveQuotes } from "./live-quotes"
+import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -54,6 +54,8 @@ interface MobileDepositProps {
   onConnect: () => void
   onReview: () => void
   live: LiveQuotes
+  horizon: Horizon // what the figures count over once an amount is typed
+  onHorizon: (horizon: Horizon) => void
 }
 
 // Phones and tablets: one card, the way a swap app works. With an amount typed, every route shows in the card,
@@ -86,6 +88,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     onConnect,
     onReview,
     live,
+    horizon,
+    onHorizon,
   },
   ref
 ) {
@@ -174,6 +178,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             onExpandedChange={onExpandedChange}
             sortBy={sortBy}
             onSort={onSort}
+            horizon={horizon}
+            onHorizon={onHorizon}
           />
         ) : (
           <BestRoute
@@ -295,8 +301,8 @@ function BestRoute({
   )
 }
 
-// With an amount: every route in sortBy order with its Safety Score and what it leaves after a year once the entry
-// cost is taken off. What lands, the entry cost and the APY show in the dialog before signing.
+// With an amount: every route in sortBy order with its Safety Score and what it leaves over the horizon once entry
+// and exit costs are taken off. What lands, the entry cost and the APY show in the dialog before signing.
 function RouteChoices({
   live,
   routes,
@@ -311,6 +317,8 @@ function RouteChoices({
   onExpandedChange,
   sortBy,
   onSort,
+  horizon,
+  onHorizon,
 }: {
   routes: YieldRoute[]
   totalForToken: number
@@ -325,9 +333,11 @@ function RouteChoices({
   sortBy: SortBy
   onSort: (sort: SortBy) => void
   live: LiveQuotes
+  horizon: Horizon
+  onHorizon: (horizon: Horizon) => void
 }) {
   // The best quote once quotes are in, the best APY until then
-  const quoted = bestQuoteRoute(routes, amount, live)
+  const quoted = bestQuoteRoute(routes, amount, live, horizon)
   const best = quoted ?? bestApyRoute(routes)
   const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
   const hidden = totalForToken - routes.length
@@ -344,6 +354,10 @@ function RouteChoices({
         <SortToggle value={sortBy} onChange={onSort} compact />
         <ViewToggle value={view} onChange={onView} compact />
       </div>
+      <div className="flex items-center justify-between gap-2 border-b border-row-line bg-card px-3 py-2">
+        <span className="text-[12px] text-muted-foreground">After costs, over</span>
+        <HorizonToggle value={horizon} onChange={onHorizon} compact />
+      </div>
 
       <div role="radiogroup" aria-label={`${token} routes`}>
         {routes.length === 0 && (
@@ -358,8 +372,8 @@ function RouteChoices({
           const selected = r.id === selectedId
           const isBest = r === best
           const quote = live.byRoute[r.id]
-          const yearly = estimatedYear(r, amount, quote)
-          // A route that can't take this amount right now (over a cap, price impact) says so instead of a yearly figure
+          const earned = estimatedReturn(r, amount, quote, horizon)
+          // A route that can't take this amount right now (over a cap, price impact) says so instead of a figure
           const noQuote = !!quote && !quote.quote
           return (
             <button
@@ -392,8 +406,10 @@ function RouteChoices({
                 </span>
               ) : (
                 <span className={cn("shrink-0 text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
-                  {yearly < 0 ? "−" : "+"}
-                  {formatTokenAmount(Math.abs(yearly), r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
+                  {formatEarned(earned, r.token)}{" "}
+                  <span className="text-xs font-medium">
+                    {r.token} {horizonSuffix(horizon)}
+                  </span>
                 </span>
               )}
             </button>

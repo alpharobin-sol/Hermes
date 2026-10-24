@@ -456,7 +456,7 @@ function HowItWorks({ routes }: { routes: YieldRoute[] | null }) {
     {
       numeral: "II",
       title: "Compare the routes",
-      body: "Hermes opens on Top rated. Each row shows the route, its Safety Score and its APY, or what it earns in a year once you type an amount.",
+      body: "Hermes opens on Top rated. Each row shows the route, its Safety Score and its APY, or, once you type an amount, what it leaves after costs over a month, six months or a year.",
       visual: sol.length > 0 ? <CompareVisual routes={sol.slice(0, 3)} /> : <IconVisual icon={ListOrdered} />,
     },
     {

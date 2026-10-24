@@ -73,6 +73,7 @@ export interface YieldRoute {
   withdrawable?: number | null; // lending only: share of the supply that can be withdrawn right now
   deposit: DepositStatus | null; // null: view only, deposit in the protocol's app
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
+  exitCost?: number | null; // share of value lost leaving today: 0 for lending, a swap back to SOL for liquid staking
 }
 
 export class YieldAPI {

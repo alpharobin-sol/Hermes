@@ -7,13 +7,14 @@ import { AlertCircle, AlertTriangle, ArrowDown, Check, CheckCircle2, ExternalLin
 
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { DepositAPI, type DepositQuote } from "@/lib/api/deposit-api"
+import { DepositAPI, type DepositQuote, type RouteQuote } from "@/lib/api/deposit-api"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, exitTight, formatApy, withdrawablePercent } from "./rate-board"
 import { whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
+import { HorizonSummary } from "./live-quotes"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -22,6 +23,7 @@ interface DepositDialogProps {
   onOpenChange: (open: boolean) => void
   route: YieldRoute
   amount: number
+  liveQuote?: RouteQuote // the route's live quote for this amount, for what it leaves after costs
   onDeposited?: () => void
 }
 
@@ -56,6 +58,7 @@ export function DepositDialog({
   onOpenChange,
   route,
   amount,
+  liveQuote,
   onDeposited,
 }: DepositDialogProps) {
   const { connection } = useConnection()
@@ -302,6 +305,8 @@ export function DepositDialog({
                 <Row label="Hermes fee">None</Row>
               </dl>
             )}
+
+            {quote && status !== "success" && <HorizonSummary route={route} amount={amount} quote={liveQuote} />}
 
             {typeof route.utilization === "number" && route.utilization >= HIGH_UTILIZATION && status !== "success" && (
               <Notice tone="warning">
