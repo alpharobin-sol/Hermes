@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Image from "next/image"
-import { Menu } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Menu, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { AccountPane } from "../account-pane"
+import { AppMenu } from "./app-menu"
 import { CustomConnectButton } from "../wallet-connect/CustomConnectKit"
 import { useLoading } from "./loading-context"
 import { NetworkPill } from "./network-pill"
@@ -23,32 +25,36 @@ function Wordmark({ className }: { className?: string }) {
   )
 }
 
-// The app's header, the way Titan's works: logo, network, wallet and a menu that opens the account pane (wallet,
-// portfolio, settings). Section links belong to the landing page.
+// The app's header, the way Titan's works: logo, network, wallet and a menu with the app's pages (Earn, Portfolio,
+// Settings). The wallet's name opens the portfolio. Section links belong to the landing page.
 export function AppHeader() {
-  const [paneOpen, setPaneOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const router = useRouter()
   const { isLoading } = useLoading()
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
         <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-6 px-4 md:h-[76px] md:px-8">
-          <a href="#top" aria-label="Hermes home" className="flex items-center">
+          <Link href="/" aria-label="Hermes home" className="flex items-center">
             <Wordmark className="h-[22px] md:h-[26px]" />
-          </a>
+          </Link>
 
           <div className="flex items-center gap-2 md:gap-3">
             <div className="hidden lg:block">
               <NetworkPill />
             </div>
-            <CustomConnectButton onOpenAccount={() => setPaneOpen(true)} />
+            <CustomConnectButton onOpenPortfolio={() => router.push("/portfolio")} />
             <button
+              ref={menuButton}
               type="button"
-              onClick={() => setPaneOpen(true)}
-              aria-label="Menu: portfolio and settings"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close menu" : "Menu"}
+              aria-expanded={menuOpen}
               className="grid size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
-              <Menu className="size-[18px]" strokeWidth={1.75} />
+              {menuOpen ? <X className="size-[18px]" strokeWidth={1.75} /> : <Menu className="size-[18px]" strokeWidth={1.75} />}
             </button>
           </div>
         </div>
@@ -59,7 +65,7 @@ export function AppHeader() {
         </div>
       </header>
 
-      <AccountPane open={paneOpen} onOpenChange={setPaneOpen} />
+      <AppMenu open={menuOpen} onOpenChange={setMenuOpen} toggle={menuButton} />
     </>
   )
 }

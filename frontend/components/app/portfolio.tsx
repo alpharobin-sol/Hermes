@@ -97,7 +97,7 @@ export function PortfolioSection({
   return (
     <section aria-label="Portfolio" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="label-roman">Portfolio</h3>
+        <h2 className="label-roman">Portfolio</h2>
         <button
           type="button"
           onClick={onRefresh}

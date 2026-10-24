@@ -58,8 +58,8 @@ export function ConnectWalletDialog({ open, onOpenChange }: { open: boolean; onO
   )
 }
 
-// The header's wallet button: connects a wallet, or once connected shows its name and opens the account pane
-export function CustomConnectButton({ className, onOpenAccount }: { className?: string; onOpenAccount: () => void }) {
+// The header's wallet button: connects a wallet, or once connected shows its name and opens the portfolio
+export function CustomConnectButton({ className, onOpenPortfolio }: { className?: string; onOpenPortfolio: () => void }) {
   const { connected, publicKey } = useWallet()
   const [open, setOpen] = useState(false)
 
@@ -71,7 +71,7 @@ export function CustomConnectButton({ className, onOpenAccount }: { className?: 
     <>
       <button
         type="button"
-        onClick={() => (connected ? onOpenAccount() : setOpen(true))}
+        onClick={() => (connected ? onOpenPortfolio() : setOpen(true))}
         title={connected ? publicKey?.toBase58() : undefined}
         className={cn(connected ? "btn-frame" : "btn-teal", "h-11 whitespace-nowrap px-3.5 text-sm md:px-[18px]", className)}
       >
