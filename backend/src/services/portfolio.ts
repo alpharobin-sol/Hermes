@@ -379,6 +379,25 @@ async function kamino(owner: string): Promise<Found[]> {
   return [...byRoute.values()];
 }
 
+/**
+ * What the wallet has deposited in one Kamino reserve through its main Kamino account (the one Hermes deposits into
+ * and Kamino's withdraw transaction draws from), in the reserve's token. 0 when it has none.
+ */
+export async function kaminoDeposit(owner: string, reserve: string): Promise<{ amount: number; borrows: boolean }> {
+  const { data } = await http.get(`${kaminoApi}/kamino-market/${KAMINO_MAIN_MARKET}/users/${owner}/obligations`, {
+    params: { env: 'mainnet-beta' },
+  });
+  const main = (Array.isArray(data) ? data : []).find((obligation: any) => Number(obligation.obligationTag) === 0);
+  const deposit = (main?.state?.deposits ?? []).find((d: any) => d.depositReserve === reserve && Number(d.depositedAmount) > 0);
+  if (!deposit) return { amount: 0, borrows: false };
+  const exchange = await kaminoExchangeRate(reserve);
+  if (!exchange) throw new Error('no Kamino exchange rate');
+  return {
+    amount: Number(deposit.depositedAmount) / 10 ** exchange.decimals / exchange.rate,
+    borrows: Number(main.refreshedStats?.userTotalBorrow) > 0,
+  };
+}
+
 async function jupiterLend(owner: string): Promise<Found[]> {
   const { data } = await lendApi.get('/earn/positions', { params: { users: owner } });
   const held = (Array.isArray(data) ? data : []).flatMap((position: any) => {

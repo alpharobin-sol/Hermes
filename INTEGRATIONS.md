@@ -30,11 +30,12 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 - [ ] Errors read plainly: low balance, price impact over the cap, protocol paused or full
 - [ ] The deposit dialog shows the Beta label and the token the user receives
 - [ ] Exit path written down: where and how the user withdraws
+- [ ] In-app withdrawal from Portfolio simulates at a small amount and for the whole position
 
 ## 3. Live
 
 - [ ] The owner deposits real funds through hermesagg.xyz and the receipt lands in the wallet. Link the transaction below.
-- [ ] The owner exits (withdraw or swap back). Link the transaction below.
+- [ ] The owner exits through Hermes's Withdraw (or at the protocol). Link the transaction below.
 - [ ] No open issues from the beta
 
 ## Status
@@ -56,3 +57,15 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 | MarginFi | not listed | | | | Phase 1, step 4. Needs a live rate source first. |
 
 The first six beta routes predate this gate. Their rate checks against each protocol's app are still to do.
+
+## In-app withdrawals (beta, 24 Oct)
+
+Built and simulated on mainnet with real positions, never signed:
+
+- Liquid staking (JitoSOL): 0.01 and the whole balance swap back to SOL on Jupiter. 0.037 JitoSOL returned 0.04837 SOL against a pool value of 0.04842 (0.1% exit cost, 0.09% price impact).
+- Kamino Lend SOL: 0.01, 0.5 and the whole deposit pass. The whole deposit asks for 0.1% more than Kamino's hourly exchange rate shows; Kamino caps it at the deposit, so nothing is left, and closes the account, returning 0.0176 SOL of rent. With loans in the same account, a full exit is refused with the most that can leave (about 13.88 of 29.11 SOL in the test account).
+- Kamino Lend USDC: 1 passes.
+- Jupiter Lend USDC: 1 and the whole position (redeems every jlUSDC) pass.
+- Jupiter Lend SOL: 0.5 and the whole position pass, SOL arrives unwrapped.
+
+The same checks as the deposits: Kamino's transaction against the deposit allow-list, Jupiter Lend's program only with the user the only signer, the swap with the user the only signer. Each is simulated, and SOL may not leave the wallet beyond the fee and a token account (0.01 SOL).

@@ -180,29 +180,42 @@ export default function Docs() {
             </Section>
 
             <Section id="withdrawing">
-              <p>Withdrawals happen in each protocol&apos;s own app for now. In-app withdrawals are coming.</p>
+              <p>
+                Open{" "}
+                <Link href="/portfolio" className={LINK}>
+                  Portfolio
+                </Link>{" "}
+                and tap Withdraw under a position. Type an amount or tap Max, check what you get, and sign in your wallet.
+              </p>
               <List>
                 <li>
-                  Staking tokens: swap back to SOL on{" "}
-                  <a href="https://jup.ag" target="_blank" rel="noopener noreferrer" className={LINK}>
-                    Jupiter
-                  </a>{" "}
-                  or in the protocol&apos;s app.
+                  Staking tokens swap back to SOL on Jupiter at the market price. Hermes shows what the tokens are worth in
+                  their pool, so you see the exit cost before you sign.
                 </li>
                 <li>
-                  Kamino Lend:{" "}
-                  <a href="https://app.kamino.finance" target="_blank" rel="noopener noreferrer" className={LINK}>
-                    app.kamino.finance
-                  </a>
+                  Kamino Lend and Jupiter Lend pay your USDC, USDT or SOL back. Only part of a reserve can leave at once
+                  when most of it is lent out, and Hermes shows how much can leave right now.
                 </li>
                 <li>
-                  Jupiter Lend:{" "}
-                  <a href="https://jup.ag/lend/earn" target="_blank" rel="noopener noreferrer" className={LINK}>
-                    jup.ag/lend/earn
-                  </a>
+                  Taking everything out of Kamino closes your Kamino account and returns the one-time rent you paid on
+                  your first deposit.
                 </li>
               </List>
-              <p>Each position in your Portfolio links to the place to manage it.</p>
+              <p>
+                In-app withdrawals are in beta. You can also withdraw in each protocol&apos;s own app: Kamino at{" "}
+                <a href="https://app.kamino.finance" target="_blank" rel="noopener noreferrer" className={LINK}>
+                  app.kamino.finance
+                </a>
+                , Jupiter Lend at{" "}
+                <a href="https://jup.ag/lend/earn" target="_blank" rel="noopener noreferrer" className={LINK}>
+                  jup.ag/lend/earn
+                </a>
+                , and staking tokens on{" "}
+                <a href="https://jup.ag" target="_blank" rel="noopener noreferrer" className={LINK}>
+                  Jupiter
+                </a>
+                .
+              </p>
             </Section>
 
             <Section id="portfolio">

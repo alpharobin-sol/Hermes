@@ -31,7 +31,7 @@ import { createJupiterClient } from './jupiter';
  * the user alone, then simulates the transaction to check it and to read the jl tokens it mints.
  */
 
-const JUPITER_LEND_PROGRAM = new PublicKey('jup3YeL8QhtSx1e253b2FDvsMNC87fDrgQZivbrndc9');
+export const JUPITER_LEND_PROGRAM = new PublicKey('jup3YeL8QhtSx1e253b2FDvsMNC87fDrgQZivbrndc9');
 // Measured on mainnet: a first deposit (token accounts plus deposit) uses 62k to 78k compute units
 const JUPITER_LEND_COMPUTE_UNITS = 150_000;
 // SOL kept back for the token account rent and fees
@@ -122,7 +122,7 @@ function describeJupiterLendError(err: unknown, logs: string[], asset: TokenInfo
 }
 
 // The token amount held in a token account, from its raw data
-function tokenAmount(data: Buffer | null | undefined): bigint {
+export function tokenAmount(data: Buffer | null | undefined): bigint {
   return data && data.length >= 72 ? data.readBigUInt64LE(64) : 0n;
 }
 
