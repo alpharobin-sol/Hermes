@@ -66,7 +66,7 @@ Landing page (next, owner's call on 24 Oct)
 Search and growth
 
 - [x] Crawlable rates, share image, structured data, search tags
-- [ ] Google Search Console and Bing Webmaster: verify hermesagg.xyz, submit the sitemap (owner)
+- [x] Google Search Console and Bing Webmaster: hermesagg.xyz verified, sitemap submitted (owner, 24 Oct)
 - [ ] Landing page copy and its FAQ with FAQPage structured data
 - [ ] A page per route (for example "JitoSOL APY today") with its live rate, Safety Score and what can go wrong: Hermes's own data for searches no one else answers live (owner's call)
 - [ ] Links in: Solana ecosystem directories, X threads and articles that link to hermesagg.xyz (owner)
@@ -76,7 +76,7 @@ Trust and curation (the wedge)
 - [x] Safety Score on every route: 0 to 100 from live data, each part shown with its source
 - [x] Top rated (the capstone's Sleep Well) as the first screen: only routes scoring 80 or more, with a plain line on what can go wrong
 - [ ] Top rated split: one signed deposit spread across two or three top rated routes
-- [ ] Plain labels for new users: staking, lending and LP, and what each can lose
+- [x] Plain labels for new users: tap the route type (Liquid staking, Lending) for what it is, where the yield comes from and how you get out. LP gets its own when LP routes arrive.
 - [ ] More score inputs: depeg (LST market price vs fair value), validator concentration, incident history with links
 
 Routes
@@ -130,6 +130,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, plain labels: the route type on the phone card and desktop panel opens a three-line explainer (what it is, yield from, getting out), hidden until tapped. Code: `frontend/components/app/route-type.tsx`.
 - 24 Oct 2026, search basics: live rates in the server HTML, a 1200x630 share image for X and Telegram, Open Graph and X card tags, JSON-LD, a keyword title and description, and Search Console codes from Vercel env.
 - 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.
 - 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source and the Why panel explains the score and what it doesn't cover. The footer is the logo, the copyright and the Telegram and X links, nothing else. Longer explanations go in articles and threads. Under the deposit button only the cap shows ("Max 10 SOL per deposit"): the Mainnet beta pill already says real funds.
