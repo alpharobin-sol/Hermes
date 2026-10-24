@@ -7,6 +7,7 @@ import yieldsRouter from './yields';
 import depositRouter from './deposit';
 import alertsRouter from './alerts';
 import namesRouter from './names';
+import portfolioRouter from './portfolio';
 import { historyEnabled, lastSnapshot } from '../services/history';
 
 export function createApp(): Express {
@@ -55,6 +56,7 @@ export function createApp(): Express {
   app.use('/api/deposit', depositRouter);
   app.use('/api/alerts', alertsRouter);
   app.use('/api/names', namesRouter);
+  app.use('/api/portfolio', portfolioRouter);
   
   // 404 handler
   app.use((_req: Request, res: Response) => {

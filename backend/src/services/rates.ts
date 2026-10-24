@@ -75,6 +75,25 @@ export const solPrice = cached(
   { ttlMs: MINUTE_MS, maxStaleMs: 15 * MINUTE_MS }
 );
 
+// USD prices of the tokens routes take (SOL, USDC, USDT), from Jupiter's price API. For portfolio totals.
+export const tokenPrices = cached(
+  'token prices from Jupiter',
+  async () => {
+    const symbols = Object.keys(TOKENS) as (keyof typeof TOKENS)[];
+    const response = await http.get(process.env.JUPITER_PRICE_API_URL || jupiterBase('price/v3'), {
+      params: { ids: symbols.map((symbol) => TOKENS[symbol].mint).join(',') },
+      headers: process.env.JUPITER_PRICE_API_URL ? undefined : jupiterHeaders(),
+    });
+    const prices = new Map<string, number>();
+    for (const symbol of symbols) {
+      const price = Number(response.data?.[TOKENS[symbol].mint]?.usdPrice);
+      if (price > 0) prices.set(symbol, price);
+    }
+    return prices;
+  },
+  { ttlMs: MINUTE_MS, maxStaleMs: 15 * MINUTE_MS }
+);
+
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
 
 // Keyed by stake pool address. APY compounds the pool's own record of this epoch's SOL per token against

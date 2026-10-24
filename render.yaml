@@ -31,6 +31,10 @@ services:
       # Optional: a private mainnet RPC (Helius, Triton). Defaults to solana-rpc.publicnode.com
       - key: SOLANA_RPC_URL
         sync: false
+      # Portfolio: an RPC that keeps full wallet history (a Helius RPC URL with its key), for what staking tokens and
+      # Jupiter Lend have earned. Without it the portfolio leaves those earnings out.
+      - key: SOLANA_HISTORY_RPC_URL
+        sync: false
       # Hermes's own rate history: Supabase Postgres, Session pooler connection string. Without it history is off.
       - key: DATABASE_URL
         sync: false
