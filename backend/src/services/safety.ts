@@ -218,7 +218,7 @@ interface ExitQuote {
   impact: number; // share the sale moves the price
 }
 
-const jupiter = createJupiterClient();
+const jupiter = createJupiterClient('swap/v1', process.env.JUPITER_API_URL);
 const exitQuotes = new Map<string, Cached<ExitQuote>>();
 
 function swapExit(route: RouteConfig): Cached<ExitQuote> | undefined {

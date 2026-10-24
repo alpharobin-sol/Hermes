@@ -20,6 +20,7 @@ import { TokenInfo } from '../registry/routes';
 import { cached } from './cache';
 import { depositBudgetInstructions } from './compute-budget';
 import { DepositError } from './errors';
+import { createJupiterClient } from './jupiter';
 
 /**
  * Deposits into Jupiter Lend Earn (mainnet only).
@@ -36,10 +37,7 @@ const JUPITER_LEND_COMPUTE_UNITS = 150_000;
 // SOL kept back for the token account rent and fees
 const FEE_BUFFER_LAMPORTS = 10_000_000;
 
-const lendApi = axios.create({
-  baseURL: process.env.JUPITER_LEND_API_URL || 'https://lite-api.jup.ag/lend/v1',
-  timeout: 20000,
-});
+const lendApi = createJupiterClient('lend/v1', process.env.JUPITER_LEND_API_URL);
 
 // Asset mint -> asset units to shares, scaled by the asset's decimals. Quotes read it, so keep it fresh.
 const shareRates = cached(

@@ -24,7 +24,7 @@ export interface RouteQuote {
 }
 
 const TTL_MS = 15_000;
-const TIMEOUT_MS = 8_000;
+const TIMEOUT_MS = 12_000; // quotes wait their turn in the Jupiter queue
 const MAX_ROUTES = 12;
 const cache = new Map<string, { at: number; result: Promise<RouteQuote> }>();
 
