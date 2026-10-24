@@ -2,7 +2,6 @@
 
 import { YieldPanel } from "@/components/app/yield-panel"
 import { DiamondRule } from "@/components/app/layout/meander"
-import { NetworkPill } from "@/components/app/layout/network-pill"
 import {
   Accordion,
   AccordionContent,
@@ -14,10 +13,6 @@ export default function Home() {
   return (
     <div id="top">
       <h1 className="sr-only">Compare Solana yields. Deposit from your own wallet.</h1>
-      {/* The app opens on the deposit card, like a swap app. The header has no room for the network on phones and tablets. */}
-      <div className="flex justify-center px-4 pt-3 lg:hidden">
-        <NetworkPill className="h-7 px-2.5 text-[11px]" />
-      </div>
       <YieldPanel />
       <HowItWorks />
       <FaqSection />

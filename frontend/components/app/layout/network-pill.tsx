@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 import { IS_DEVNET } from "@/lib/network"
 
-// Which network deposits go to. The header shows it on desktop, a line above the deposit card on phones and tablets.
+// Which network deposits go to. The header shows it on desktop, the toolbar over the deposit card on phones and tablets.
 export function NetworkPill({ className }: { className?: string }) {
   return (
     <span
