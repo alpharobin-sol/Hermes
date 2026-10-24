@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { DepositAPI, type DepositQuote, type RouteQuote, type ServerRouteQuote, type SwapToQuote } from "@/lib/api/deposit-api"
-import { formatTokenAmount } from "./tokens"
 
 // Live quotes: type an amount and every route quotes it at once, the way a swap aggregator compares venues.
 // The API quotes the direct deposits (Jito's stake pool, Marinade, Kamino Lend, Jupiter Lend) and hands back
@@ -209,18 +208,6 @@ export function bestQuoteRoute(routes: YieldRoute[], amount: number, live: LiveQ
   return best
 }
 
-// "You get 0.7653 JitoSOL", the entry cost when it is worth saying, or why the route can't quote
-export function quoteLine(route: YieldRoute, quote?: RouteQuote): string | null {
-  if (!quote) return null
-  if (!quote.quote) return quote.error
-  const q = quote.quote
-  const got = q.position
-    ? `Held in your ${q.position} account`
-    : `You get ${formatTokenAmount(Number(q.outAmount), route.token === "SOL" ? "SOL" : q.outputToken.symbol)} ${q.outputToken.symbol}`
-  const cost = quote.entryCost
-  if (cost === null || Math.abs(cost) < 0.0001) return got
-  return cost > 0 ? `${got} · ${(cost * 100).toFixed(2)}% entry cost` : `${got} · ${(-cost * 100).toFixed(2)}% under value`
-}
 
 // The pulsing dot and countdown over the quotes, like a swap app's live indicator
 export function LiveBadge({ live, className }: { live: LiveQuotes; className?: string }) {

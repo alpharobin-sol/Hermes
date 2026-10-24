@@ -266,7 +266,6 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       />
 
       <DepositPanel
-        live={live}
         token={selectedToken}
         amount={amount}
         onAmount={setAmount}

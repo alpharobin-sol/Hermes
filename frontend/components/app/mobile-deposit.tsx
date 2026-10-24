@@ -186,7 +186,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           />
         )}
 
-        {route && <SafetyBreakdown route={route} withSource />}
+        {route && <SafetyBreakdown route={route} />}
 
         {route?.deposit && <RouteAlertToggle route={route} />}
 

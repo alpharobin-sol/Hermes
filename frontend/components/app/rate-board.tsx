@@ -5,13 +5,11 @@ import { AlertCircle, RotateCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
-import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
-import { LiveBadge, bestQuoteRoute, estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
+import { LiveBadge, bestQuoteRoute, estimatedYear, type LiveQuotes } from "./live-quotes"
 import type { RouteQuote } from "@/lib/api/deposit-api"
 import {
   TOP_ROUTES,
-  SafetyCell,
   SortToggle,
   ViewToggle,
   bestApyRoute,
@@ -66,9 +64,8 @@ export function Medallion({ route, className }: { route: YieldRoute; className?:
   )
 }
 
-// 1024 to 1279px leaves out est. yearly: the deposit panel shows it for the selected route
-const GRID =
-  "lg:grid lg:grid-cols-[minmax(0,1fr)_104px_80px_100px_20px] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_104px_120px_80px_100px_20px]"
+// Route, its number (the APY, or what it earns in a year once an amount is typed) and the radio
+const GRID = "lg:grid lg:grid-cols-[minmax(0,1fr)_auto_20px] lg:gap-4"
 
 interface RateBoardProps {
   live: LiveQuotes
@@ -162,15 +159,6 @@ export function RateBoard({
           </div>
         </div>
 
-        {/* Column heads */}
-        <div aria-hidden="true" className={cn("hidden px-[18px] py-3 label-roman", GRID)}>
-          <span>Route</span>
-          <span>APY</span>
-          <span className="hidden xl:block">Est. yearly</span>
-          <span>TVL</span>
-          <span>Safety</span>
-          <span />
-        </div>
 
         {loading ? (
           <div aria-label={`Checking live ${token} rates`} aria-busy="true">
@@ -216,7 +204,6 @@ export function RateBoard({
                 best={route === best}
                 bestLabel={quoted ? "Best quote" : "Best APY"}
                 quote={live.byRoute[route.id]}
-                quoting={live.status === "loading"}
                 selected={route.id === selectedId}
                 amount={amount}
                 onSelect={() => onSelect(route.id)}
@@ -253,7 +240,6 @@ function RouteRow({
   best,
   bestLabel,
   quote,
-  quoting,
   selected,
   amount,
   onSelect,
@@ -262,16 +248,14 @@ function RouteRow({
   best: boolean
   bestLabel: string
   quote?: RouteQuote
-  quoting: boolean
   selected: boolean
   amount: number
   onSelect: () => void
 }) {
   // What the route leaves after a year once the entry cost is taken off, from its live quote
   const yearly = estimatedYear(route, amount, quote)
-  const line = amount > 0 ? quoteLine(route, quote) : null
-  const borrowed = borrowedPercent(route)
-  const withdrawable = withdrawablePercent(route)
+  // A route that can't take this amount right now (over a cap, price impact) says so instead of a yearly figure
+  const noQuote = amount > 0 && !!quote && !quote.quote
 
   return (
     <div className={cn("border-t border-row-line transition-colors", selected ? "bg-accent" : "hover:bg-plate")}>
@@ -280,9 +264,9 @@ function RouteRow({
         role="radio"
         aria-checked={selected}
         onClick={onSelect}
-        className={cn("flex w-full items-center gap-3 px-3 py-3 text-left md:items-center md:px-[18px]", GRID)}
+        className={cn("flex w-full items-center gap-3 px-3 py-3 text-left md:px-[18px]", GRID)}
       >
-        {/* Route */}
+        {/* Route and its Safety Score. The rest is in the Why panel and the deposit dialog. */}
         <span className="flex min-w-0 flex-1 items-center gap-3">
           <Medallion route={route} />
           <span className="flex min-w-0 flex-col gap-0.5">
@@ -294,50 +278,25 @@ function RouteRow({
                 </span>
               )}
             </span>
-            <span className="text-xs text-muted-foreground">
-              {CATEGORY_LABELS[route.category]}
-              {route.receipt && ` · get ${route.receipt}`}
-              {borrowed !== null && (
-                <span className={cn(route.utilization! >= HIGH_UTILIZATION && "font-medium text-warning")}>
-                  {` · ${borrowed}% borrowed`}
-                </span>
-              )}
-              {withdrawable !== null && (
-                <span className={cn(exitTight(route) && "font-medium text-warning")}>{` · ${withdrawable}% withdrawable now`}</span>
-              )}
-              <span className="lg:hidden">{` · ${safetyText(route)}`}</span>
-            </span>
-            {line ? (
-              <span className={cn("text-[11px]", quote?.quote ? "text-foreground" : "text-warning")}>{line}</span>
-            ) : (
-              amount > 0 &&
-              route.deposit &&
-              quoting && <span aria-hidden="true" className="mt-0.5 h-3 w-40 animate-pulse rounded-[2px] bg-hairline" />
-            )}
+            <span className="text-xs text-muted-foreground">{safetyText(route)}</span>
           </span>
         </span>
 
-        {/* APY and its source */}
-        <span className="flex shrink-0 flex-col items-end gap-0.5 lg:items-start">
-          <span className={cn("font-roman text-lg font-bold lg:text-[21px]", best ? "text-ink" : "text-foreground")}>
-            {formatApy(route)}
+        {/* The APY before an amount, what the route earns in a year after */}
+        {!(amount > 0) ? (
+          <span className={cn("shrink-0 font-roman text-lg font-bold lg:text-[21px]", best ? "text-ink" : "text-foreground")}>
+            {formatApy(route)} <span className="font-sans text-xs font-medium">APY</span>
           </span>
-          <span className="hidden text-[11px] text-muted-foreground lg:block">{route.source}</span>
-        </span>
-
-        {/* Returns at today's APY, in the deposit token */}
-        <span className="hidden flex-col gap-0.5 xl:flex">
-          <span className="text-sm font-medium">
-            {amount > 0 ? `${yearly < 0 ? "−" : "+"}${formatTokenAmount(Math.abs(yearly), route.token)} ${route.token}` : "—"}
+        ) : noQuote ? (
+          <span className="shrink-0 text-[13px] text-muted-foreground" title={quote?.error ?? undefined}>
+            No quote
           </span>
-          {amount > 0 && <span className="text-[11px] text-muted-foreground">{formatTokenAmount(yearly / 12, route.token)} / mo</span>}
-        </span>
-
-        <span className="hidden text-sm font-medium lg:block">{formatUSD(route.tvl)}</span>
-
-        <span className="hidden lg:flex">
-          <SafetyCell route={route} />
-        </span>
+        ) : (
+          <span className={cn("shrink-0 text-base font-semibold", best ? "text-ink" : "text-foreground")}>
+            {yearly < 0 ? "−" : "+"}
+            {formatTokenAmount(Math.abs(yearly), route.token)} <span className="text-xs font-medium">{route.token} / yr</span>
+          </span>
+        )}
 
         <span
           aria-hidden="true"
@@ -349,7 +308,6 @@ function RouteRow({
           {selected && <span className="size-2 rounded-full bg-ink" />}
         </span>
       </button>
-
     </div>
   )
 }

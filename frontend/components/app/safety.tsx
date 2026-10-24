@@ -113,18 +113,6 @@ export function safetyText(route: YieldRoute): string {
   return route.safety ? `Safety ${route.safety.score}` : "Not scored"
 }
 
-// Board column: the score in the risk level's color, with the level under it
-export function SafetyCell({ route }: { route: YieldRoute }) {
-  const level = riskLevel(route)
-  return (
-    <span className="flex flex-col gap-0.5" title="Safety Score: size, track record, 30-day outflows and exit">
-      <span className={cn("font-roman text-lg font-bold leading-none", route.safety ? level.text : "text-muted-foreground")}>
-        {route.safety ? route.safety.score : "—"}
-      </span>
-      <span className="text-[11px] text-muted-foreground">{level.label} risk</span>
-    </span>
-  )
-}
 
 // Sort toggle for route lists
 export function SortToggle({ value, onChange, compact = false }: { value: SortBy; onChange: (sort: SortBy) => void; compact?: boolean }) {
@@ -154,10 +142,10 @@ export function SortToggle({ value, onChange, compact = false }: { value: SortBy
 }
 
 // What each part of the selected route's score measured, with its points and source. Closed by default.
-// `withSource` adds where the APY and TVL come from, for the phone card, which has no stats block to say it
-export function SafetyBreakdown({ route, withSource, className }: { route: YieldRoute; withSource?: boolean; className?: string }) {
+// Ends with where the APY and TVL come from: the route rows and cards leave the source out
+export function SafetyBreakdown({ route, className }: { route: YieldRoute; className?: string }) {
   const level = riskLevel(route)
-  const source = withSource ? ` APY and TVL from ${route.source}.` : ""
+  const source = ` APY and TVL from ${route.source}.`
 
   if (!route.safety) {
     return (
