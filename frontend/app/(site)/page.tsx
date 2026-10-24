@@ -5,6 +5,7 @@ import {
   Activity,
   ArrowRight,
   ArrowRightLeft,
+  Bell,
   Check,
   CircleDollarSign,
   Coins,
@@ -726,7 +727,8 @@ function Alerts() {
           ))}
         </ul>
         <Link href="/app" className="btn-frame mt-7 h-12 px-6 text-[15px]">
-          Turn on alerts in the app
+          <Bell className="size-4" aria-hidden="true" />
+          Turn on alerts
         </Link>
       </div>
     </section>
