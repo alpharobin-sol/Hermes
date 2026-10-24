@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * GET /api/names/:address
- * The wallet's primary SNS name ("duke.sns"), or null when it has none
+ * The wallet's main AllDomains name ("duke.abc"), or null when it has none
  */
 router.get('/:address', async (req: Request, res: Response) => {
   let address: string;

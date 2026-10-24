@@ -5,7 +5,7 @@ import type { PublicKey } from "@solana/web3.js"
 
 import { getFullUrl } from "@/lib/api/yield-api"
 
-// The connected wallet's primary SNS name ("duke.sns"), or null while loading or when it has none.
+// The connected wallet's main AllDomains name ("duke.abc"), or null while loading or when it has none.
 // The API reads it on chain and keeps it for an hour.
 export function useWalletName(publicKey: PublicKey | null): string | null {
   const [name, setName] = useState<string | null>(null)

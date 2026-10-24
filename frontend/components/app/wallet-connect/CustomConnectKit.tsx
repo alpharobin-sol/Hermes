@@ -16,7 +16,7 @@ export function CustomConnectButton({ className }: Props) {
   const [open, setOpen] = useState(false)
 
   const short = publicKey ? `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}` : ""
-  // The wallet's primary SNS name when it has one, the short address otherwise
+  // The wallet's main AllDomains name when it has one, the short address otherwise
   const name = useWalletName(connected ? publicKey : null)
 
   // The provider's autoConnect connects once the selection lands. Calling connect() here would race it.

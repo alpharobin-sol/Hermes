@@ -1,13 +1,12 @@
-import { PublicKey } from '@solana/web3.js';
-import { getMultiplePrimaryDomains } from '@bonfida/spl-name-service';
+import { getMainDomainChecked } from '@onsol/tldparser';
 import { logger } from '../utils/logger';
 import { connection } from './rates';
 
 /**
  * WALLET NAMES
- * A wallet's primary SNS name (for example "duke.sns"), so the site can show it in place of the address.
- * Read on chain with SNS's SDK, which leaves out a primary name the wallet no longer owns. SNS has moved from .sol
- * to .sns (the SDK rejects .sol reads from slot 452,825,395), so names show with .sns.
+ * A wallet's main AllDomains name (for example "fatcat.wen" or "duke.abc"), so the site can show it in place of the
+ * address. Read on chain with AllDomains' parser (@onsol/tldparser): the main domain the wallet set, checked against
+ * who owns the name now, including names held as NFTs, so a name the wallet sold doesn't show.
  * Each wallet's answer, a name or none, is kept for an hour. A failed read isn't kept, so the next one retries.
  */
 
@@ -20,10 +19,10 @@ export function primaryName(address: string): Promise<string | null> {
   const hit = cache.get(address);
   if (hit && now - hit.at < TTL_MS) return hit.name;
 
-  const name = getMultiplePrimaryDomains(connection, [new PublicKey(address)])
-    .then(([reverse]) => (reverse ? `${reverse}.sns` : null))
+  const name = getMainDomainChecked(connection, address)
+    .then(({ mainDomain }) => mainDomain ?? null)
     .catch((error) => {
-      logger.info(`Primary name lookup failed for ${address}: ${error instanceof Error ? error.message : error}`);
+      logger.info(`Main domain lookup failed for ${address}: ${error instanceof Error ? error.message : error}`);
       cache.delete(address);
       return null;
     });
