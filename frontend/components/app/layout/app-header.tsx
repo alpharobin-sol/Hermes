@@ -2,10 +2,10 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { Settings } from "lucide-react"
+import { Menu } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { SettingsModal } from "../settings-modal"
+import { AccountPane } from "../account-pane"
 import { CustomConnectButton } from "../wallet-connect/CustomConnectKit"
 import { useLoading } from "./loading-context"
 import { NetworkPill } from "./network-pill"
@@ -23,9 +23,10 @@ function Wordmark({ className }: { className?: string }) {
   )
 }
 
-// The app's header: logo, network, settings and wallet. Section links belong to the landing page.
+// The app's header, the way Titan's works: logo, network, wallet and a menu that opens the account pane (wallet,
+// portfolio, settings). Section links belong to the landing page.
 export function AppHeader() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [paneOpen, setPaneOpen] = useState(false)
   const { isLoading } = useLoading()
 
   return (
@@ -40,15 +41,15 @@ export function AppHeader() {
             <div className="hidden lg:block">
               <NetworkPill />
             </div>
+            <CustomConnectButton onOpenAccount={() => setPaneOpen(true)} />
             <button
               type="button"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Settings"
+              onClick={() => setPaneOpen(true)}
+              aria-label="Menu: portfolio and settings"
               className="grid size-11 place-items-center rounded-[4px] border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
-              <Settings className="size-[18px]" strokeWidth={1.75} />
+              <Menu className="size-[18px]" strokeWidth={1.75} />
             </button>
-            <CustomConnectButton />
           </div>
         </div>
 
@@ -58,7 +59,7 @@ export function AppHeader() {
         </div>
       </header>
 
-      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <AccountPane open={paneOpen} onOpenChange={setPaneOpen} />
     </>
   )
 }
