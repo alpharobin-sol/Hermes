@@ -214,6 +214,53 @@
     @apply inline-block size-1.5 rotate-45 bg-gilt;
   }
 
+  /* A section label in a pill, with a diamond: the landing page's section heads */
+  .eyebrow-pill {
+    @apply inline-flex h-7 items-center gap-2 rounded-full border border-frame bg-card px-3 font-roman text-[11px] font-semibold tracking-[0.18em] text-ornament;
+  }
+
+  /* The live rates strip on the landing page: the list runs twice, so moving it half its width loops cleanly */
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee var(--marquee-duration, 60s) linear infinite;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+
+  /* Sections rise in as they scroll into view, where the browser supports scroll-driven animations. No JavaScript,
+     and the content is there either way. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 220px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee,
+    .reveal {
+      animation: none;
+    }
+  }
+
   @keyframes scan {
     0% {
       left: -10%;
