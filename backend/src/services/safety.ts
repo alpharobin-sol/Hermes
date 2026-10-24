@@ -21,9 +21,14 @@ import { depositHistory } from './history';
  *   Liquid staking: what selling 10,000 of the token for SOL on Jupiter returns, against the token's SOL value in its
  *   pool. That takes in both a depeg (the market price under the pool value) and price impact. 1% or less below the
  *   pool value scores 25, 5% or more 0.
- * Also checked, not scored: validator spread for liquid staking (how many validators hold the stake and the largest
- * one's share), read from the stake pool's validator list on chain.
- * It does not measure smart contract risk or a sudden depeg. A route with any part missing has no score.
+ * Then deductions, shown with the parts:
+ * - Validator spread (liquid staking): the largest validator's share of the stake, from the stake pool's validator list
+ *   on chain (Marinade's through its SDK). 10% or less takes nothing, 50% or more takes 10 points.
+ * - Incidents: hacks in DefiLlama's list under the protocol's or its team's names (the registry's `incidents`).
+ *   In the last year: 25 points if the money was not returned, 5 if it was. One to three years ago: 5 if not returned.
+ *   Older incidents are not shown.
+ * The score never goes below 0. It does not measure smart contract risk or a sudden depeg. A route with any part
+ * missing has no score.
  */
 
 export type SafetyPartKey = 'size' | 'track-record' | 'outflows' | 'exit';
@@ -37,18 +42,20 @@ export interface SafetyPart {
   source: string;
 }
 
-// Measured and shown with the score, but not counted in it
-export interface SafetyCheck {
-  key: 'validator-spread';
+// Points taken off the parts' sum. 0 when the check found nothing to take off, so the line still shows.
+export interface SafetyDeduction {
+  key: 'validator-spread' | 'incident';
   label: string;
+  points: number; // 0 or less
   detail: string;
   source: string;
+  link?: string;
 }
 
 export interface SafetyScore {
-  score: number; // sum of the parts' points, 0 to 100
+  score: number; // the parts' points less the deductions, 0 to 100
   parts: SafetyPart[];
-  checks: SafetyCheck[];
+  deductions: SafetyDeduction[];
 }
 
 const PART_MAX = 25;
@@ -289,7 +296,7 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
 }
 
 // Validator spread for liquid staking: how many validators hold the pool's stake and the largest one's share.
-// Read from the stake pool's validator list on chain. Shown with the score, not counted in it.
+// Read from the stake pool's validator list on chain, or Marinade's validator records through its SDK.
 
 interface Spread {
   validators: number;
@@ -298,15 +305,30 @@ interface Spread {
 
 const spreads = new Map<string, Cached<Spread>>();
 
+function spreadOf(stakes: number[]): Spread {
+  const held = stakes.filter((stake) => stake > 0);
+  const total = held.reduce((sum, stake) => sum + stake, 0);
+  if (total <= 0) throw new Error('no validator stake');
+  return { validators: held.length, largest: Math.max(...held) / total };
+}
+
+async function marinadeSpread(): Promise<Spread> {
+  const { Marinade, MarinadeConfig } = await import('@marinade.finance/marinade-ts-sdk');
+  const state = await new Marinade(new MarinadeConfig({ connection })).getMarinadeState();
+  const { validatorRecords } = await state.getValidatorRecords();
+  return spreadOf(validatorRecords.map((record) => Number(record.activeBalance.toString())));
+}
+
 function validatorSpread(route: RouteConfig): Cached<Spread> | undefined {
   const source = route.source;
-  if (route.category !== 'liquid-staking' || source.kind !== 'stake-pool') return undefined;
+  if (route.category !== 'liquid-staking' || (source.kind !== 'stake-pool' && source.kind !== 'marinade')) return undefined;
 
   let entry = spreads.get(route.id);
   if (!entry) {
     entry = cached(
       `validator spread for ${route.id}`,
       async () => {
+        if (source.kind === 'marinade') return marinadeSpread();
         const poolAccount = await connection.getAccountInfo(new PublicKey(source.pool));
         if (!poolAccount) throw new Error('stake pool account not found');
         const pool = StakePoolLayout.decode(poolAccount.data);
@@ -315,12 +337,7 @@ function validatorSpread(route: RouteConfig): Cached<Spread> | undefined {
         const list = ValidatorListLayout.decode(listAccount.data) as {
           validators: { activeStakeLamports: unknown; transientStakeLamports: unknown }[];
         };
-        const stakes: number[] = list.validators
-          .map((v) => Number(v.activeStakeLamports) + Number(v.transientStakeLamports))
-          .filter((stake) => stake > 0);
-        const total = stakes.reduce((sum, stake) => sum + stake, 0);
-        if (total <= 0) throw new Error('no validator stake');
-        return { validators: stakes.length, largest: Math.max(...stakes) / total };
+        return spreadOf(list.validators.map((v) => Number(v.activeStakeLamports) + Number(v.transientStakeLamports)));
       },
       { ttlMs: 6 * HOUR_MS, maxStaleMs: 2 * DAY_MS, retryAfterMs: 15 * 60 * 1000 }
     );
@@ -329,18 +346,71 @@ function validatorSpread(route: RouteConfig): Cached<Spread> | undefined {
   return entry;
 }
 
-function spreadCheck(route: RouteConfig): SafetyCheck | undefined {
+const SPREAD_MAX_DEDUCTION = 10;
+
+function spreadDeduction(route: RouteConfig): SafetyDeduction | undefined {
   const spread = validatorSpread(route)?.peek();
   if (!spread) return undefined;
+  // The largest validator holding 10% or less takes nothing, 50% or more takes the full 10
+  const share = Math.min(1, Math.max(0, (spread.largest - 0.1) / 0.4));
   return {
     key: 'validator-spread',
     label: 'Validator spread',
+    points: -Math.round(share * SPREAD_MAX_DEDUCTION),
     detail:
       spread.validators === 1
         ? 'All the stake sits with one validator. If it goes down, rewards pause until it is back.'
         : `${spread.validators} validators hold the stake. The largest holds ${formatPercent(spread.largest)}.`,
-    source: 'the stake pool on chain',
+    source: route.source.kind === 'marinade' ? "Marinade's validator records" : 'the stake pool on chain',
   };
+}
+
+// Incidents: DefiLlama's hacks list, matched by the names in the registry
+
+interface Hack {
+  name: string;
+  date: number; // unix seconds
+  amount: number | null;
+  returnedFunds: number | null;
+  technique: string | null;
+  source: string | null;
+}
+
+const hacks = cached<Hack[]>(
+  'DefiLlama hacks',
+  async () => {
+    const response = await http.get('https://api.llama.fi/hacks');
+    if (!Array.isArray(response.data)) throw new Error('unexpected hacks response');
+    return response.data;
+  },
+  { ttlMs: 6 * HOUR_MS, maxStaleMs: 7 * DAY_MS, retryAfterMs: 15 * 60 * 1000 }
+);
+
+const YEAR_MS = 365 * DAY_MS;
+
+function incidentDeductions(route: RouteConfig): SafetyDeduction[] {
+  const list = hacks.peek();
+  if (!list) return [];
+  const names = new Set(route.incidents.map((name) => name.toLowerCase()));
+  return list
+    .filter((hack) => names.has(String(hack.name).toLowerCase()) && Date.now() - hack.date * 1000 < 3 * YEAR_MS)
+    .sort((a, b) => b.date - a.date)
+    .map((hack) => {
+      const age = Date.now() - hack.date * 1000;
+      const returned = !!hack.amount && (hack.returnedFunds ?? 0) >= hack.amount * 0.9;
+      const points = age < YEAR_MS ? (returned ? -5 : -25) : returned ? 0 : -5;
+      const team = hack.name.toLowerCase() === route.name.toLowerCase() ? '' : ` (${route.name}'s team)`;
+      const taken = hack.amount ? `${formatUsd(hack.amount)} taken` : 'Funds taken';
+      const how = hack.technique ? ` through ${hack.technique.toLowerCase()}` : '';
+      return {
+        key: 'incident' as const,
+        label: 'Incident',
+        points,
+        detail: `${hack.name}${team}, ${monthYear(hack.date * 1000)}: ${taken}${how}. ${returned ? 'Users were paid back.' : 'Not returned.'}`,
+        source: "DefiLlama's hacks list",
+        link: hack.source || 'https://defillama.com/hacks',
+      };
+    });
 }
 
 /**
@@ -386,8 +456,11 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
     exit,
   ];
 
-  const checks = [spreadCheck(route)].filter((check): check is SafetyCheck => !!check);
-  return { score: parts.reduce((sum, part) => sum + part.points, 0), parts, checks };
+  const deductions = [spreadDeduction(route), ...incidentDeductions(route)].filter(
+    (deduction): deduction is SafetyDeduction => !!deduction
+  );
+  const total = [...parts, ...deductions].reduce((sum, item) => sum + item.points, 0);
+  return { score: Math.max(0, total), parts, deductions };
 }
 
 let refreshing: Promise<void> | null = null;
@@ -412,6 +485,7 @@ export function refreshSafetyInputs(): Promise<void> {
     inSequence(routes, (route) => outflows(route)?.get()),
     inSequence(routes, (route) => swapExit(route)?.get()),
     inSequence(routes, (route) => validatorSpread(route)?.get()),
+    hacks.get(),
   ])
     .then(() => undefined)
     .finally(() => {
