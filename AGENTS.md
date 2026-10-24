@@ -136,6 +136,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, Safety Score fails safe on cold cache: the incident and validator-spread deductions now gate the score the same way the four parts do. Before, a route served before its penalty loaded (just after a restart) scored as if the penalty were zero, so a hacked or validator-concentrated route could briefly reach Top rated. Now an applicable-but-unloaded deduction leaves the route unscored (shown with TVL risk, out of Top rated) until the data loads.
 - 24 Oct 2026, wallet names: the wallet button shows the connected wallet's SNS name ("alpharobin") or AllDomains name ("fatcat.wen") when it has one, the short address otherwise, the way Titan does.
 - 24 Oct 2026, swap build and CORS hardening: the Jupiter swap transaction is checked before the user signs it (the user is the only signer, so no co-signer is slipped in; the amount received is held to the quote minimum on-chain by Jupiter). The API no longer sends Access-Control-Allow-Credentials with a wildcard origin; credentials are allowed only once CORS_ORIGIN names the sites.
 - 24 Oct 2026, live quotes: type an amount and every route quotes it at once, refreshed every 15 seconds with a live dot and countdown. Rows show what you get, the entry cost against pool value and the 1-year earnings after it, with "Best quote" on the top one.
