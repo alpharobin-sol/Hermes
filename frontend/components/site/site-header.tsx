@@ -7,6 +7,7 @@ import { Wordmark } from "@/components/app/layout/wordmark"
 const LINKS = [
   { href: "/#how", label: "How it works" },
   { href: "/#safety", label: "Safety Score" },
+  { href: "/#alerts", label: "Alerts" },
   { href: "/#faq", label: "Questions" },
   { href: "/docs", label: "Docs" },
 ]
