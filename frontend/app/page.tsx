@@ -1,71 +1,22 @@
 'use client';
 
-import Image from "next/image"
-
 import { YieldPanel } from "@/components/app/yield-panel"
 import { DiamondRule } from "@/components/app/layout/meander"
-import { NetworkPill } from "@/components/app/layout/network-pill"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import banner from "@/public/brand/aurora-banner.jpg"
 
 export default function Home() {
   return (
     <div id="top">
-      <Hero />
+      <h1 className="sr-only">Compare Solana yields. Deposit from your own wallet.</h1>
       <YieldPanel />
       <HowItWorks />
       <FaqSection />
     </div>
-  )
-}
-
-const facts = ["Non-custodial", "No Hermes fee today", "Beta: real funds, capped per deposit"]
-
-// Reni's Aurora in an arch, with the headline on a plaque set over its lower edge
-function Hero() {
-  return (
-    <section className="mx-auto max-w-[1200px] px-4 pt-3 md:px-8 md:pt-7">
-      <figure className="m-0 rounded-t-[100px] border border-gilt bg-card p-1 md:rounded-t-[246px] md:p-1.5">
-        <Image
-          src={banner}
-          alt="Guido Reni's Aurora fresco with the Hermes mark as Apollo leading the Hours"
-          sizes="(min-width: 1200px) 1136px, 100vw"
-          className="block aspect-[3/1] h-auto w-full rounded-t-[96px] rounded-b-[2px] object-cover md:rounded-t-[240px]"
-          preload
-        />
-      </figure>
-
-      <div className="plaque relative mx-2 -mt-6 border-gilt sm:mx-auto sm:max-w-[840px] md:-mt-[clamp(24px,6.5vw,96px)] md:p-[5px]">
-        {/* Phones get the headline only, so the deposit card comes right after it */}
-        <div className="plaque-inner px-4 pb-4 pt-4 text-center sm:px-6 sm:pb-7 sm:pt-6 md:px-10 md:pb-10 md:pt-9">
-          {/* The header has no room for the network on phones and tablets, so it shows here */}
-          <NetworkPill className="mb-2.5 h-7 px-2.5 text-[11px] md:mb-3.5 lg:hidden" />
-          <p className="eyebrow mb-2.5 hidden md:mb-3.5 lg:block">Live Solana yields</p>
-          <h1 className="font-display text-[28px] font-semibold leading-[1.08] sm:text-[40px] md:text-[60px] md:leading-[1.04]">
-            Compare Solana yields.{" "}
-            <br />
-            <em className="text-[0.8em] font-medium sm:text-[1em]">Deposit from your own wallet.</em>
-          </h1>
-          <p className="mx-auto mt-3.5 hidden max-w-[600px] text-sm leading-relaxed text-muted-foreground sm:block md:mt-[18px] md:text-[17px]">
-            Hermes checks live rates across Solana protocols and builds the deposit for the route you pick. You sign it
-            in your wallet. Funds never touch Hermes.
-          </p>
-          <ul className="mt-5 hidden flex-wrap items-center justify-center gap-x-[18px] gap-y-2.5 text-[13px] font-medium sm:flex md:mt-[26px] md:text-sm">
-            {facts.map((fact, index) => (
-              <li key={fact} className="flex items-center gap-[18px]">
-                {index > 0 && <span className="diamond" aria-hidden="true" />}
-                {fact}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
   )
 }
 

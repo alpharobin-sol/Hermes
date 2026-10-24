@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { useWalletModal } from "@solana/wallet-adapter-react-ui"
+import { RefreshCw } from "lucide-react"
 
 import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances"
 import { useLoading } from "./layout/loading-context"
+import { NetworkPill } from "./layout/network-pill"
 import { RateBoard } from "./rate-board"
 import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
@@ -88,15 +90,21 @@ export function YieldPanel() {
   useEffect(() => {
     reviewOpenRef.current = reviewOpen
   }, [reviewOpen])
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshRates = () => {
+    setRefreshing(true)
+    return YieldAPI.getRoutes()
+      .then((data) => {
+        setRoutes(data)
+        setError(null)
+      })
+      .catch(() => {})
+      .finally(() => setRefreshing(false))
+  }
   useEffect(() => {
     const timer = setInterval(() => {
       if (reviewOpenRef.current || document.hidden) return
-      YieldAPI.getRoutes()
-        .then((data) => {
-          setRoutes(data)
-          setError(null)
-        })
-        .catch(() => {})
+      refreshRates()
     }, RATE_REFRESH_MS)
     return () => clearInterval(timer)
   }, [])
@@ -175,8 +183,23 @@ export function YieldPanel() {
     <section
       id="rates"
       aria-label="Rates"
-      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 md:pt-16"
+      className="mx-auto flex max-w-[1200px] scroll-mt-24 flex-wrap items-start gap-5 px-4 pb-16 pt-3 md:gap-6 md:px-8 md:pb-24 lg:pt-10"
     >
+      {/* Phones and tablets: a toolbar over the card, like a swap app's. Desktop shows the network in the header. */}
+      <div className="-mb-2 flex basis-full items-center justify-between gap-3 lg:hidden">
+        <NetworkPill />
+        <button
+          type="button"
+          onClick={() => (error ? setReloadKey((key) => key + 1) : refreshRates())}
+          disabled={loading || refreshing}
+          aria-label="Refresh rates"
+          title={updatedLabel(forToken) ? `Rates updated ${updatedLabel(forToken)}` : "Refresh rates"}
+          className="grid size-8 place-items-center rounded-full border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60"
+        >
+          <RefreshCw className={loading || refreshing ? "size-3.5 animate-spin" : "size-3.5"} aria-hidden="true" />
+        </button>
+      </div>
+
       <MobileDeposit
         ref={mobileCardRef}
         tokens={tokens}
