@@ -9,10 +9,10 @@ import { InputToken, TOKENS } from '../registry/routes';
 
 const router = Router();
 
-const amountSchema = z.union([z.string(), z.number()])
+export const amountSchema = z.union([z.string(), z.number()])
   .refine((value) => /^\d+(\.\d+)?$/.test(String(value)) && Number(value) > 0, 'Amount must be a positive number');
 
-const publicKeySchema = z.string().refine((value) => {
+export const publicKeySchema = z.string().refine((value) => {
   try {
     new PublicKey(value);
     return true;
@@ -39,7 +39,7 @@ const buildSchema = quoteSchema.extend({
   userPublicKey: publicKeySchema,
 });
 
-function handleError(res: Response, error: unknown, action: string) {
+export function handleError(res: Response, error: unknown, action: string) {
   if (error instanceof z.ZodError) {
     return res.status(400).json({ success: false, error: error.errors[0]?.message || 'Invalid request' });
   }

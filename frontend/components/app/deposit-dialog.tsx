@@ -25,7 +25,7 @@ interface DepositDialogProps {
   onDeposited?: () => void
 }
 
-function base64ToBytes(base64: string): Uint8Array {
+export function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -212,8 +212,8 @@ export function DepositDialog({
                       {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol} in {quote.position}
                     </span>
                     <span className="text-xs leading-relaxed text-muted-foreground">
-                      A position in your own {quote.position} account, not a token in your wallet. Manage or withdraw it at{" "}
-                      {hostOf(route.website)}.
+                      A position in your own {quote.position} account, not a token in your wallet. Withdraw it from your
+                      Portfolio, or at {hostOf(route.website)}.
                     </span>
                   </>
                 ) : quote ? (
@@ -225,7 +225,7 @@ export function DepositDialog({
                       <span className="text-xs text-muted-foreground">Sits in your own wallet and earns staking yield.</span>
                     ) : (
                       <span className="text-xs leading-relaxed text-muted-foreground">
-                        Sits in your own wallet and grows in value as interest accrues. Withdraw at {hostOf(route.website)}.
+                        Sits in your own wallet and grows in value as interest accrues. Withdraw it from your Portfolio.
                       </span>
                     )}
                   </>
@@ -345,7 +345,7 @@ export function DepositDialog({
             {status === "success" && (
               <Notice tone="success">
                 {quote?.position
-                  ? `Deposit confirmed. Your ${quote.outputToken.symbol} is supplied to ${quote.position} and earning yield. Manage or withdraw it at ${hostOf(route.website)}.`
+                  ? `Deposit confirmed. Your ${quote.outputToken.symbol} is supplied to ${quote.position} and earning yield. Withdraw it any time from your Portfolio.`
                   : `Deposit confirmed. Your ${quote?.outputToken.symbol} is in your wallet and earning yield.`}
               </Notice>
             )}
@@ -404,7 +404,7 @@ export function DepositDialog({
   )
 }
 
-function Row({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+export function Row({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
       <dt className="text-muted-foreground">{label}</dt>
@@ -420,7 +420,7 @@ const NOTICE_TONES = {
   plain: "border-frame bg-secondary text-foreground",
 }
 
-function Notice({ tone, children }: { tone: keyof typeof NOTICE_TONES; children: React.ReactNode }) {
+export function Notice({ tone, children }: { tone: keyof typeof NOTICE_TONES; children: React.ReactNode }) {
   const Icon = tone === "success" ? CheckCircle2 : tone === "error" ? AlertCircle : AlertTriangle
   return (
     <div className={cn("flex items-start gap-2.5 rounded-[2px] border px-3.5 py-3 text-[13px] leading-relaxed", NOTICE_TONES[tone])}>

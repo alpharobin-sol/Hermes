@@ -7,6 +7,7 @@ import { ArrowUpRight, RotateCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getFullUrl } from "@/lib/api/yield-api"
 import { formatTokenAmount } from "./tokens"
+import { WithdrawDialog } from "./withdraw-dialog"
 
 // What the connected wallet holds in each route Hermes lists and what it has earned. The API reads it live from the
 // chain, Kamino and Jupiter Lend, and keeps each wallet's answer a minute.
@@ -87,12 +88,17 @@ export function PortfolioSection({
   status,
   portfolio,
   onRefresh,
+  onWithdrawn,
 }: {
   status: State["status"]
   portfolio: Portfolio | null
   onRefresh: () => void
+  onWithdrawn?: () => void // after a withdrawal lands, so the wallet's balances refresh too
 }) {
   const loading = status === "loading"
+  // The position being withdrawn from. Kept while the dialog closes, so it doesn't empty mid-animation.
+  const [withdrawing, setWithdrawing] = useState<Position | null>(null)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const positions = portfolio?.positions ?? []
   const missingEarned = positions.some((p) => p.earned === null && !p.earnedNote)
 
@@ -172,13 +178,7 @@ export function PortfolioSection({
         <ul className="m-0 flex list-none flex-col overflow-hidden rounded-[4px] border border-frame p-0">
           {positions.map((p) => (
             <li key={p.routeId} className="border-t border-row-line bg-card first:border-t-0">
-              <a
-                href={p.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Manage at ${new URL(p.website).host.replace(/^www\./, "")}`}
-                className="flex items-center gap-3 px-3 py-2.5 hover:bg-plate"
-              >
+              <div className="flex items-center gap-3 px-3 pt-2.5">
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="font-display text-[19px] font-bold leading-[1.1]">{p.name}</span>
                   <span className="text-[11px] text-muted-foreground">
@@ -187,18 +187,40 @@ export function PortfolioSection({
                   </span>
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-0.5">
-                  <span className="text-[15px] font-semibold">{p.valueUsd !== null ? formatUsd(p.valueUsd) : p.value !== null ? `${formatTokenAmount(p.value, p.token)} ${p.token}` : "—"}</span>
+                  <span className="text-[15px] font-semibold">
+                    {p.valueUsd !== null ? formatUsd(p.valueUsd) : p.value !== null ? `${formatTokenAmount(p.value, p.token)} ${p.token}` : "—"}
+                  </span>
                   {p.earned !== null && (
                     <span className={cn("text-[11px]", p.earned >= 0 ? "text-success" : "text-warning")}>
                       {signed(p.earned, p.token)}
                     </span>
                   )}
                 </span>
-                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              </a>
+              </div>
               {(p.earnedNote || p.note) && (
-                <p className="-mt-1 px-3 pb-2.5 text-[11px] leading-relaxed text-muted-foreground">{p.note ?? p.earnedNote}</p>
+                <p className="px-3 pt-1 text-[11px] leading-relaxed text-muted-foreground">{p.note ?? p.earnedNote}</p>
               )}
+              <div className="flex items-center gap-3 px-3 pb-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawing(p)
+                    setWithdrawOpen(true)
+                  }}
+                  className="btn-frame h-9 px-3.5 text-[13px]"
+                >
+                  Withdraw
+                </button>
+                <a
+                  href={p.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground"
+                >
+                  {new URL(p.website).host.replace(/^www\./, "")}
+                  <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                </a>
+              </div>
             </li>
           ))}
         </ul>
@@ -210,6 +232,17 @@ export function PortfolioSection({
           network fees aside.
           {missingEarned && " Earned for staking tokens and Jupiter Lend is coming soon."}
         </p>
+      )}
+      {withdrawing && (
+        <WithdrawDialog
+          position={withdrawing}
+          open={withdrawOpen}
+          onOpenChange={setWithdrawOpen}
+          onDone={() => {
+            onRefresh()
+            onWithdrawn?.()
+          }}
+        />
       )}
     </section>
   )

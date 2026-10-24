@@ -20,6 +20,8 @@ export function PortfolioPage() {
   const { status, portfolio, refresh } = usePortfolio(address, true)
   const [connectOpen, setConnectOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Bumped after a withdrawal, so the wallet's balances read again
+  const [balancesKey, setBalancesKey] = useState(0)
   const short = address ? `${address.slice(0, 4)}...${address.slice(-4)}` : ""
 
   const copy = async () => {
@@ -75,9 +77,16 @@ export function PortfolioPage() {
             </div>
           )}
 
-          {address && <WalletBalances prices={portfolio?.prices ?? null} />}
+          {address && <WalletBalances key={balancesKey} prices={portfolio?.prices ?? null} />}
 
-          {address && <PortfolioSection status={status} portfolio={portfolio} onRefresh={refresh} />}
+          {address && (
+            <PortfolioSection
+              status={status}
+              portfolio={portfolio}
+              onRefresh={refresh}
+              onWithdrawn={() => setBalancesKey((key) => key + 1)}
+            />
+          )}
 
           {address && (
             <button

@@ -37,7 +37,7 @@ import { DepositError } from './errors';
 const KAMINO_COMPUTE_UNITS = 300_000;
 
 // The Kamino Lend program. Its own instructions, and the token moves it makes inside them, are the deposit.
-const KAMINO_LEND_PROGRAM = new PublicKey('KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD');
+export const KAMINO_LEND_PROGRAM = new PublicKey('KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD');
 
 // Programs a real Kamino deposit uses at the top level: the lending program, account creation (ATA), the user's
 // own lookup table (first deposit), wrapped SOL moves (System and Token), and compute budget. Any other program
@@ -72,15 +72,21 @@ const DANGEROUS_TOKEN_IX = new Set([
 const MAX_SETUP_SOL = Number(process.env.KAMINO_MAX_SETUP_SOL || 0.05);
 
 /**
- * Refuse a Kamino transaction that does more than deposit. The API's response is not signed, so Hermes checks it
- * before building: only the programs a deposit uses, no top-level token transfer or approval, and wrapped SOL
- * moves only between the user's own accounts. A compromised response can then at worst fail, never drain.
+ * Refuse a Kamino transaction that does more than deposit or withdraw. The API's response is not signed, so Hermes
+ * checks it before building: only the programs a deposit or withdrawal uses, no top-level token transfer or
+ * approval, and wrapped SOL moves only between the user's own accounts. A compromised response can then at worst
+ * fail, never drain.
  */
-export function assertKaminoDepositOnly(instructions: TransactionInstruction[], user: PublicKey, token: TokenInfo): void {
+export function assertKaminoOnly(
+  instructions: TransactionInstruction[],
+  user: PublicKey,
+  token: TokenInfo,
+  action: 'deposit' | 'withdrawal' = 'deposit'
+): void {
   const wsolAccount = getAssociatedTokenAddressSync(NATIVE_MINT, user, true);
   const refuse = (why: string): never => {
-    logger.warn(`Kamino deposit for ${user.toBase58()} refused: ${why}`);
-    throw new DepositError("Kamino's deposit service returned an unexpected transaction. Try again shortly.", 502);
+    logger.warn(`Kamino ${action} for ${user.toBase58()} refused: ${why}`);
+    throw new DepositError(`Kamino's ${action} service returned an unexpected transaction. Try again shortly.`, 502);
   };
 
   for (const ix of instructions) {
@@ -97,7 +103,7 @@ export function assertKaminoDepositOnly(instructions: TransactionInstruction[], 
       // Only funding the user's own wrapped SOL account (a Transfer to it) is part of a deposit
       const isTransfer = ix.data.length >= 4 && ix.data.readUInt32LE(0) === 2;
       if (!isTransfer || !ix.keys[1]?.pubkey.equals(wsolAccount)) refuse('unexpected system instruction');
-      if (token.symbol !== 'SOL') refuse('system transfer on a non-SOL deposit');
+      if (token.symbol !== 'SOL') refuse(`system transfer on a non-SOL ${action}`);
     }
   }
 }
@@ -143,7 +149,7 @@ async function fetchKaminoTransaction({ market, reserve, amount, user }: KaminoD
   return transaction;
 }
 
-async function loadLookupTables(connection: Connection, transaction: VersionedTransaction): Promise<AddressLookupTableAccount[]> {
+export async function loadLookupTables(connection: Connection, transaction: VersionedTransaction): Promise<AddressLookupTableAccount[]> {
   return Promise.all(
     transaction.message.addressTableLookups.map(async (lookup) => {
       const table = (await connection.getAddressLookupTable(lookup.accountKey)).value;
@@ -175,7 +181,7 @@ export async function buildKaminoDeposit(connection: Connection, params: KaminoD
   const message = TransactionMessage.decompile(kaminoTransaction.message, { addressLookupTableAccounts: lookupTables });
   const instructions = message.instructions.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
   // The response is not signed by Kamino, so check it does only a deposit before the user signs it
-  assertKaminoDepositOnly(instructions, user, token);
+  assertKaminoOnly(instructions, user, token);
   const budget = await depositBudgetInstructions(connection, [new PublicKey(reserve)], KAMINO_COMPUTE_UNITS);
 
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
