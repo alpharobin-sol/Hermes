@@ -25,8 +25,8 @@ function Wordmark({ className }: { className?: string }) {
   )
 }
 
-// The app's header, the way Titan's works: logo, network, wallet and a menu with the app's pages (Earn, Portfolio,
-// Settings). The wallet's name opens the portfolio. Section links belong to the landing page.
+// The app's header, the way Titan's works: logo (home, the routes), network, wallet and a menu with Portfolio,
+// Settings and Docs. The wallet's name opens the portfolio. Section links belong to the landing page.
 export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButton = useRef<HTMLButtonElement>(null)

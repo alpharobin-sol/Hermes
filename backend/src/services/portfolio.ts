@@ -51,7 +51,7 @@ export interface Portfolio {
   positions: Position[];
   totalUsd: number; // positions with a USD value
   earnedUsd: number | null; // positions with a known earned, null when none
-  solPrice: number | null;
+  prices: Partial<Record<InputToken, number>>; // USD, for the wallet's own SOL, USDC and USDT too
   unavailable: string[]; // sources that didn't answer, so their positions are missing
   history: boolean; // whether Hermes can read wallet history, which liquid staking's earned needs
   updatedAt: string;
@@ -463,7 +463,7 @@ async function readPortfolio(address: string): Promise<Portfolio> {
     positions,
     totalUsd: positions.reduce((sum, p) => sum + (p.valueUsd ?? 0), 0),
     earnedUsd: known.length ? known.reduce((sum, p) => sum + p.earnedUsd!, 0) : null,
-    solPrice: prices?.get('SOL') ?? null,
+    prices: Object.fromEntries(prices ?? []),
     unavailable,
     history: historyRpc !== null,
     updatedAt: new Date().toISOString(),

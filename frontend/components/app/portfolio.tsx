@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
 import { ArrowUpRight, RotateCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -34,7 +35,7 @@ export interface Portfolio {
   positions: Position[]
   totalUsd: number
   earnedUsd: number | null
-  solPrice: number | null
+  prices: Partial<Record<"SOL" | "USDC" | "USDT", number>> // USD
   unavailable: string[]
   history: boolean
   updatedAt: string
@@ -80,7 +81,8 @@ function signed(value: number, token: string): string {
   return `${value < 0 ? "−" : "+"}${formatTokenAmount(Math.abs(value), token)} ${token}`
 }
 
-// The total, then one row per position: what it holds and its Safety Score, what it's worth and what it has earned
+// What the wallet has in Hermes's routes: the total, then one row per position with what it holds and its Safety
+// Score, what it's worth and what it has earned
 export function PortfolioSection({
   status,
   portfolio,
@@ -95,9 +97,9 @@ export function PortfolioSection({
   const missingEarned = positions.some((p) => p.earned === null && !p.earnedNote)
 
   return (
-    <section aria-label="Portfolio" className="flex flex-col gap-3">
+    <section aria-label="Earning" className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="label-roman">Portfolio</h2>
+        <h2 className="label-roman">Earning</h2>
         <button
           type="button"
           onClick={onRefresh}
@@ -113,10 +115,10 @@ export function PortfolioSection({
         <div className="flex flex-col gap-0.5">
           <span className="text-[34px] font-semibold leading-tight text-foreground">{formatUsd(portfolio.totalUsd)}</span>
           <span className="text-[13px] text-muted-foreground">
-            {portfolio.solPrice ? `≈ ${formatTokenAmount(portfolio.totalUsd / portfolio.solPrice, "SOL")} SOL` : null}
+            {portfolio.prices.SOL ? `≈ ${formatTokenAmount(portfolio.totalUsd / portfolio.prices.SOL, "SOL")} SOL` : null}
             {portfolio.earnedUsd !== null && (
               <>
-                {portfolio.solPrice ? " · " : null}
+                {portfolio.prices.SOL ? " · " : null}
                 <span className={portfolio.earnedUsd >= 0 ? "text-success" : "text-warning"}>
                   {portfolio.earnedUsd >= 0 ? "+" : ""}
                   {formatUsd(portfolio.earnedUsd)} earned
@@ -148,7 +150,10 @@ export function PortfolioSection({
 
       {portfolio && positions.length === 0 && portfolio.unavailable.length === 0 && (
         <p className="rounded-[2px] border border-hairline bg-background px-3 py-4 text-center text-[13px] text-muted-foreground">
-          No Hermes routes in this wallet yet.
+          No Hermes routes in this wallet yet.{" "}
+          <Link href="/" className="font-medium text-ink underline underline-offset-2">
+            Find a route
+          </Link>
         </p>
       )}
 

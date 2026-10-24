@@ -4,24 +4,17 @@ import type { RefObject } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { ArrowUpRight } from "lucide-react"
+import { FileText, LayoutGrid, Settings, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-// The menu, the way Titan's works: a card under the header with the app's pages, then Hermes's links.
-// Each page opens on its own. The header's menu button turns into a close button while it is open.
-const PAGES = [
-  { href: "/", label: "Earn" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/settings", label: "Settings" },
+// The menu, the way Titan's and Gloam's work: a card under the header with the pages, each opening on its own.
+// The routes are home, under the logo. The header's menu button turns into a close button while it is open.
+const PAGES: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/portfolio", label: "Portfolio", icon: LayoutGrid },
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/docs", label: "Docs", icon: FileText },
 ]
-
-const LINKS = [
-  { href: "https://x.com/Hermes_agg", label: "X" },
-  { href: "https://t.me/+gYZPiesNgH85YzE8", label: "Telegram" },
-]
-
-const ROW = "flex h-14 items-center justify-between rounded-[4px] px-4 font-display text-[22px] font-bold transition-colors"
 
 export function AppMenu({
   open,
@@ -45,44 +38,32 @@ export function AppMenu({
           onInteractOutside={(event) => {
             if (toggle.current?.contains(event.target as Node)) event.preventDefault()
           }}
-          className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 fixed right-4 top-[72px] z-50 w-[calc(100vw-2rem)] max-w-sm rounded-[4px] border border-gilt bg-card p-[5px] shadow-[0_12px_40px_rgba(0,0,0,0.25)] outline-none md:right-[max(2rem,calc((100vw-1200px)/2+2rem))] md:top-[84px] md:w-80"
+          className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 fixed right-4 top-[72px] z-50 w-[calc(100vw-2rem)] max-w-sm rounded-[4px] border border-gilt bg-card p-[5px] shadow-[0_12px_40px_rgba(0,0,0,0.25)] outline-none md:right-[max(2rem,calc((100vw-1200px)/2+2rem))] md:top-[84px] md:w-64"
         >
           <div className="plaque-inner p-2">
             <DialogPrimitive.Title className="sr-only">Menu</DialogPrimitive.Title>
-            <DialogPrimitive.Description className="sr-only">Hermes pages and links</DialogPrimitive.Description>
+            <DialogPrimitive.Description className="sr-only">Portfolio, settings and docs</DialogPrimitive.Description>
             <nav aria-label="Hermes">
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {PAGES.map((page) => {
-                  const current = pathname === page.href
+              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                {PAGES.map(({ href, label, icon: Icon }) => {
+                  const current = pathname === href || pathname.startsWith(`${href}/`)
                   return (
-                    <li key={page.href}>
+                    <li key={href}>
                       <Link
-                        href={page.href}
+                        href={href}
                         onClick={() => onOpenChange(false)}
                         aria-current={current ? "page" : undefined}
-                        className={cn(ROW, current ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-plate hover:text-foreground")}
+                        className={cn(
+                          "flex h-12 items-center gap-3 rounded-[4px] px-3.5 text-[15px] font-medium transition-colors",
+                          current ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-plate hover:text-foreground"
+                        )}
                       >
-                        {page.label}
+                        <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden="true" />
+                        {label}
                       </Link>
                     </li>
                   )
                 })}
-              </ul>
-              <p className="m-0 pb-1 pt-3 text-center label-roman">Community</p>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {LINKS.map((link) => (
-                  <li key={link.href}>
-                    <a
-                      href={link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(ROW, "text-muted-foreground hover:bg-plate hover:text-foreground")}
-                    >
-                      {link.label}
-                      <ArrowUpRight className="size-5" aria-hidden="true" />
-                    </a>
-                  </li>
-                ))}
               </ul>
             </nav>
           </div>

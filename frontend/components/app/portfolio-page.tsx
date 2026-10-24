@@ -1,14 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { useWallet } from "@solana/wallet-adapter-react"
 import { Check, Copy, Wallet } from "lucide-react"
 
-import { PortfolioSection, usePortfolio } from "./portfolio"
+import { useTokenBalances } from "@/hooks/use-token-balances"
+import { PortfolioSection, formatUsd, usePortfolio, type Portfolio } from "./portfolio"
+import { BASE_TOKENS, formatTokenAmount } from "./tokens"
 import { ConnectWalletDialog } from "./wallet-connect/CustomConnectKit"
 import { useWalletName } from "./wallet-connect/use-wallet-name"
 
-// The portfolio page, like Titan's profile: the wallet, its total and each position, then Disconnect
+// The portfolio page, like Titan's profile and Gloam's portfolio: the wallet and what it holds, what it is earning in
+// Hermes's routes and each position, then Disconnect
 export function PortfolioPage() {
   const { connected, publicKey, wallet, disconnect } = useWallet()
   const address = connected && publicKey ? publicKey.toBase58() : null
@@ -71,6 +75,8 @@ export function PortfolioPage() {
             </div>
           )}
 
+          {address && <WalletBalances prices={portfolio?.prices ?? null} />}
+
           {address && <PortfolioSection status={status} portfolio={portfolio} onRefresh={refresh} />}
 
           {address && (
@@ -86,5 +92,38 @@ export function PortfolioPage() {
       </section>
       <ConnectWalletDialog open={connectOpen} onOpenChange={setConnectOpen} />
     </div>
+  )
+}
+
+// The SOL, USDC and USDT in the wallet itself, ready to deposit. Read in the browser from the wallet's accounts.
+function WalletBalances({ prices }: { prices: Portfolio["prices"] | null }) {
+  const { balances } = useTokenBalances()
+  const known = BASE_TOKENS.filter((token) => typeof balances[token.symbol] === "number")
+  const totalUsd = prices
+    ? known.reduce((sum, token) => sum + balances[token.symbol] * (prices[token.symbol as keyof Portfolio["prices"]] ?? 0), 0)
+    : null
+
+  return (
+    <section aria-label="In your wallet" className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="label-roman">In your wallet</h2>
+        {totalUsd !== null && known.length > 0 && <span className="text-[13px] font-medium">{formatUsd(totalUsd)}</span>}
+      </div>
+      {known.length === 0 ? (
+        <span aria-hidden="true" className="h-[52px] animate-pulse rounded-[4px] bg-hairline" />
+      ) : (
+        <ul className="m-0 grid list-none grid-cols-3 gap-2 p-0">
+          {known.map((token) => (
+            <li key={token.symbol} className="flex flex-col gap-1 rounded-[4px] border border-frame bg-background px-3 py-2.5">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                <Image src={token.icon} alt="" width={14} height={14} className="size-3.5" />
+                {token.symbol}
+              </span>
+              <span className="truncate text-[15px] font-semibold">{formatTokenAmount(balances[token.symbol], token.symbol)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
