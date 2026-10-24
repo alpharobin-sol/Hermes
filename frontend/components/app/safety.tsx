@@ -187,7 +187,18 @@ export function SafetyBreakdown({ route, className }: { route: YieldRoute; class
             </span>
           </div>
         ))}
-        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs and depegs.</p>
+        {route.safety.checks?.map((check) => (
+          <div key={check.key} className="flex flex-col gap-1">
+            <span className="flex items-baseline justify-between gap-3 text-xs">
+              <span className="font-medium text-foreground">{check.label}</span>
+              <span className="text-muted-foreground">not scored</span>
+            </span>
+            <span className="text-[11px] leading-relaxed text-muted-foreground">
+              {check.detail} Source: {check.source}.
+            </span>
+          </div>
+        ))}
+        <p className="text-[11px] leading-relaxed text-muted-foreground">Not covered: smart contract bugs or a sudden depeg.</p>
       </div>
     </details>
   )

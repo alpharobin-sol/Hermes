@@ -57,7 +57,7 @@ function rateSource(name: string, fetcher: () => Promise<RateMap>, ttlMs = MINUT
   );
 }
 
-const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://solana-rpc.publicnode.com', 'confirmed');
+export const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://solana-rpc.publicnode.com', 'confirmed');
 
 // SOL in USD from Jupiter's price API
 export const solPrice = cached(

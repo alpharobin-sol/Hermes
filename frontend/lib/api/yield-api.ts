@@ -36,10 +36,19 @@ export interface SafetyPart {
   source: string;
 }
 
-// 0 to 100 from live data: size, track record, 30-day outflows and exit. Not contract or depeg risk.
+// 0 to 100 from live data: size, track record, 30-day outflows and exit (which counts a depeg). Not contract risk.
+// Measured and shown with the score, not counted in it (validator spread)
+export interface SafetyCheck {
+  key: string;
+  label: string;
+  detail: string;
+  source: string;
+}
+
 export interface SafetyScore {
   score: number;
   parts: SafetyPart[];
+  checks?: SafetyCheck[];
 }
 
 // One route from GET /api/yields

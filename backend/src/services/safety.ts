@@ -1,8 +1,10 @@
+import { PublicKey } from '@solana/web3.js';
+import { StakePoolLayout, ValidatorListLayout } from '@solana/spl-stake-pool';
 import { solanaNetwork } from '../config/runtime';
 import { depositStatus, KAMINO_MAIN_MARKET, ROUTES, RouteConfig, TOKENS } from '../registry/routes';
 import { cached, Cached } from './cache';
 import { createJupiterClient } from './jupiter';
-import { getRate, http, Rate, SOURCE_LABELS } from './rates';
+import { connection, getRate, http, Rate, SOURCE_LABELS } from './rates';
 import { depositHistory } from './history';
 
 /**
@@ -16,8 +18,12 @@ import { depositHistory } from './history';
  * - Exit: how easily money gets out today.
  *   Lending: the share of deposits that can't be withdrawn right now (borrowed, or held back by a withdrawal limit).
  *   90% or less scores 25, 100% scores 0.
- *   Liquid staking: the price impact of selling 10,000 of the token for SOL on Jupiter. 1% or less scores 25, 5% or more 0.
- * It does not measure smart contract or depeg risk. A route with any part missing has no score.
+ *   Liquid staking: what selling 10,000 of the token for SOL on Jupiter returns, against the token's SOL value in its
+ *   pool. That takes in both a depeg (the market price under the pool value) and price impact. 1% or less below the
+ *   pool value scores 25, 5% or more 0.
+ * Also checked, not scored: validator spread for liquid staking (how many validators hold the stake and the largest
+ * one's share), read from the stake pool's validator list on chain.
+ * It does not measure smart contract risk or a sudden depeg. A route with any part missing has no score.
  */
 
 export type SafetyPartKey = 'size' | 'track-record' | 'outflows' | 'exit';
@@ -31,9 +37,18 @@ export interface SafetyPart {
   source: string;
 }
 
+// Measured and shown with the score, but not counted in it
+export interface SafetyCheck {
+  key: 'validator-spread';
+  label: string;
+  detail: string;
+  source: string;
+}
+
 export interface SafetyScore {
   score: number; // sum of the parts' points, 0 to 100
   parts: SafetyPart[];
+  checks: SafetyCheck[];
 }
 
 const PART_MAX = 25;
@@ -189,19 +204,24 @@ function outflows(route: RouteConfig): Cached<Outflow> | undefined {
   return entry;
 }
 
-// Exit for liquid staking: price impact of selling EXIT_SAMPLE of the token for SOL on Jupiter
+// Exit for liquid staking: a Jupiter quote for selling EXIT_SAMPLE of the token for SOL
+
+interface ExitQuote {
+  outSol: number; // SOL the sale returns
+  impact: number; // share the sale moves the price
+}
 
 const jupiter = createJupiterClient();
-const exitImpacts = new Map<string, Cached<number>>();
+const exitQuotes = new Map<string, Cached<ExitQuote>>();
 
-function swapExit(route: RouteConfig): Cached<number> | undefined {
+function swapExit(route: RouteConfig): Cached<ExitQuote> | undefined {
   const receipt = route.receipt;
   if (route.category !== 'liquid-staking' || !receipt) return undefined;
 
-  let entry = exitImpacts.get(route.id);
+  let entry = exitQuotes.get(route.id);
   if (!entry) {
     entry = cached(
-      `exit price impact for ${route.id}`,
+      `exit quote for ${route.id}`,
       async () => {
         const response = await jupiter.get('/quote', {
           params: {
@@ -212,12 +232,13 @@ function swapExit(route: RouteConfig): Cached<number> | undefined {
           },
         });
         const impact = Math.abs(Number(response.data?.priceImpactPct));
-        if (!Number.isFinite(impact)) throw new Error('no price impact in quote');
-        return impact;
+        const outSol = Number(response.data?.outAmount) / 10 ** TOKENS.SOL.decimals;
+        if (!Number.isFinite(impact) || !(outSol > 0)) throw new Error('no amount or price impact in quote');
+        return { outSol, impact };
       },
       { ttlMs: 30 * 60 * 1000, maxStaleMs: 3 * HOUR_MS, retryAfterMs: 5 * 60 * 1000 }
     );
-    exitImpacts.set(route.id, entry);
+    exitQuotes.set(route.id, entry);
   }
   return entry;
 }
@@ -245,15 +266,80 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
     };
   }
 
-  const impact = swapExit(route)?.peek();
-  if (impact === undefined || !route.receipt) return undefined;
+  const quote = swapExit(route)?.peek();
+  if (!quote || !route.receipt) return undefined;
+  const sale = `Selling ${EXIT_SAMPLE.toLocaleString('en-US')} ${route.receipt.symbol} for SOL`;
+  const small = (share: number) => (share < 0.0001 ? 'less than 0.01%' : formatPercent(share, 2));
+
+  // Without the token's pool value, price impact alone
+  if (!rate.tokenValue) {
+    return { ...base, points: points(quote.impact, 0.05, 0.01), detail: `${sale} moves the price ${small(quote.impact)}.`, source: 'Jupiter' };
+  }
+
+  // Against the pool value, so a depeg counts as well as price impact. (Jupiter's price impact is measured from its
+  // own reference price, so the loss isn't split into the two.)
+  const loss = 1 - quote.outSol / (EXIT_SAMPLE * rate.tokenValue);
+  const pool = route.source.kind === 'marinade' ? "Marinade's pool" : route.source.kind === 'infinity' ? 'the Infinity pool' : 'its stake pool';
   return {
     ...base,
-    points: points(impact, 0.05, 0.01),
-    detail: `Selling ${EXIT_SAMPLE.toLocaleString('en-US')} ${route.receipt.symbol} for SOL moves the price ${
-      impact < 0.0001 ? 'less than 0.01%' : formatPercent(impact, 2)
-    }.`,
-    source: 'Jupiter',
+    points: points(Math.max(0, loss), 0.05, 0.01),
+    detail: `${sale} returns ${loss <= 0 ? 'at least its value' : `${small(loss)} less than its value`} in ${pool}.`,
+    source: route.source.kind === 'marinade' ? "Jupiter, Marinade's API" : 'Jupiter, on chain',
+  };
+}
+
+// Validator spread for liquid staking: how many validators hold the pool's stake and the largest one's share.
+// Read from the stake pool's validator list on chain. Shown with the score, not counted in it.
+
+interface Spread {
+  validators: number;
+  largest: number; // share of the stake with the largest validator
+}
+
+const spreads = new Map<string, Cached<Spread>>();
+
+function validatorSpread(route: RouteConfig): Cached<Spread> | undefined {
+  const source = route.source;
+  if (route.category !== 'liquid-staking' || source.kind !== 'stake-pool') return undefined;
+
+  let entry = spreads.get(route.id);
+  if (!entry) {
+    entry = cached(
+      `validator spread for ${route.id}`,
+      async () => {
+        const poolAccount = await connection.getAccountInfo(new PublicKey(source.pool));
+        if (!poolAccount) throw new Error('stake pool account not found');
+        const pool = StakePoolLayout.decode(poolAccount.data);
+        const listAccount = await connection.getAccountInfo(pool.validatorList);
+        if (!listAccount) throw new Error('validator list not found');
+        const list = ValidatorListLayout.decode(listAccount.data) as {
+          validators: { activeStakeLamports: unknown; transientStakeLamports: unknown }[];
+        };
+        const stakes: number[] = list.validators
+          .map((v) => Number(v.activeStakeLamports) + Number(v.transientStakeLamports))
+          .filter((stake) => stake > 0);
+        const total = stakes.reduce((sum, stake) => sum + stake, 0);
+        if (total <= 0) throw new Error('no validator stake');
+        return { validators: stakes.length, largest: Math.max(...stakes) / total };
+      },
+      { ttlMs: 6 * HOUR_MS, maxStaleMs: 2 * DAY_MS, retryAfterMs: 15 * 60 * 1000 }
+    );
+    spreads.set(route.id, entry);
+  }
+  return entry;
+}
+
+function spreadCheck(route: RouteConfig): SafetyCheck | undefined {
+  const spread = validatorSpread(route)?.peek();
+  if (!spread) return undefined;
+  return {
+    key: 'validator-spread',
+    label: 'Validator spread',
+    detail:
+      spread.validators === 1
+        ? 'All the stake sits with one validator. If it goes down, rewards pause until it is back.'
+        : `${spread.validators} validators hold the stake. The largest holds ${formatPercent(spread.largest)}.`,
+    source: 'the stake pool on chain',
   };
 }
 
@@ -300,7 +386,8 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
     exit,
   ];
 
-  return { score: parts.reduce((sum, part) => sum + part.points, 0), parts };
+  const checks = [spreadCheck(route)].filter((check): check is SafetyCheck => !!check);
+  return { score: parts.reduce((sum, part) => sum + part.points, 0), parts, checks };
 }
 
 let refreshing: Promise<void> | null = null;
@@ -324,6 +411,7 @@ export function refreshSafetyInputs(): Promise<void> {
   refreshing = Promise.all([
     inSequence(routes, (route) => outflows(route)?.get()),
     inSequence(routes, (route) => swapExit(route)?.get()),
+    inSequence(routes, (route) => validatorSpread(route)?.get()),
   ])
     .then(() => undefined)
     .finally(() => {
