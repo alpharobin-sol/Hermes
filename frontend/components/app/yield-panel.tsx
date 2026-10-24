@@ -18,11 +18,6 @@ import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 
 const RATE_REFRESH_MS = 60 * 1000
 
-// "A", "A and B", "A, B and C"
-function listOf(items: string[]): string {
-  return items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`
-}
-
 // Round down so a quick amount never exceeds what the wallet can spend
 function floorTo(value: number, decimals: number): number {
   const factor = 10 ** decimals
@@ -127,7 +122,6 @@ export function YieldPanel() {
   )
   const visibleRoutes = view === "all" ? forToken : forToken.filter(isTopRated)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
-  const sources = listOf([...new Set(forToken.map((route) => route.source))])
 
   const numericAmount = useMemo(() => {
     const parsed = Number.parseFloat(amount.replace(/,/g, ""))
@@ -248,8 +242,6 @@ export function YieldPanel() {
         loading={loading}
         error={error}
         onRetry={() => setReloadKey((key) => key + 1)}
-        sources={sources}
-        updatedLabel={updatedLabel(forToken)}
         // On phones and tablets the card lists every route once an amount is typed, so this list steps aside
         className={numericAmount > 0 && !loading && !error ? "max-lg:hidden" : undefined}
       />

@@ -8,7 +8,6 @@ import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatUSD } from "@/lib/helpers/formatters"
 import { formatTokenAmount } from "./tokens"
 import {
-  TOP_RATED_MIN_SCORE,
   TOP_ROUTES,
   SafetyCell,
   SortToggle,
@@ -87,8 +86,6 @@ interface RateBoardProps {
   loading: boolean
   error: string | null
   onRetry: () => void
-  sources: string
-  updatedLabel: string | null
   className?: string
 }
 
@@ -110,8 +107,6 @@ export function RateBoard({
   loading,
   error,
   onRetry,
-  sources,
-  updatedLabel,
   className,
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
@@ -238,13 +233,6 @@ export function RateBoard({
           </div>
         )}
 
-        <p className="border-t border-hairline bg-plate px-3 py-3 text-xs leading-relaxed text-muted-foreground md:px-[18px]">
-          {sources ? `Rates from ${sources}${updatedLabel ? `, updated ${updatedLabel}` : ""}. ` : ""}
-          Returns assume today&apos;s APY holds and are not guaranteed. The Safety Score adds four parts from live data,
-          25 points each: size, track record, 30-day outflows and exit. Pick a route to see why it scores what it does.
-          It does not cover smart contract bugs or depegs. Risk level follows the score: low from 80, moderate from 60.
-          Top rated shows only routes scoring {TOP_RATED_MIN_SCORE} or more.
-        </p>
       </div>
     </div>
   )

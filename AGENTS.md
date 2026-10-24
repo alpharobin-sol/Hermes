@@ -121,7 +121,7 @@ Open decisions for the owner
 
 ## Shipped
 
-- 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone.
+- 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source, the Why panel explains the score and what it doesn't cover, and the footer says rates change and are not guaranteed.
 - 23 Oct 2026, app opens on the tool: the hero and the header's section links (Rates, How it works, Questions) are off the app and wait for the landing page. Phones get Settings in the header instead of a menu, and a toolbar over the deposit card with the network and a rate refresh.
 - 23 Oct 2026, site audit fixes: robots.txt, sitemap.xml and a canonical URL (www.hermesagg.xyz), headers that stop other sites framing Hermes, Vercel Web Analytics turned on (its script returned 404 while it was off), the Night wordmark loads up front, clean H1 and Connect text, and the empty Top rated state names how many routes "Show all" opens.
 - 23 Oct 2026, alerts guide: the bell asks for notifications straight from the tap, with a pop-up that shows what to tap and how to allow blocked or hidden prompts per browser.
