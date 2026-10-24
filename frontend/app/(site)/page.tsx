@@ -155,13 +155,13 @@ const ROADMAP = [
   },
   {
     status: "Live",
-    title: "Signals and moves",
-    body: "Phone alerts and moves are live: Hermes proposes a better top rated route and you sign. Next: alerts for your own positions, and Telegram.",
+    title: "Signals and Reroute",
+    body: "Phone alerts and Reroute are live: Hermes proposes a better top rated route and you sign. Next: alerts for your own positions, and Telegram.",
   },
   {
     status: "Later",
-    title: "Automation",
-    body: "An opt-in vault that rebalances and exits on signals. Only after a Hermes program, an outside security review and deposit caps.",
+    title: "Autopilot",
+    body: "An opt-in vault that reroutes and exits on signals for you. Only after a Hermes program, an outside security review and deposit caps.",
   },
 ]
 
@@ -206,7 +206,7 @@ const FAQS = [
   {
     question: "Can Hermes move my funds to a better route?",
     answer:
-      "Hermes proposes, you sign. In Portfolio, Hermes proposes a move under a position when a top rated route for the same token pays at least half a point more today. Tap Move to see the cost, what the new route earns in a year at today's rates and how long it takes to make the cost back. A staking token to a staking token is one swap. A move with lending in it is two steps you sign one after the other, and if the second fails the funds wait in your wallet.",
+      "Yes, with Reroute: Hermes proposes, you sign. In Portfolio, Hermes proposes a reroute under a position when a top rated route for the same token pays at least half a point more today. Tap Reroute to see the cost, what the new route earns in a year at today's rates and how long it takes to make the cost back. A staking token to a staking token is one swap. A reroute with lending in it is two steps you sign one after the other, and if the second fails the funds wait in your wallet.",
   },
   {
     question: "Can Hermes alert me?",

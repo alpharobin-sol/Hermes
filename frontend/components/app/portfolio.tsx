@@ -84,7 +84,7 @@ function signed(value: number, token: string): string {
   return `${value < 0 ? "−" : "+"}${formatTokenAmount(Math.abs(value), token)} ${token}`
 }
 
-// Hermes proposes a move when a top rated route for the same token pays at least half a point more today
+// Hermes proposes a reroute when a top rated route for the same token pays at least half a point more today
 const SUGGEST_GAIN = 0.005
 
 function suggestion(routes: YieldRoute[], position: Position): YieldRoute | null {
@@ -243,7 +243,7 @@ export function PortfolioSection({
                       {((better.apy - p.apy) * 100).toFixed(2)} points more. Top rated, Safety {better.safety?.score}.
                     </span>
                     <button type="button" onClick={() => openMove(p, better.id)} className="btn-frame h-8 shrink-0 px-3 text-[12px]">
-                      Move
+                      Reroute
                     </button>
                   </div>
                 )}
@@ -258,7 +258,7 @@ export function PortfolioSection({
                   >
                     Withdraw
                   </button>
-                  {/* With a proposal above, its Move button is the one */}
+                  {/* With a proposal above, its Reroute button is the one */}
                   {!better && (
                     <button
                       type="button"
@@ -266,7 +266,7 @@ export function PortfolioSection({
                       disabled={routes.length === 0}
                       className="btn-frame h-9 px-3.5 text-[13px]"
                     >
-                      Move
+                      Reroute
                     </button>
                   )}
                   <a

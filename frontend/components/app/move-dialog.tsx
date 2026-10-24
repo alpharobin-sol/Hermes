@@ -16,7 +16,7 @@ import { Notice, Row, base64ToBytes } from "./deposit-dialog"
 import { formatTokenAmount } from "./tokens"
 import type { Position } from "./portfolio"
 
-// Move a position into another route for the same token. Hermes proposes, the wallet signs. A staking token to a
+// Reroute: move a position into another route for the same token. Hermes proposes, the wallet signs. A staking token to a
 // staking token is one Jupiter swap. Anything with lending in it is two steps: the withdrawal, then the deposit of
 // what landed, each signed in the wallet. If step 2 fails, the funds wait in the wallet.
 
@@ -44,7 +44,7 @@ function amountText(value: string | number, digits = 6): string {
 function errorText(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
   if (/user rejected|rejected the request/i.test(message)) return "You rejected the transaction in your wallet."
-  return message || "Move failed"
+  return message || "Reroute failed"
 }
 
 const apyText = (apy: number) => `${(apy * 100).toFixed(2)}%`
@@ -252,7 +252,7 @@ export function MoveDialog({
         sig = await sendAndConfirm(built.transaction, built.lastValidBlockHeight, "confirming")
       } catch (err) {
         if (err instanceof Error && err.message === "failed on-chain") {
-          throw new Error(built.steps === 1 ? "The swap failed on-chain. Nothing moved." : "The withdrawal failed on-chain. Nothing left your position.")
+          throw new Error(built.steps === 1 ? "The swap failed on-chain. Nothing was rerouted." : "The withdrawal failed on-chain. Nothing left your position.")
         }
         throw err
       }
@@ -286,9 +286,9 @@ export function MoveDialog({
   const doneText =
     quote && target
       ? quote.kind === "swap"
-        ? `Move confirmed. About ${amountText(quote.outAmount)} ${quote.outputToken.symbol} is in your wallet.`
-        : `Move confirmed. ${amountText(finish?.quote.inAmount ?? quote.inAmount)} ${quote.token} went into ${target.name}.`
-      : "Move confirmed."
+        ? `Reroute confirmed. About ${amountText(quote.outAmount)} ${quote.outputToken.symbol} is in your wallet.`
+        : `Reroute confirmed. ${amountText(finish?.quote.inAmount ?? quote.inAmount)} ${quote.token} went into ${target.name}.`
+      : "Reroute confirmed."
 
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
@@ -299,7 +299,7 @@ export function MoveDialog({
               {position.name.charAt(0)}
             </span>
             <div className="flex min-w-0 flex-col gap-0.5">
-              <DialogTitle className="font-display text-[26px] font-bold leading-[1.1]">Move from {position.name}</DialogTitle>
+              <DialogTitle className="font-display text-[26px] font-bold leading-[1.1]">Reroute from {position.name}</DialogTitle>
               <DialogDescription className="text-[13px] text-muted-foreground">
                 {amountText(held, 6)} {unit} {lending ? `in ${position.name}` : "in your wallet"}
                 {position.apy !== null && ` · ${apyText(position.apy)} APY`}
@@ -312,8 +312,8 @@ export function MoveDialog({
               <Notice tone="plain">No other {position.token} route takes deposits in Hermes right now.</Notice>
             ) : (
               <div className="flex flex-col gap-1.5">
-                <span className="label-roman text-[10px]">Move to</span>
-                <div role="radiogroup" aria-label="Route to move to" className="flex flex-col gap-1">
+                <span className="label-roman text-[10px]">Reroute to</span>
+                <div role="radiogroup" aria-label="Route to reroute to" className="flex flex-col gap-1">
                   {shown.map((route) => {
                     const selected = route.id === to
                     return (
@@ -360,7 +360,7 @@ export function MoveDialog({
             <div className="flex flex-col gap-1.5 rounded-[2px] border border-border bg-background px-4 py-3.5 focus-within:border-ink">
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="move-amount" className="label-roman text-[10px]">
-                  You move
+                  Amount
                 </label>
                 <button
                   type="button"
@@ -397,7 +397,7 @@ export function MoveDialog({
                 <Row label="APY">
                   {apyText(quote.fromApy)} → <span className={cn(quote.toApy > quote.fromApy && "text-ink")}>{apyText(quote.toApy)}</span>
                 </Row>
-                <Row label="Cost to move" className={cn(costShare > 0.005 && "text-warning")}>
+                <Row label="Cost to reroute" className={cn(costShare > 0.005 && "text-warning")}>
                   {cost <= 0 ? "None" : `${formatPercent(costShare * 100)} (${formatTokenAmount(cost, quote.token)} ${quote.token})`}
                 </Row>
                 <Row label="A year at today's rates" className={cn(extra < 0 && "text-warning")}>
@@ -432,7 +432,7 @@ export function MoveDialog({
               </Notice>
             )}
             {status !== "success" && status !== "step2-ready" && (
-              <Notice tone="warning">Beta: moves are new and move real funds. Start with a small amount.</Notice>
+              <Notice tone="warning">Beta: rerouting is new and moves real funds. Start with a small amount.</Notice>
             )}
 
             {step1 && status !== "success" && (
@@ -502,8 +502,8 @@ export function MoveDialog({
                           : status === "error"
                             ? "Try again"
                             : target
-                              ? `Move to ${target.name}`
-                              : "Move"}
+                              ? `Reroute to ${target.name}`
+                              : "Reroute"}
               </button>
             )}
             <p className="-mt-1 text-center text-xs leading-relaxed text-muted-foreground">

@@ -13,7 +13,7 @@ const moveSchema = z
     all: z.boolean().optional(),
     userPublicKey: publicKeySchema,
   })
-  .refine((body) => body.all || body.amount !== undefined, 'Enter an amount to move');
+  .refine((body) => body.all || body.amount !== undefined, 'Enter an amount to reroute');
 
 const finishSchema = moveSchema.and(z.object({ signature: z.string().min(64).max(100) }));
 
@@ -27,7 +27,7 @@ router.post('/quote', async (req: Request, res: Response) => {
     const quote = await quoteMove(moveSchema.parse(req.body));
     return res.json({ success: true, data: quote });
   } catch (error) {
-    return handleError(res, error, 'quote move');
+    return handleError(res, error, 'quote reroute');
   }
 });
 
@@ -40,7 +40,7 @@ router.post('/build', async (req: Request, res: Response) => {
     const result = await buildMove(moveSchema.parse(req.body));
     return res.json({ success: true, data: result });
   } catch (error) {
-    return handleError(res, error, 'build move');
+    return handleError(res, error, 'build reroute');
   }
 });
 
@@ -53,7 +53,7 @@ router.post('/finish', async (req: Request, res: Response) => {
     const result = await finishMove(finishSchema.parse(req.body));
     return res.json({ success: true, data: result });
   } catch (error) {
-    return handleError(res, error, 'finish move');
+    return handleError(res, error, 'finish reroute');
   }
 });
 

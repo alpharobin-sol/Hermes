@@ -11,7 +11,7 @@ import depositService, { assertUserOnlySigner, DepositQuote, DepositTransaction 
 import { buildWithdrawal, quoteWithdrawal, WithdrawQuote } from './withdraw';
 
 /**
- * HERMES MOVES
+ * HERMES REROUTE (moves)
  * Moves a position from one route to another for the same token. Hermes proposes, the wallet signs. Mainnet.
  *
  * - Staking token to staking token: one Jupiter swap from one token to the other, one signature. Checked like a
@@ -84,14 +84,14 @@ const raw = (amount: string | number, decimals: number) => BigInt(new Decimal(am
 const ui = (amount: bigint | string | number, decimals: number) => new Decimal(amount.toString()).div(new Decimal(10).pow(decimals)).toFixed();
 
 function resolve(request: MoveRequest): { from: RouteConfig; to: RouteConfig; user: PublicKey } {
-  if (solanaNetwork() !== 'mainnet-beta') throw new DepositError('Moves run on mainnet only.', 422);
+  if (solanaNetwork() !== 'mainnet-beta') throw new DepositError('Rerouting runs on mainnet only.', 422);
   const from = getRoute(request.from);
   const to = getRoute(request.to);
-  if (!from || !depositStatus(from, 'mainnet-beta')) throw new DepositError(`Hermes can't move a position out of ${request.from}.`, 404);
+  if (!from || !depositStatus(from, 'mainnet-beta')) throw new DepositError(`Hermes can't reroute a position out of ${request.from}.`, 404);
   if (!to || !depositStatus(to, 'mainnet-beta')) throw new DepositError(`Hermes can't deposit into ${request.to}.`, 404);
-  if (from.id === to.id) throw new DepositError('Pick a different route to move to.');
-  if (from.token !== to.token) throw new DepositError(`${from.name} holds ${from.token} and ${to.name} takes ${to.token}. Moves stay in one token.`);
-  if (!request.all && !(Number(request.amount) > 0)) throw new DepositError('Enter an amount to move.');
+  if (from.id === to.id) throw new DepositError('Pick a different route to reroute to.');
+  if (from.token !== to.token) throw new DepositError(`${from.name} holds ${from.token} and ${to.name} takes ${to.token}. Rerouting stays in one token.`);
+  if (!request.all && !(Number(request.amount) > 0)) throw new DepositError('Enter an amount to reroute.');
   return { from, to, user: new PublicKey(request.userPublicKey) };
 }
 
@@ -113,7 +113,7 @@ async function tokenValue(route: RouteConfig): Promise<Decimal> {
 function checkCap(to: RouteConfig, valueIn: Decimal) {
   const cap = depositCap(to, 'mainnet-beta');
   if (cap !== null && valueIn.gt(cap)) {
-    throw new DepositError(`${to.name} is in beta: moves into it are limited to ${cap} ${to.token} each for now. Move a smaller amount.`, 422);
+    throw new DepositError(`${to.name} is in beta: reroutes into it are limited to ${cap} ${to.token} each for now. Reroute a smaller amount.`, 422);
   }
 }
 
@@ -302,7 +302,7 @@ export async function buildMove(request: MoveRequest): Promise<MoveTransaction> 
  */
 export async function finishMove(request: MoveRequest & { signature: string }): Promise<MoveFinish> {
   const { from, to, user } = resolve(request);
-  if (isSwap(from, to)) throw new DepositError('This move is a single swap. There is no second step.');
+  if (isSwap(from, to)) throw new DepositError('This reroute is a single swap. There is no second step.');
   const token = TOKENS[to.token];
   const { amount: received, blockTime } = await landed(request.signature, user, token);
   if (blockTime && Date.now() / 1000 - blockTime > FINISH_WINDOW_SECONDS) {

@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 export const metadata: Metadata = {
   title: "Docs · Hermes",
   description:
-    "How Hermes works: live Solana yield routes, the Safety Score, live quotes, what can go wrong, withdrawing, moving, your portfolio, alerts and fees.",
+    "How Hermes works: live Solana yield routes, the Safety Score, live quotes, what can go wrong, withdrawing, rerouting, your portfolio, alerts and fees.",
   alternates: { canonical: "/docs" },
 }
 
@@ -18,7 +18,7 @@ const SECTIONS = [
   { id: "quotes", title: "Live quotes" },
   { id: "risks", title: "What can go wrong" },
   { id: "withdrawing", title: "Withdrawing" },
-  { id: "moving", title: "Moving" },
+  { id: "rerouting", title: "Rerouting" },
   { id: "portfolio", title: "Portfolio" },
   { id: "alerts", title: "Alerts" },
   { id: "fees", title: "Fees and limits" },
@@ -219,33 +219,33 @@ export default function Docs() {
               </p>
             </Section>
 
-            <Section id="moving">
+            <Section id="rerouting">
               <p>
                 Open{" "}
                 <Link href="/portfolio" className={LINK}>
                   Portfolio
                 </Link>{" "}
-                and tap Move under a position. When a top rated route for the same token pays at least half a point more
-                today, Hermes proposes it right under the position. Pick the route, keep Max or type an amount, check the
-                numbers and sign.
+                and tap Reroute under a position to move it into another route for the same token. When a top rated
+                route pays at least half a point more today, Hermes proposes it right under the position. Pick the route,
+                keep Max or type an amount, check the numbers and sign.
               </p>
               <List>
                 <li>
                   A staking token to another staking token is one swap on Jupiter and one signature. Both tokens are
-                  counted at their value in their pools, so the cost of the move is plain.
+                  counted at their value in their pools, so the cost of the reroute is plain.
                 </li>
                 <li>
-                  A move with lending in it takes two steps: the withdrawal, then the deposit of what it paid into your
+                  A reroute with lending in it takes two steps: the withdrawal, then the deposit of what it paid into your
                   wallet. You sign each one. If the second step fails, the funds wait in your wallet, and you can try it
                   again or deposit them from the app.
                 </li>
                 <li>
-                  Before you sign, Hermes shows what the move costs, what the new route earns in a year at today&apos;s
+                  Before you sign, Hermes shows what the reroute costs, what the new route earns in a year at today&apos;s
                   rates next to the old one, and how many days the higher APY takes to make the cost back. Rates move,
                   so this is today&apos;s picture, not a promise.
                 </li>
               </List>
-              <p>Moves stay in one token, follow the same beta caps as deposits, and are in beta.</p>
+              <p>Rerouting stays in one token, follows the same beta caps as deposits, and is in beta.</p>
             </Section>
 
             <Section id="portfolio">
