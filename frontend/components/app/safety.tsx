@@ -68,11 +68,12 @@ export function ViewToggle({ value, onChange, compact = false }: { value: View; 
 // "Show all" opens the rest.
 export const TOP_ROUTES = 3
 
-export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId: string | null): YieldRoute[] {
+// The top routes in the current sort, plus the selected route and the best quote when they sit further down
+export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId: string | null, bestId?: string | null): YieldRoute[] {
   if (expanded || routes.length <= TOP_ROUTES) return routes
   const top = routes.slice(0, TOP_ROUTES)
-  const selected = routes.find((route) => route.id === selectedId)
-  return selected && !top.includes(selected) ? [...top, selected] : top
+  const extra = routes.filter((route) => !top.includes(route) && (route.id === selectedId || route.id === bestId))
+  return [...top, ...extra]
 }
 
 // A plain line on how the route can lose money and how to get out, from what Hermes knows about it now

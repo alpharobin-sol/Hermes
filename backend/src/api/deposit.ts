@@ -4,6 +4,8 @@ import axios from 'axios';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import depositService, { DepositError } from '../services/deposit';
+import { quoteRoutes } from '../services/route-quotes';
+import { InputToken, TOKENS } from '../registry/routes';
 
 const router = Router();
 
@@ -25,6 +27,12 @@ const quoteSchema = z.object({
   slippageBps: z.number().int().min(1).max(300).optional(),
   // Optional: lets lending quotes check the balance and include one-time account rent
   userPublicKey: publicKeySchema.optional(),
+});
+
+const quotesSchema = z.object({
+  token: z.string().refine((value) => value in TOKENS, 'Unsupported token'),
+  amount: amountSchema,
+  routeIds: z.array(z.string().min(1)).max(20).optional(),
 });
 
 const buildSchema = quoteSchema.extend({
@@ -68,6 +76,21 @@ router.post('/quote', async (req: Request, res: Response) => {
     });
   } catch (error) {
     return handleError(res, error, 'quote deposit');
+  }
+});
+
+/**
+ * POST /api/deposit/quotes
+ * Quote one amount across a token's routes at once: what lands, what it is worth, the entry cost.
+ * A route that can't quote returns its reason instead, so the others still show.
+ */
+router.post('/quotes', async (req: Request, res: Response) => {
+  try {
+    const request = quotesSchema.parse(req.body);
+    const data = await quoteRoutes(request.token as InputToken, String(request.amount), request.routeIds);
+    return res.json({ success: true, quotedAt: new Date().toISOString(), data });
+  } catch (error) {
+    return handleError(res, error, 'quote routes');
   }
 });
 

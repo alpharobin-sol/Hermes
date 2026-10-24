@@ -14,6 +14,7 @@ import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown, whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
+import { estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -36,9 +37,11 @@ interface DepositPanelProps {
   onConnect: () => void
   onReview: () => void
   className?: string
+  live: LiveQuotes
 }
 
 export function DepositPanel({
+  live,
   token,
   amount,
   onAmount,
@@ -55,7 +58,9 @@ export function DepositPanel({
   onReview,
   className,
 }: DepositPanelProps) {
-  const yearly = route ? numericAmount * route.apy : 0
+  // From the route's live quote once it is in, so the entry cost is taken off
+  const yearly = route ? estimatedYear(route, numericAmount, live.byRoute[route.id]) : 0
+  const line = route && numericAmount > 0 ? quoteLine(route, live.byRoute[route.id]) : null
   const borrowed = route ? borrowedPercent(route) : null
   const withdrawable = route ? withdrawablePercent(route) : null
   const overCap = isOverCap(route, numericAmount)
@@ -182,6 +187,7 @@ export function DepositPanel({
               )}
             </dl>
             <p className="-mt-1 text-[11px] text-muted-foreground">Rate and TVL from {route.source}.</p>
+            {line && <p className="-mt-2 text-[11px] text-foreground">{line}</p>}
           </div>
         )}
 

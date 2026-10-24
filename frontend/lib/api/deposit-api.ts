@@ -66,7 +66,21 @@ function assertSameNetwork(network: SolanaNetwork) {
   }
 }
 
+// One route's live quote for an amount: what lands, what it is worth right after (in the input token), the entry cost
+export interface RouteQuote {
+  routeId: string;
+  quote: DepositQuote | null;
+  value: string | null;
+  entryCost: number | null; // share of the amount lost on entry. Negative: the deposit is worth more than went in
+  error: string | null; // why this route can't quote right now
+}
+
 export class DepositAPI {
+  // Every route for a token at once, like a swap aggregator's quotes
+  static async quoteRoutes(token: string, amount: number, routeIds: string[], opts?: { signal?: AbortSignal }) {
+    return post<RouteQuote[]>("/api/deposit/quotes", { token, amount: String(amount), routeIds }, opts?.signal);
+  }
+
   static async getQuote(params: DepositParams, opts?: { signal?: AbortSignal }) {
     const quote = await post<DepositQuote>("/api/deposit/quote", { ...params, amount: String(params.amount) }, opts?.signal);
     assertSameNetwork(quote.network);

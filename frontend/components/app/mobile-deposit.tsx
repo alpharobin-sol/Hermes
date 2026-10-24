@@ -26,6 +26,7 @@ import {
 } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
+import { LiveBadge, bestQuoteRoute, estimatedYear, quoteLine, type LiveQuotes } from "./live-quotes"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -54,6 +55,7 @@ interface MobileDepositProps {
   updatedLabel: string | null
   onConnect: () => void
   onReview: () => void
+  live: LiveQuotes
 }
 
 function riskLabel(route: YieldRoute): string {
@@ -90,6 +92,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     updatedLabel,
     onConnect,
     onReview,
+    live,
   },
   ref
 ) {
@@ -167,6 +170,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
 
         {showRoutes ? (
           <RouteChoices
+            live={live}
             routes={routes}
             totalForToken={totalForToken}
             token={token.symbol}
@@ -311,8 +315,10 @@ function BestRoute({
   )
 }
 
-// With an amount: every route in sortBy order, with what each earns and how far behind the best APY it is
+// With an amount: every route in sortBy order with its live quote, what it leaves after a year once the entry
+// cost is taken off, and how far behind the best quote it is
 function RouteChoices({
+  live,
   routes,
   totalForToken,
   token,
@@ -338,17 +344,23 @@ function RouteChoices({
   onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
+  live: LiveQuotes
 }) {
-  const best = bestApyRoute(routes)
-  const listed = listedRoutes(routes, expanded, selectedId)
-  const bestYearly = best ? amount * best.apy : 0
+  // The best quote once quotes are in, the best APY until then
+  const quoted = bestQuoteRoute(routes, amount, live)
+  const best = quoted ?? bestApyRoute(routes)
+  const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
+  const bestYearly = best ? estimatedYear(best, amount, live.byRoute[best.id]) : 0
   const hidden = totalForToken - routes.length
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[4px] border border-gilt">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-frame bg-accent px-3 py-2.5">
-        <span className="label-roman text-foreground">
-          {routes.length} {routes.length === 1 ? "route" : "routes"}
+        <span className="flex items-center gap-2.5">
+          <span className="label-roman text-foreground">
+            {routes.length} {routes.length === 1 ? "route" : "routes"}
+          </span>
+          <LiveBadge live={live} />
         </span>
         <SortToggle value={sortBy} onChange={onSort} compact />
         <ViewToggle value={view} onChange={onView} compact />
@@ -366,7 +378,9 @@ function RouteChoices({
         {listed.map((r) => {
           const selected = r.id === selectedId
           const isBest = r === best
-          const yearly = amount * r.apy
+          const quote = live.byRoute[r.id]
+          const yearly = estimatedYear(r, amount, quote)
+          const line = quoteLine(r, quote)
           return (
             <button
               key={r.id}
@@ -388,15 +402,22 @@ function RouteChoices({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="font-display text-[19px] font-bold leading-[1.1]">{r.name}</span>
-                  {isBest && <span className={BEST_TAG}>Best APY</span>}
+                  {isBest && <span className={BEST_TAG}>{quoted ? "Best quote" : "Best APY"}</span>}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {r.receipt ?? CATEGORY_LABELS[r.category]} · {safetyText(r)}
                 </span>
+                {line ? (
+                  <span className={cn("text-[11px]", quote?.quote ? "text-foreground" : "text-warning")}>{line}</span>
+                ) : (
+                  r.deposit &&
+                  live.status === "loading" && <span aria-hidden="true" className="mt-0.5 h-3 w-36 animate-pulse rounded-[2px] bg-hairline" />
+                )}
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
                 <span className={cn("text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
-                  +{formatTokenAmount(yearly, r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
+                  {yearly < 0 ? "−" : "+"}
+                  {formatTokenAmount(Math.abs(yearly), r.token)} <span className="text-xs font-medium">{r.token} / yr</span>
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   {formatApy(r)} APY
