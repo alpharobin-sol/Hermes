@@ -130,6 +130,7 @@ Open decisions for the owner
 
 ## Shipped
 
+- 24 Oct 2026, Kamino deposit hardening: the Kamino transaction API response is checked before the user signs it. Only the programs a deposit uses are allowed, no top-level token transfer or approval, wrapped SOL moves only between the user's own accounts, and SOL leaving the wallet beyond the deposit is bounded. A compromised Kamino response can now at worst fail, never move funds the user did not intend. Matches the checks the Jupiter Lend builder already does.
 - 24 Oct 2026, search basics: live rates in the server HTML, a 1200x630 share image for X and Telegram, Open Graph and X card tags, JSON-LD, a keyword title and description, and Search Console codes from Vercel env.
 - 24 Oct 2026, API kept awake: an UptimeRobot monitor pings `/health` every 5 minutes. Checked: the API stayed up through 21 minutes with no other requests.
 - 24 Oct 2026: how it works and the FAQ are off the app and wait for the landing page. The app is the rate board and the deposit alone. The rate board's footnote (sources, returns caveat, score summary) is gone too: each route shows its rate source and the Why panel explains the score and what it doesn't cover. The footer is the logo, the copyright and the Telegram and X links, nothing else. Longer explanations go in articles and threads. Under the deposit button only the cap shows ("Max 10 SOL per deposit"): the Mainnet beta pill already says real funds.
