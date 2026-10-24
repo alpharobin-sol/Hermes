@@ -16,17 +16,17 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 
 ## Canonical
 
-- Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`)
+- Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`). The landing page is `/`, the app is `/app` (the routes), with Portfolio, Settings and Docs beside it. Next route groups: `frontend/app/(site)` for the landing page (its own header), `frontend/app/(app)` for the app (wallet, menu, alerts).
 - API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`). An UptimeRobot monitor (owner's account) pings `/health` every 5 minutes so it never sleeps. The free plan's 750 hours a month cover this one service awake all month.
 - Repo: `alpharobin-sol/Hermes`
 - Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
 - Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
-- Wallet history RPC: `SOLANA_HISTORY_RPC_URL` on Render, a Helius RPC URL with its key (owner adds it). The portfolio reads a wallet's history with it for what staking tokens and Jupiter Lend have earned. Without it the portfolio leaves those earnings out.
+- Wallet history RPC: `SOLANA_HISTORY_RPC_URL` on Render, a Helius RPC URL with its key (free plan, owner added it 24 Oct). The portfolio reads a wallet's history with it for what staking tokens and Jupiter Lend have earned. Without it the portfolio leaves those earnings out.
 - History database: Supabase Postgres (West US, Oregon), `DATABASE_URL` on Render, Session pooler string. Hermes's own rate history, every 10 minutes, 90 days. `/health` shows whether it records.
 - Route registry: `backend/src/registry/routes.ts`. The one place that lists routes, their rate source and their deposit status per network.
 - Integration gate: `INTEGRATIONS.md`
-- Search: the page renders live rates on the server (Next ISR, every 60 seconds; the browser refreshes on load), so crawlers and link previews see real routes and APYs. Title, description, Open Graph and X card tags and JSON-LD (Organization, WebSite, WebApplication) are in `frontend/app/layout.tsx`. Share image: `frontend/app/opengraph-image.jpg` and `twitter-image.jpg` (1200x630, made from the hero). Search Console codes go in `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION` on Vercel. "Hermes" alone is a crowded name, so the alternate names Hermes Agg and HermesAgg and the X account tie this Hermes to hermesagg.xyz.
+- Search: the landing page and `/app` render live rates on the server (Next ISR, every 60 seconds; the browser refreshes on load), so crawlers and link previews see real routes and APYs. Title, description, Open Graph and X card tags and JSON-LD (Organization, WebSite, WebApplication) are in `frontend/app/layout.tsx`. Share image: `frontend/app/opengraph-image.jpg` and `twitter-image.jpg` (1200x630, made from the hero). Search Console codes go in `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION` on Vercel. "Hermes" alone is a crowded name, so the alternate names Hermes Agg and HermesAgg and the X account tie this Hermes to hermesagg.xyz.
 
 ## Brand
 
@@ -34,7 +34,8 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Logo unchanged. Wordmarks, mark and favicons are in `frontend/public/brand`.
 - Type: Cormorant Garamond for headlines, Cinzel for rates and labels, Inter for sentences and amounts.
 - Color tokens live in `frontend/app/globals.css`. Teal marks only the main button, the best rate and the selected route. Gilt is for frames and ornament, never text.
-- The app opens on the tool, the way a swap app works (Titan is the reference): no hero and no section links in the header. The header holds the logo (home: the routes), the network (desktop), the wallet and a menu (≡), the way Titan's does. The menu opens a card under the header (≡ turns to ×) with three pages, each with an icon like Gloam's menu (gloam.trade, the owner's other app): Portfolio (`/portfolio`), Settings (`/settings`) and Docs (`/docs`). Each opens on its own, the current one highlighted. The wallet's name opens Portfolio, like Titan's profile. No settings gear. Portfolio and Settings are noindex and stay out of the sitemap: they are about one wallet or device. Docs is in the sitemap. The Aurora hero, the headline, section links, how it works and the FAQ belong to the landing page, coming next.
+- The app opens on the tool, the way a swap app works (Titan is the reference): no hero and no section links in the header. The header holds the logo (home: the routes), the network (desktop), the wallet and a menu (≡), the way Titan's does. The menu opens a card under the header (≡ turns to ×) with three pages, each with an icon like Gloam's menu (gloam.trade, the owner's other app): Portfolio (`/portfolio`), Settings (`/settings`) and Docs (`/docs`). Each opens on its own, the current one highlighted. The wallet's name opens Portfolio, like Titan's profile. No settings gear. Portfolio and Settings are noindex and stay out of the sitemap: they are about one wallet or device. Docs is in the sitemap. The app's logo goes to `/app`.
+- Landing page (`/`), like Gloam's (gloam.trade): its own header (logo, How it works, Safety Score, Questions, Docs, Open app; no wallet), the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill, Open app and How it works, the facts line), Top rated right now (live from the API on the server, up to three routes per token by Safety Score, the best APY in teal; left out if the API is down), how it works in three steps, the Safety Score's four parts and deductions, Questions (FAQ, with FAQPage structured data) and a closing Open app. Code: `frontend/app/(site)/page.tsx`, `frontend/components/site/site-header.tsx`.
 - Phones and tablets (under 1024px): one deposit card comes first. Amount and token, then the route, then one button. Before an amount the card shows the best route and the list below compares APYs. With an amount the card lists the routes in the current sort with their live quotes (below), and the list below steps aside. Each row, on phones and desktop, is the route name, its tag (Best quote), "Safety 98" and one number: the APY before an amount ("4.83% APY"), what it earns in a year after ("+0.0493 SOL / yr"). No rate line and no TVL or source column: the APY and TVL source is at the end of the Why panel, and what lands shows in the deposit dialog. The desktop deposit panel shows the route, its type and its APY, like the phone card, with no stats block. The token opens as a bottom sheet. A toolbar sits over the card there, the way Titan puts its mode chip over the swap card: the network pill (Mainnet beta) on the left, a refresh button for the rates on the right. On desktop the network shows in the header.
 - Hero art (landing page): `frontend/public/brand/aurora-banner.jpg`, the same image as the X banner, with no protocol marks. A protocol's medallion goes back on the X banner when its integration is announced.
 
@@ -66,14 +67,14 @@ From the vision deck, the Turbine tutor's feedback and the capstone research. Ti
 
 Landing page (next, owner's call on 24 Oct)
 
-- [ ] A landing page apart from the app, with what the app dropped on 23 Oct: the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill), the facts line (Non-custodial, No Hermes fee today, Beta: real funds, capped per deposit), section links (How it works, Questions), how it works and the FAQ. The FAQ covers the risks behind every route (a token trading below its value, a contract bug, a reserve fully borrowed, a protocol hack) and points to the Safety Score and alerts: the app shows that only in the deposit dialog now. The removed code is in git: the hero in `frontend/app/page.tsx` at commit 8c8a3ea, how it works and the FAQ in the same file at 1f5322b.
+- [x] A landing page apart from the app (24 Oct): landing at `/`, the app at `/app`, like Gloam. Built from what the app dropped on 23 Oct: the Aurora hero (banner in an arch, the headline "Compare Solana yields. Deposit from your own wallet.", the Mainnet beta pill), the facts line (Non-custodial, No Hermes fee today, Beta: real funds, capped per deposit), section links (How it works, Questions), how it works and the FAQ. The FAQ covers the risks behind every route (a token trading below its value, a contract bug, a reserve fully borrowed, a protocol hack) and points to the Safety Score and alerts: the app shows that only in the deposit dialog now. The removed code is in git: the hero in `frontend/app/page.tsx` at commit 8c8a3ea, how it works and the FAQ in the same file at 1f5322b.
 
 Search and growth
 
 - [x] Crawlable rates, share image, structured data, search tags
 - [x] Google Search Console and Bing Webmaster: hermesagg.xyz verified, sitemap submitted (owner, 24 Oct)
 - [x] Docs (`/docs`, 24 Oct): how Hermes works in plain words. What Hermes is, quick start, routes, the Safety Score, live quotes, what can go wrong, withdrawing, portfolio, alerts, fees and limits, contact. Risk explanations live here and in the deposit dialog, not on the cards. Keep it current when anything it describes changes. Code: `frontend/app/docs/page.tsx`.
-- [ ] Landing page copy and its FAQ with FAQPage structured data
+- [x] Landing page copy and its FAQ with FAQPage structured data (24 Oct)
 - [ ] A page per route (for example "JitoSOL APY today") with its live rate, Safety Score and what can go wrong: Hermes's own data for searches no one else answers live (owner's call)
 - [ ] Links in: Solana ecosystem directories, X threads and articles that link to hermesagg.xyz (owner)
 
@@ -104,7 +105,7 @@ Smart router
 
 Portfolio and signals
 
-- [x] Portfolio: what the connected wallet holds in each route and what it has earned, its own page from the menu (24 Oct). Earned for staking tokens and Jupiter Lend needs `SOLANA_HISTORY_RPC_URL` on Render (owner: a free Helius key).
+- [x] Portfolio: what the connected wallet holds in each route and what it has earned, its own page from the menu (24 Oct). Earned for staking tokens and Jupiter Lend reads wallet history through `SOLANA_HISTORY_RPC_URL` (Helius, added 24 Oct).
 - [x] In-app withdrawals, beta (24 Oct): staking tokens back to SOL on Jupiter, Kamino Lend and Jupiter Lend from Portfolio. Owner withdrawal per route still to do, like the owner deposits.
 - [x] Alerts: a rate drop, a better route, a reserve nearly all borrowed, a score drop (web push to phones, bell per route)
 - [ ] Alerts by Telegram, and alerts for a connected wallet's positions
@@ -133,13 +134,14 @@ Open decisions for the owner
 - Secrets stay server-side (`JUPITER_API_KEY` on Render).
 - Show where every number comes from. Each part of the Safety Score shows its points, what it measured and its source.
 - If it does not serve comparing Solana yields, depositing from your own wallet, or (later) opt-in automation, it waits.
-- The app is the routes (the rate board with its deposit panel, `/`), plus Portfolio, Settings and Docs from the menu. Nothing else. Explaining Hermes is the job of Docs and the landing page, never the cards. Rates show before an amount is typed.
+- The app is the routes (the rate board with its deposit panel, `/app`), plus Portfolio, Settings and Docs from the menu. Nothing else. Explaining Hermes is the job of the landing page (`/`) and Docs, never the cards. Rates show before an amount is typed.
 - Show only routes Hermes can deposit into. A view-only route stays in the registry, hidden, until its deposit passes `INTEGRATIONS.md` (`SHOW_VIEW_ONLY_ROUTES=true` on Render shows them again).
 - Writing: plain language, short sentences, no hype.
 - Commit to a branch and merge through a PR. Run `npm run build` in `backend` and `frontend` before pushing.
 
 ## Shipped
 
+- 24 Oct 2026, landing page: hermesagg.xyz opens on a landing page (the Aurora hero, Top rated right now from live rates, how it works, the Safety Score, plain answers with FAQPage data) and the app moves to /app, like Gloam. Home Screen launches and alert taps open /app. The sitemap lists /, /app and /docs.
 - 24 Oct 2026, in-app withdrawals (beta): Withdraw under each Portfolio position. Staking tokens swap back to SOL with the exit cost shown, Kamino Lend and Jupiter Lend pay the token back, Max empties the position (a Kamino exit returns the account rent). Simulated before signing, checked like the deposits.
 - 24 Oct 2026, portfolio, docs and a Titan-style menu: a menu (≡) replaces the settings gear and lists Portfolio, Settings and Docs, each its own page with an icon (Gloam's style). The wallet's name opens Portfolio, which shows the wallet's own SOL, USDC and USDT too. Docs explains Hermes in plain words. The portfolio shows the total in USD and SOL, each position with its Safety Score, its value and what it has earned: Kamino from its interest record, staking tokens and Jupiter Lend from the wallet's history (value now minus what was paid in).
 - 24 Oct 2026, simpler deposit card and panel: the "What can go wrong" line and the one-time rent note are off the phone card and the desktop panel. Both show in the deposit dialog before signing. The landing page FAQ will cover DeFi risks.

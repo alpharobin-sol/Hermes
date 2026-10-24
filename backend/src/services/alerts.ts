@@ -80,7 +80,7 @@ async function send(subscription: PushSubscriptionInput, notice: Notice): Promis
   const keys = await vapidKeys();
   if (!keys) return 'failed';
   try {
-    await webpush.sendNotification(subscription, JSON.stringify({ ...notice, url: SITE_URL }), {
+    await webpush.sendNotification(subscription, JSON.stringify({ ...notice, url: `${SITE_URL}/app` }), {
       TTL: 12 * 60 * 60,
       vapidDetails: { subject: SITE_URL, publicKey: keys.publicKey, privateKey: keys.privateKey },
     });

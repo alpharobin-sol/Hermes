@@ -95,7 +95,7 @@ export default function Docs() {
               </ol>
               <p>Hermes is in beta on mainnet. Deposits use real funds, so start small.</p>
               <p>
-                <Link href="/" className={LINK}>
+                <Link href="/app" className={LINK}>
                   Open the routes
                 </Link>
               </p>

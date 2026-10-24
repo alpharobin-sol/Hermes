@@ -17,7 +17,8 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 // nearly all borrowed or held back (risk level low). "All routes" shows the rest.
 export type View = "top-rated" | "all"
 
-export const TOP_RATED_MIN_SCORE = 80
+import { TOP_RATED_MIN_SCORE } from "@/lib/top-rated"
+export { TOP_RATED_MIN_SCORE, isTopRated } from "@/lib/top-rated"
 
 // The way out of an empty Top rated view, with the count so it's clear routes exist
 export function showAllLabel(count: number, token: string): string {
@@ -28,10 +29,6 @@ const VIEW_OPTIONS: { value: View; label: string }[] = [
   { value: "top-rated", label: "Top rated" },
   { value: "all", label: "All routes" },
 ]
-
-export function isTopRated(route: YieldRoute): boolean {
-  return !!route.safety && route.safety.score >= TOP_RATED_MIN_SCORE && route.risk === "low"
-}
 
 export function ViewToggle({ value, onChange, compact = false }: { value: View; onChange: (view: View) => void; compact?: boolean }) {
   return (

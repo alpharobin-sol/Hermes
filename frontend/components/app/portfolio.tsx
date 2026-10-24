@@ -168,7 +168,7 @@ export function PortfolioSection({
       {portfolio && positions.length === 0 && portfolio.unavailable.length === 0 && (
         <p className="rounded-[2px] border border-hairline bg-background px-3 py-4 text-center text-[13px] text-muted-foreground">
           No Hermes routes in this wallet yet.{" "}
-          <Link href="/" className="font-medium text-ink underline underline-offset-2">
+          <Link href="/app" className="font-medium text-ink underline underline-offset-2">
             Find a route
           </Link>
         </p>
