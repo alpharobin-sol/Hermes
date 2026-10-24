@@ -5,8 +5,6 @@ import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import "./styles/wallet-adapter.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import AppLayout from "@/components/app/layout/app-layout"
-import { AlertsProvider } from "@/components/app/alerts"
 import { SITE_URL } from "@/lib/site"
 
 // Cormorant Garamond for headlines, Cinzel (Roman capitals) for rates and labels, Inter for sentences
@@ -95,7 +93,7 @@ const STRUCTURED_DATA = {
     {
       "@type": "WebApplication",
       name: "Hermes",
-      url: SITE_URL,
+      url: `${SITE_URL}/app`,
       description: DESCRIPTION,
       applicationCategory: "FinanceApplication",
       operatingSystem: "Web",
@@ -118,9 +116,8 @@ export default function RootLayout({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }} />
         {/* Aurora is the default. Night is a choice in Settings, not taken from the system setting. */}
         <ThemeProvider defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-          <AlertsProvider>
-            <AppLayout>{children}</AppLayout>
-          </AlertsProvider>
+          {/* The landing page (site) and the app (app) each bring their own header and footer */}
+          {children}
         </ThemeProvider>
         <Analytics />
       </body>

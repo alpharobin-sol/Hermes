@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       icon: "/brand/icon-192.png",
       badge: "/brand/favicon-32.png",
-      data: { url: data.url || "/" },
+      data: { url: data.url || "/app" },
     })
   )
 })
@@ -20,7 +20,7 @@ self.addEventListener("push", (event) => {
 // Open Hermes, or focus it if it is already open
 self.addEventListener("notificationclick", (event) => {
   event.notification.close()
-  const url = (event.notification.data && event.notification.data.url) || "/"
+  const url = (event.notification.data && event.notification.data.url) || "/app"
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       for (const client of windows) {

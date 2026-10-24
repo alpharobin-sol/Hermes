@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Hermes",
     short_name: "Hermes",
     description: "Compare live Solana yields and deposit from your own wallet.",
-    start_url: "/",
+    start_url: "/app",
     display: "standalone",
     background_color: "#f6ead0",
     theme_color: "#f6ead0",
