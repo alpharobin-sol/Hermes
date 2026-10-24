@@ -9,7 +9,7 @@ import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { SOL_FEE_RESERVE, useTokenBalances } from "@/hooks/use-token-balances"
 import { useLoading } from "./layout/loading-context"
 import { NetworkPill } from "./layout/network-pill"
-import { useLiveQuotes } from "./live-quotes"
+import { useLiveQuotes, type Horizon } from "./live-quotes"
 import { RateBoard } from "./rate-board"
 import { DepositPanel, type BalanceIssue } from "./deposit-panel"
 import { DepositDialog } from "./deposit-dialog"
@@ -53,6 +53,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   const [expanded, setExpanded] = useState(false)
   // Routes lead with the Safety Score. APY is one tap away.
   const [sortBy, setSortBy] = useState<SortBy>("safety")
+  // How long the money stays in: what the routes' figures and the best quote count over
+  const [horizon, setHorizon] = useState<Horizon>("1y")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const mobileCardRef = useRef<HTMLElement>(null)
@@ -235,6 +237,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         onExpandedChange={setExpanded}
         sortBy={sortBy}
         onSort={setSortBy}
+        horizon={horizon}
+        onHorizon={setHorizon}
         route={loading || error ? null : selectedRoute}
         onSelectRoute={setSelectedId}
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
@@ -253,6 +257,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         onExpandedChange={setExpanded}
         sortBy={sortBy}
         onSort={setSortBy}
+        horizon={horizon}
+        onHorizon={setHorizon}
         routes={visibleRoutes}
         totalForToken={forToken.length}
         selectedId={selectedRoute?.id ?? null}
@@ -289,6 +295,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
           onOpenChange={setReviewOpen}
           route={selectedRoute}
           amount={numericAmount}
+          liveQuote={live.byRoute[selectedRoute.id]}
           onDeposited={refreshBalances}
         />
       )}

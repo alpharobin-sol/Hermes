@@ -4,6 +4,7 @@ import { ROUTES, Category, DepositStatus, InputToken, depositCap, depositStatus 
 import { getRate, refreshRates, SOURCE_LABELS } from './rates';
 import { refreshSafetyInputs, safetyScore, SafetyScore } from './safety';
 import { recordSnapshots, Snapshot } from './history';
+import { exitCost, refreshExitCosts } from './exit-cost';
 
 export type RiskTier = 'low' | 'moderate' | 'high';
 
@@ -25,6 +26,7 @@ export interface YieldRoute {
   withdrawable: number | null; // lending only: share of the supply that can be withdrawn right now
   deposit: DepositStatus | null; // in-app deposit on the network the API runs on
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
+  exitCost: number | null; // share of value lost leaving today: 0 for lending, a swap back to SOL for liquid staking
 }
 
 // A lending reserve this borrowed or held back may not have liquidity for withdrawals
@@ -98,6 +100,7 @@ export async function getYieldRoutes(
       withdrawable: rate.withdrawable ?? null,
       deposit: depositStatus(route, network),
       depositCap: depositCap(route, network),
+      exitCost: exitCost(route, rate),
     };
   });
 
@@ -134,6 +137,8 @@ export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout
     refreshRates()
       // Snapshots after the score inputs, so each one carries the route's Safety Score
       .then(() => refreshSafetyInputs())
+      // Exit quotes after the score's, so Jupiter calls stay spread out
+      .then(() => refreshExitCosts())
       .then(() => recordSnapshots(collectSnapshots))
       .catch((error) => logger.error('Rate refresh failed:', error));
   refresh();

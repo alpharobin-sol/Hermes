@@ -6,7 +6,7 @@ import { AlertCircle, RotateCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
 import { formatTokenAmount } from "./tokens"
-import { LiveBadge, bestQuoteRoute, estimatedYear, type LiveQuotes } from "./live-quotes"
+import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
 import type { RouteQuote } from "@/lib/api/deposit-api"
 import {
   TOP_ROUTES,
@@ -78,6 +78,8 @@ interface RateBoardProps {
   onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
+  horizon: Horizon // what the figures count over once an amount is typed
+  onHorizon: (horizon: Horizon) => void
   routes: YieldRoute[] // for the token, in the view, in sortBy order
   totalForToken: number
   selectedId: string | null
@@ -100,6 +102,8 @@ export function RateBoard({
   onExpandedChange,
   sortBy,
   onSort,
+  horizon,
+  onHorizon,
   routes,
   totalForToken,
   selectedId,
@@ -112,7 +116,7 @@ export function RateBoard({
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
   // The best quote for the amount once quotes are in, the best APY until then
-  const quoted = amount > 0 ? bestQuoteRoute(routes, amount, live) : null
+  const quoted = amount > 0 ? bestQuoteRoute(routes, amount, live, horizon) : null
   const best = quoted ?? bestApyRoute(routes)
   const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
 
@@ -150,7 +154,12 @@ export function RateBoard({
           </div>
 
           <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto">
-            {amount > 0 && <LiveBadge live={live} />}
+            {amount > 0 && (
+              <span className="flex items-center gap-3">
+                <LiveBadge live={live} />
+                <HorizonToggle value={horizon} onChange={onHorizon} />
+              </span>
+            )}
             <span className="flex items-center gap-2">
               <span className="label-roman whitespace-nowrap text-xs">Sort</span>
               <SortToggle value={sortBy} onChange={onSort} />
@@ -206,6 +215,7 @@ export function RateBoard({
                 quote={live.byRoute[route.id]}
                 selected={route.id === selectedId}
                 amount={amount}
+                horizon={horizon}
                 onSelect={() => onSelect(route.id)}
               />
             ))}
@@ -242,6 +252,7 @@ function RouteRow({
   quote,
   selected,
   amount,
+  horizon,
   onSelect,
 }: {
   route: YieldRoute
@@ -250,11 +261,12 @@ function RouteRow({
   quote?: RouteQuote
   selected: boolean
   amount: number
+  horizon: Horizon
   onSelect: () => void
 }) {
-  // What the route leaves after a year once the entry cost is taken off, from its live quote
-  const yearly = estimatedYear(route, amount, quote)
-  // A route that can't take this amount right now (over a cap, price impact) says so instead of a yearly figure
+  // What the route leaves over the horizon once entry and exit costs are taken off, from its live quote
+  const earned = estimatedReturn(route, amount, quote, horizon)
+  // A route that can't take this amount right now (over a cap, price impact) says so instead of a figure
   const noQuote = amount > 0 && !!quote && !quote.quote
 
   return (
@@ -293,8 +305,10 @@ function RouteRow({
           </span>
         ) : (
           <span className={cn("shrink-0 text-base font-semibold", best ? "text-ink" : "text-foreground")}>
-            {yearly < 0 ? "−" : "+"}
-            {formatTokenAmount(Math.abs(yearly), route.token)} <span className="text-xs font-medium">{route.token} / yr</span>
+            {formatEarned(earned, route.token)}{" "}
+            <span className="text-xs font-medium">
+              {route.token} {horizonSuffix(horizon)}
+            </span>
           </span>
         )}
 
