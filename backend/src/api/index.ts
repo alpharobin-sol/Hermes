@@ -10,11 +10,15 @@ import namesRouter from './names';
 import portfolioRouter from './portfolio';
 import withdrawRouter from './withdraw';
 import moveRouter from './move';
+import { apiLimiter, expensiveGlobalLimiter, expensivePerClientLimiter, EXPENSIVE_PATHS } from './rate-limit';
 import { historyEnabled, lastSnapshot } from '../services/history';
 
 export function createApp(): Express {
   const app = express();
-  
+
+  // Cloudflare then Render sit in front, so the client IP comes from the forwarded headers, not the socket
+  app.set('trust proxy', 1);
+
   // Security middleware
   app.use(helmet());
   
@@ -53,6 +57,11 @@ export function createApp(): Express {
     });
   });
   
+  // Rate limits: every /api endpoint per client, and a tighter per-client plus a global cap on the ones that
+  // read the chain or call Jupiter. /health is above this line, so UptimeRobot's pings are never limited.
+  app.use('/api', apiLimiter);
+  app.use(EXPENSIVE_PATHS, expensiveGlobalLimiter, expensivePerClientLimiter);
+
   // API routes
   app.use('/api/yields', yieldsRouter);
   app.use('/api/deposit', depositRouter);
