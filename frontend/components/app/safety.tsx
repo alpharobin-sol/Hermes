@@ -113,7 +113,6 @@ export function safetyText(route: YieldRoute): string {
   return route.safety ? `Safety ${route.safety.score}` : "Not scored"
 }
 
-
 // Sort toggle for route lists
 export function SortToggle({ value, onChange, compact = false }: { value: SortBy; onChange: (sort: SortBy) => void; compact?: boolean }) {
   return (
