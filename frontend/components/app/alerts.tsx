@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
-import { Bell, BellRing, Check, Loader2, Send } from "lucide-react"
+import { Bell, BellRing, Check, Loader2, Mail } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
@@ -16,27 +16,29 @@ import {
   platform,
   readFollowing,
   readHeld,
-  readTelegramToken,
+  alertChannels,
+  confirmEmailLink,
+  emailStatus,
+  forgetEmail,
+  readEmail,
   readWatched,
   registration,
   saveAlerts,
-  startTelegramLink,
-  telegramLinked,
+  startEmailAlerts,
   turnOffAlerts,
   turnOffPush,
-  unlinkTelegram as unlinkTelegramChat,
+  unsubscribeEmail,
   watchRoutes,
   writeFollowing,
   type AlertLists,
   type AlertsSupport,
   type Platform,
-  type TelegramLink,
 } from "@/lib/alerts"
 
 // Alerts: the routes this device watches and the routes its wallet holds, and the two ways they arrive: this
-// browser's notifications and Telegram, through Herald. Shared by the route bells, Portfolio and Settings.
-// Turning alerts on for the first time goes through a guide: what Hermes sends, then the browser's prompt, the
-// steps to allow notifications when the browser hides or blocks the prompt, or Telegram instead.
+// browser's notifications, or email. Shared by the route bells, Portfolio and Settings.
+// Turning alerts on for the first time goes through a guide: phone or email, then the browser's prompt and the
+// steps to allow notifications when the browser hides or blocks it, or an address and the link Hermes emails it.
 
 type GuideStep =
   | "ask" // what alerts cover, before the browser's prompt
@@ -49,8 +51,9 @@ type GuideStep =
   | "failed"
   | "home-screen"
   | "unsupported"
-  | "telegram" // open Herald in Telegram with this device's link
-  | "telegram-on"
+  | "email" // type an address
+  | "email-sent" // waiting for the link in the email to be opened
+  | "email-on"
 
 interface Guide {
   step: GuideStep
@@ -61,9 +64,10 @@ interface Guide {
 
 interface AlertsState {
   support: AlertsSupport
-  enabled: boolean // alerts reach this device, its Telegram, or both
+  enabled: boolean // alerts reach this device, its email, or both
   push: boolean // this browser's notifications are on
-  telegram: boolean // a Telegram chat is linked
+  emailOffered: boolean // Hermes can send email right now
+  email: { address: string; confirmed: boolean } | null // this device's address
   watched: string[]
   held: string[]
   following: boolean // the held list follows the wallet's positions
@@ -76,29 +80,31 @@ interface AlertsState {
   addHeld: (routeId: string) => void
   turnOff: () => Promise<void>
   turnOffPush: () => Promise<void>
-  unlinkTelegram: () => Promise<void>
-  showGuide: (step: "ask" | "blocked" | "home-screen" | "unsupported" | "telegram") => void
+  stopEmail: () => Promise<void>
+  refreshEmail: () => Promise<void>
+  showGuide: (step: "ask" | "blocked" | "home-screen" | "unsupported" | "email") => void
 }
 
 const AlertsContext = createContext<AlertsState | null>(null)
 
 const FALLBACK_ERROR = "Hermes could not update alerts. Try again shortly."
-const TELEGRAM_POLL_MS = 2500
+const EMAIL_POLL_MS = 3000
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id))
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [support, setSupport] = useState<AlertsSupport>("unsupported")
   const [push, setPush] = useState(false)
-  const [telegram, setTelegram] = useState(false)
+  const [emailOffered, setEmailOffered] = useState(false)
+  const [email, setEmail] = useState<{ address: string; token: string; confirmed: boolean } | null>(null)
   const [watched, setWatched] = useState<string[]>([])
   const [held, setHeld] = useState<string[]>([])
   const [following, setFollowing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [guide, setGuide] = useState<Guide | null>(null)
-  const [telegramLink, setTelegramLink] = useState<TelegramLink | null>(null)
-  const enabled = push || telegram
+  const emailOn = !!email?.confirmed
+  const enabled = push || emailOn
 
   // The latest values, for callbacks that outlive a render (a prompt answered later, Portfolio's sync)
   const latest = useRef({ watched, held, following, enabled })
@@ -109,22 +115,40 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const guideId = useRef(0)
   const subscribingFor = useRef(-1)
 
+  // This device's address and whether it's confirmed. An address Hermes no longer has is forgotten.
+  const refreshEmail = useCallback(async () => {
+    const saved = readEmail()
+    if (!saved) return setEmail(null)
+    const status = await emailStatus(saved.token)
+    if (status === "gone") {
+      forgetEmail()
+      return setEmail(null)
+    }
+    // When Hermes can't say, the address counts as it was
+    setEmail((current) => ({ ...saved, confirmed: status ? status === "confirmed" : current?.token === saved.token && current.confirmed }))
+    if (status === "confirmed") {
+      setWatched(readWatched())
+      setHeld(readHeld())
+    }
+  }, [])
+
   useEffect(() => {
     const found = alertsSupport()
     setSupport(found)
     setFollowing(readFollowing())
-    const token = readTelegramToken()
     // Keep the worker registered so the browser can show alerts while Hermes is closed
     if (found === "supported") registration().catch(() => {})
+    alertChannels().then((channels) => setEmailOffered(channels.email))
+    const saved = readEmail()
     Promise.all([
       found === "supported" ? currentSubscription().catch(() => null) : Promise.resolve(null),
-      token ? telegramLinked(token) : Promise.resolve(false),
-    ]).then(([subscription, linked]) => {
-      // When Hermes can't say, a kept link counts as linked
-      const onTelegram = linked ?? !!token
+      saved ? emailStatus(saved.token) : Promise.resolve(null),
+    ]).then(([subscription, status]) => {
+      if (saved && status === "gone") forgetEmail()
+      const address = saved && status !== "gone" ? { ...saved, confirmed: status === "confirmed" } : null
       setPush(!!subscription)
-      setTelegram(onTelegram)
-      if (subscription || onTelegram) {
+      setEmail(address)
+      if (subscription || address?.confirmed) {
         setWatched(readWatched())
         setHeld(readHeld())
       }
@@ -144,7 +168,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const closeGuide = useCallback(() => {
     guideId.current += 1
     setGuide(null)
-    setTelegramLink(null)
   }, [])
 
   // The lists once the guide's route or positions are added
@@ -238,43 +261,62 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [guideStep, guideRoute, guidePositions, subscribeTo])
 
-  // Telegram instead: make this device's link with the guide's lists, for the user to open in Telegram
-  const toTelegram = useCallback(() => {
+  // Email instead: the address form
+  const toEmail = useCallback(() => {
     if (!guide) return
-    const id = guideId.current
-    const { route, positions } = guide
-    show(id, "telegram", route, positions)
-    setTelegramLink(null)
-    startTelegramLink(pendingLists(route, positions))
-      .then((link) => {
-        if (id === guideId.current) setTelegramLink(link)
-      })
-      .catch((err) => show(id, "telegram", route, positions, err instanceof Error ? err.message : FALLBACK_ERROR))
-  }, [guide, show, pendingLists])
+    show(guideId.current, "email", guide.route, guide.positions)
+  }, [guide, show])
 
-  // Wait for Herald: the guide carries on once the link is opened in Telegram
-  const linkToken = guideStep === "telegram" ? telegramLink?.token : undefined
+  // Send the confirmation link with the guide's lists. An address already confirmed carries on at once.
+  const sendEmail = useCallback(
+    async (address: string) => {
+      if (!guide) return
+      const id = guideId.current
+      const { route, positions } = guide
+      const lists = pendingLists(route, positions)
+      try {
+        const started = await startEmailAlerts(address, lists)
+        setEmail({ address: address.trim(), token: started.token, confirmed: started.confirmed })
+        if (started.confirmed) {
+          if (positions) {
+            writeFollowing(true)
+            setFollowing(true)
+          }
+          const saved = await saveAlerts(lists)
+          setWatched(saved.routes)
+          setHeld(saved.held)
+        }
+        show(id, started.confirmed ? "email-on" : "email-sent", route, positions)
+      } catch (err) {
+        show(id, guide.step === "email-sent" ? "email-sent" : "email", route, positions, err instanceof Error ? err.message : FALLBACK_ERROR)
+      }
+    },
+    [guide, pendingLists, show]
+  )
+
+  // Wait for the link in the email: the guide carries on once it's opened, here or on another device
+  const waitingToken = guideStep === "email-sent" ? email?.token : undefined
   useEffect(() => {
-    if (!linkToken) return
+    if (!waitingToken) return
     const id = guideId.current
     let done = false
     const check = async () => {
       if (done || document.hidden) return
-      if ((await telegramLinked(linkToken)) !== true || done || id !== guideId.current) return
+      if ((await emailStatus(waitingToken)) !== "confirmed" || done || id !== guideId.current) return
       done = true
       const lists = pendingLists(guideRoute, guidePositions)
-      setTelegram(true)
+      setEmail((current) => (current ? { ...current, confirmed: true } : current))
       if (guidePositions) {
         writeFollowing(true)
         setFollowing(true)
       }
-      // Saved with the link already. This keeps the browser's copy and any push subscription the same.
+      // Saved with the address already. This keeps the browser's copy and any push subscription the same.
       await saveAlerts(lists).catch(() => {})
       setWatched(lists.routes)
       setHeld(lists.held)
-      show(id, "telegram-on", guideRoute, guidePositions)
+      show(id, "email-on", guideRoute, guidePositions)
     }
-    const timer = setInterval(check, TELEGRAM_POLL_MS)
+    const timer = setInterval(check, EMAIL_POLL_MS)
     window.addEventListener("focus", check)
     document.addEventListener("visibilitychange", check)
     return () => {
@@ -283,7 +325,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", check)
       document.removeEventListener("visibilitychange", check)
     }
-  }, [linkToken, guideRoute, guidePositions, pendingLists, show])
+  }, [waitingToken, guideRoute, guidePositions, pendingLists, show])
 
   // A first route or the positions with no channel yet: the guide, starting where this browser stands
   const startGuide = useCallback(
@@ -301,22 +343,22 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       const on = watched.includes(route.id)
       if (on) return save({ routes: watched.filter((id) => id !== route.id), held })
       if (!enabled) return startGuide(route, null)
-      // Notifications were blocked since, and there's no Telegram to fall back on
-      if (push && !telegram && notificationPermission() !== "granted") return startGuide(route, null)
+      // Notifications were blocked since, and there's no email to fall back on
+      if (push && !emailOn && notificationPermission() !== "granted") return startGuide(route, null)
       return save({ routes: [...watched, route.id], held })
     },
-    [watched, held, enabled, push, telegram, save, startGuide]
+    [watched, held, enabled, push, emailOn, save, startGuide]
   )
 
   // Portfolio's bell, from a tap
   const followPositions = useCallback(
     (routes: string[]) => {
-      if (!enabled || (push && !telegram && notificationPermission() !== "granted")) return startGuide(null, routes)
+      if (!enabled || (push && !emailOn && notificationPermission() !== "granted")) return startGuide(null, routes)
       writeFollowing(true)
       setFollowing(true)
       void save({ routes: watched, held: routes })
     },
-    [enabled, push, telegram, watched, save, startGuide]
+    [enabled, push, emailOn, watched, save, startGuide]
   )
 
   const stopFollowing = useCallback(async () => {
@@ -351,7 +393,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     try {
       await turnOffAlerts()
       setPush(false)
-      setTelegram(false)
+      setEmail(null)
       setFollowing(false)
       setWatched([])
       setHeld([])
@@ -370,29 +412,22 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const unlinkTelegram = useCallback(async () => {
+  const stopEmail = useCallback(async () => {
     setBusy(true)
+    setError(null)
     try {
-      await unlinkTelegramChat()
-      setTelegram(false)
+      await unsubscribeEmail()
+      setEmail(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : FALLBACK_ERROR)
     } finally {
       setBusy(false)
     }
   }, [])
 
   const showGuide = useCallback(
-    (step: "ask" | "blocked" | "home-screen" | "unsupported" | "telegram") => {
-      if (step !== "telegram") return void openGuide(step, null)
-      // Settings' Link Telegram: straight to the link, with the lists this device has
-      const id = openGuide("telegram", null)
-      setTelegramLink(null)
-      startTelegramLink(pendingLists(null, null))
-        .then((link) => {
-          if (id === guideId.current) setTelegramLink(link)
-        })
-        .catch((err) => show(id, "telegram", null, null, err instanceof Error ? err.message : FALLBACK_ERROR))
-    },
-    [openGuide, pendingLists, show]
+    (step: "ask" | "blocked" | "home-screen" | "unsupported" | "email") => void openGuide(step, null),
+    [openGuide]
   )
 
   return (
@@ -401,7 +436,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         support,
         enabled,
         push,
-        telegram,
+        emailOffered,
+        email: email && { address: email.address, confirmed: email.confirmed },
         watched,
         held,
         following,
@@ -414,12 +450,21 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         addHeld,
         turnOff,
         turnOffPush: turnOffBrowser,
-        unlinkTelegram,
+        stopEmail,
+        refreshEmail,
         showGuide,
       }}
     >
       {children}
-      <AlertsGuide guide={guide} telegramLink={telegramLink} onClose={closeGuide} onAllow={allow} onTelegram={toTelegram} />
+      <AlertsGuide
+        guide={guide}
+        emailOffered={emailOffered}
+        address={email?.address ?? ""}
+        onClose={closeGuide}
+        onAllow={allow}
+        onEmail={toEmail}
+        onSendEmail={sendEmail}
+      />
     </AlertsContext.Provider>
   )
 }
@@ -511,11 +556,46 @@ export function PositionAlertToggle({ routes, className }: { routes: string[]; c
   )
 }
 
-// Settings: what alerts cover on this device, and the two ways they arrive
+// Settings: what alerts cover on this device, and the two ways they arrive. The links in Hermes's emails open here
+// too: one confirms an address, the other stops the emails.
 export function AlertsSettings() {
-  const { support, enabled, push, telegram, watched, held, following, busy, error, turnOff, turnOffPush, unlinkTelegram, showGuide } =
-    useAlerts()
+  const {
+    support,
+    enabled,
+    push,
+    emailOffered,
+    email,
+    watched,
+    held,
+    following,
+    busy,
+    error,
+    turnOff,
+    turnOffPush,
+    stopEmail,
+    refreshEmail,
+    showGuide,
+  } = useAlerts()
   const blocked = support === "supported" && !push && notificationPermission() === "denied"
+  const [linkNote, setLinkNote] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const confirm = params.get("confirm")
+    const unsubscribe = params.get("unsubscribe")
+    if (!confirm && !unsubscribe) return
+    // Once only, and the token doesn't stay in the address bar
+    window.history.replaceState(null, "", window.location.pathname)
+    const task = confirm
+      ? confirmEmailLink(confirm).then(() => ({ ok: true, text: "Email alerts are on. Hermes emails you when a route you watch or hold changes." }))
+      : unsubscribeEmail(unsubscribe!).then(() => ({ ok: true, text: "Done. Hermes won't email you anymore." }))
+    task
+      .catch((err) => ({ ok: false, text: err instanceof Error ? err.message : FALLBACK_ERROR }))
+      .then((note) => {
+        setLinkNote(note)
+        void refreshEmail()
+      })
+  }, [refreshEmail])
 
   const covered = [
     watched.length > 0 && `${watched.length} ${watched.length === 1 ? "route" : "routes"}`,
@@ -534,7 +614,7 @@ export function AlertsSettings() {
         ? { text: "On iPhone, they need Hermes on your Home Screen.", help: "home-screen" as const }
         : blocked
           ? { text: "Blocked for Hermes in this browser.", help: "blocked" as const }
-          : { text: push ? "On." : "Off.", help: null }
+          : { text: push ? "Notifications on." : "Off.", help: null }
 
   return (
     <div className="flex flex-col gap-3 p-[18px]">
@@ -542,6 +622,18 @@ export function AlertsSettings() {
         <div className="label-roman">Alerts</div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{status}</p>
       </div>
+
+      {linkNote && (
+        <p
+          role="status"
+          className={cn(
+            "rounded-[4px] border px-3.5 py-2.5 text-[13px] leading-relaxed",
+            linkNote.ok ? "border-frame bg-secondary" : "border-destructive-line bg-destructive-surface text-destructive"
+          )}
+        >
+          {linkNote.text}
+        </p>
+      )}
 
       <div className="flex flex-col divide-y divide-hairline rounded-[4px] border border-hairline">
         <div className="flex items-center justify-between gap-3 px-3.5 py-3">
@@ -566,26 +658,32 @@ export function AlertsSettings() {
             </button>
           )}
         </div>
-        <div className="flex items-center justify-between gap-3 px-3.5 py-3">
-          <span className="flex min-w-0 items-start gap-2.5">
-            <Send className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium">Telegram</span>
-              <span className="block text-xs text-muted-foreground">
-                {telegram ? "Linked. Herald messages you there." : "Herald, the Hermes bot, messages you there."}
+        {(emailOffered || email) && (
+          <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+            <span className="flex min-w-0 items-start gap-2.5">
+              <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">Email</span>
+                <span className="block break-all text-xs text-muted-foreground">
+                  {email
+                    ? email.confirmed
+                      ? email.address
+                      : `Open the link sent to ${email.address}.`
+                    : "Alerts by email. Each one has a link to stop them."}
+                </span>
               </span>
             </span>
-          </span>
-          {telegram ? (
-            <button type="button" onClick={unlinkTelegram} disabled={busy} className="btn-frame h-9 shrink-0 px-3 text-[13px] disabled:opacity-60">
-              Unlink
-            </button>
-          ) : (
-            <button type="button" onClick={() => showGuide("telegram")} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
-              Link
-            </button>
-          )}
-        </div>
+            {email ? (
+              <button type="button" onClick={stopEmail} disabled={busy} className="btn-frame h-9 shrink-0 px-3 text-[13px] disabled:opacity-60">
+                {email.confirmed ? "Stop" : "Cancel"}
+              </button>
+            ) : (
+              <button type="button" onClick={() => showGuide("email")} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+                Add
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {enabled && (
@@ -600,10 +698,12 @@ export function AlertsSettings() {
 
 // The guide: a bottom sheet on phones and tablets, a dialog on desktop
 interface GuideActions {
-  telegramLink: TelegramLink | null
+  emailOffered: boolean // Hermes can send email right now
+  address: string // this device's email address, if any
   onClose: () => void
   onAllow: () => void
-  onTelegram: () => void
+  onEmail: () => void
+  onSendEmail: (address: string) => Promise<void>
 }
 
 function AlertsGuide({ guide, ...actions }: { guide: Guide | null } & GuideActions) {
@@ -659,11 +759,12 @@ const TITLES: Record<GuideStep, string> = {
   failed: "Alerts didn't turn on",
   "home-screen": "Add Hermes to your Home Screen",
   unsupported: "Open Hermes in your browser",
-  telegram: "Alerts on Telegram",
-  "telegram-on": "Telegram is linked",
+  email: "Alerts by email",
+  "email-sent": "Check your inbox",
+  "email-on": "Email alerts are on",
 }
 
-function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guide: Guide } & GuideActions) {
+function GuideBody({ guide, emailOffered, address, onClose, onAllow, onEmail, onSendEmail }: { guide: Guide } & GuideActions) {
   const { step, route, positions } = guide
   const [where, setWhere] = useState<Platform>("desktop")
   const [host, setHost] = useState("www.hermesagg.xyz")
@@ -697,16 +798,41 @@ function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guid
         {step === "ask" && (
           <>
             {(route || positions) && <WhatAlertsCover route={route} />}
-            <div className="flex flex-col gap-2">
-              <p>Next, your browser asks to send you notifications. Tap Allow.</p>
-              <PromptPreview host={host} />
-            </div>
+            {emailOffered ? (
+              <>
+                <p className="font-medium">How should Hermes reach you?</p>
+                <ChannelChoice
+                  icon={Bell}
+                  title="On this device"
+                  text="Notifications, like a message. Your browser asks first: tap Allow."
+                  action="Allow notifications"
+                  onClick={onAllow}
+                  main
+                />
+                <ChannelChoice
+                  icon={Mail}
+                  title="By email"
+                  text="Hermes emails you a link to confirm the address. Each alert email has a link to stop them."
+                  action="Use email"
+                  onClick={onEmail}
+                />
+                <button type="button" onClick={onClose} className="h-10 w-full text-sm text-muted-foreground hover:text-foreground">
+                  Not now
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <p>Next, your browser asks to send you notifications. Tap Allow.</p>
+                  <PromptPreview host={host} />
+                </div>
+                <Actions primary="Allow alerts" onPrimary={onAllow} secondary="Not now" onSecondary={onClose} />
+              </>
+            )}
             <p className="text-xs text-muted-foreground">
-              Hermes keeps this device's alert address and the routes you watch{positions ? " and hold" : ""}. No wallet, no
-              email.
+              Hermes keeps this device&apos;s alert address or your email, and the routes you watch
+              {positions ? " and hold" : ""}. Never your wallet.
             </p>
-            <Actions primary="Allow alerts" onPrimary={onAllow} secondary="Not now" onSecondary={onClose} />
-            <TelegramOption onTelegram={onTelegram} />
           </>
         )}
 
@@ -733,7 +859,7 @@ function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guid
             <p>Still no prompt? Allow notifications by hand:</p>
             <AllowSteps where={where} host={host} />
             <p className="text-xs text-muted-foreground">Hermes turns alerts on as soon as you allow them.</p>
-            <TelegramOption onTelegram={onTelegram} />
+            {emailOffered && <EmailOption onEmail={onEmail} />}
           </>
         )}
 
@@ -743,7 +869,7 @@ function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guid
             <AllowSteps where={where} host={host} />
             <p className="text-xs text-muted-foreground">Hermes turns alerts on as soon as you allow them.</p>
             <Actions primary="I've allowed them" onPrimary={onAllow} secondary="Close" onSecondary={onClose} />
-            <TelegramOption onTelegram={onTelegram} />
+            {emailOffered && <EmailOption onEmail={onEmail} />}
           </>
         )}
 
@@ -780,7 +906,7 @@ function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guid
           <>
             <p>{guide.message ?? FALLBACK_ERROR}</p>
             <Actions primary="Try again" onPrimary={onAllow} secondary="Close" onSecondary={onClose} />
-            <TelegramOption onTelegram={onTelegram} />
+            {emailOffered && <EmailOption onEmail={onEmail} />}
           </>
         )}
 
@@ -800,27 +926,33 @@ function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guid
               ]}
             />
             <Actions primary="Got it" onPrimary={onClose} />
-            <TelegramOption onTelegram={onTelegram} lead="Or skip the Home Screen:" />
+            {emailOffered && <EmailOption onEmail={onEmail} lead="Or skip the Home Screen:" />}
           </>
         )}
 
         {step === "unsupported" && (
           <>
             <Unsupported host={host} onClose={onClose} />
-            <TelegramOption onTelegram={onTelegram} lead="Or get them here on Telegram:" />
+            {emailOffered && <EmailOption onEmail={onEmail} lead="Or get them by email:" />}
           </>
         )}
 
-        {step === "telegram" && <TelegramStep link={telegramLink} message={guide.message} about={about} onRetry={onTelegram} />}
+        {step === "email" && (
+          <EmailForm initial={address} message={guide.message} about={about} onSend={onSendEmail} />
+        )}
 
-        {step === "telegram-on" && (
+        {step === "email-sent" && (
+          <EmailSent address={address} message={guide.message} onResend={() => onSendEmail(address)} onChange={onEmail} />
+        )}
+
+        {step === "email-on" && (
           <>
             <p className="flex items-start gap-2.5">
-              <Send className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <Mail className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
-                Herald will message you on Telegram when {about} changes.
-                {positions && " He follows your wallet: routes join and leave as your positions do."} He sent the list to your
-                chat. Send him /stop there, or unlink in Settings, to turn it off.
+                Hermes will email <span className="break-all font-semibold">{address}</span> when {about} changes.
+                {positions && " It follows your wallet: routes join and leave as your positions do."} Each email has a link to
+                stop them.
               </span>
             </p>
             <Actions primary="Done" onPrimary={onClose} />
@@ -851,7 +983,7 @@ function WhatAlertsCover({ route }: { route: YieldRoute | null }) {
       ]
   return (
     <div className="flex flex-col gap-2">
-      <p>{route ? `Get a notification on this device when ${route.name} changes:` : "Get a notification when a route you hold changes:"}</p>
+      <p>{route ? `Hermes tells you when ${route.name} changes:` : "Hermes tells you when a route you hold changes:"}</p>
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
           <li key={item} className="flex items-start gap-2.5">
@@ -865,53 +997,153 @@ function WhatAlertsCover({ route }: { route: YieldRoute | null }) {
   )
 }
 
-// Telegram as the other way: browsers inside apps and iPhones outside the Home Screen can't show notifications
-function TelegramOption({ onTelegram, lead = "Rather use Telegram?" }: { onTelegram: () => void; lead?: string }) {
+// The two ways, side by side, for a first alert
+function ChannelChoice({
+  icon: Icon,
+  title,
+  text,
+  action,
+  onClick,
+  main = false,
+}: {
+  icon: typeof Bell
+  title: string
+  text: string
+  action: string
+  onClick: () => void
+  main?: boolean
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[4px] border border-hairline bg-plate px-3.5 py-2.5">
-      <span className="text-[13px] text-muted-foreground">{lead}</span>
-      <button type="button" onClick={onTelegram} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
-        <Send className="size-3.5" aria-hidden="true" />
-        Get alerts on Telegram
+    <div className="flex flex-col gap-3 rounded-[4px] border border-hairline bg-plate p-3.5">
+      <span className="flex items-start gap-2.5">
+        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0">
+          <span className="block font-semibold">{title}</span>
+          <span className="block text-[13px] text-muted-foreground">{text}</span>
+        </span>
+      </span>
+      <button type="button" onClick={onClick} className={cn(main ? "btn-teal" : "btn-frame", "h-11 w-full text-sm")}>
+        {action}
       </button>
     </div>
   )
 }
 
-// The link to Herald, then a wait until it's opened. Hermes checks every few seconds and when the page comes back.
-function TelegramStep({ link, message, about, onRetry }: { link: TelegramLink | null; message?: string; about: string; onRetry: () => void }) {
-  if (message) {
-    return (
-      <>
-        <p>{message}</p>
-        <Actions primary="Try again" onPrimary={onRetry} />
-      </>
-    )
+// Email as the other way: browsers inside apps and iPhones outside the Home Screen can't show notifications
+function EmailOption({ onEmail, lead = "Rather get email?" }: { onEmail: () => void; lead?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[4px] border border-hairline bg-plate px-3.5 py-2.5">
+      <span className="text-[13px] text-muted-foreground">{lead}</span>
+      <button type="button" onClick={onEmail} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+        <Mail className="size-3.5" aria-hidden="true" />
+        Email me instead
+      </button>
+    </div>
+  )
+}
+
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function EmailForm({
+  initial,
+  message,
+  about,
+  onSend,
+}: {
+  initial: string
+  message?: string
+  about: string
+  onSend: (address: string) => Promise<void>
+}) {
+  const [value, setValue] = useState(initial)
+  const [sending, setSending] = useState(false)
+  const valid = LOOKS_LIKE_EMAIL.test(value.trim())
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!valid || sending) return
+    setSending(true)
+    await onSend(value)
+    setSending(false)
   }
   return (
-    <>
-      <p>Herald, the Hermes bot, will message you on Telegram when {about} changes.</p>
-      <Steps items={["Tap Open Telegram.", "In the chat with Herald, tap Start.", "Come back here. Hermes carries on by itself."]} />
-      {link ? (
-        <a href={link.url} target="_blank" rel="noopener noreferrer" className="btn-teal h-12 w-full text-[15px]">
-          <Send className="size-4" aria-hidden="true" />
-          Open Telegram
-        </a>
-      ) : (
-        <span className="btn-teal h-12 w-full text-[15px] opacity-60" aria-busy="true">
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          Making your link
-        </span>
-      )}
-      {link && (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
-          Waiting for Telegram
-        </p>
-      )}
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <p>Hermes will email you when {about} changes. First it sends a link, so only you can turn these on.</p>
+      <label className="flex flex-col gap-1.5">
+        <span className="label-roman">Email</span>
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoFocus
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="you@example.com"
+          className="h-12 rounded-[4px] border border-input bg-background px-3.5 text-[15px] text-foreground outline-none focus:border-ink"
+        />
+      </label>
+      {message && <p className="text-[13px] text-destructive">{message}</p>}
+      <button type="submit" disabled={!valid || sending} className="btn-teal h-12 w-full text-[15px]">
+        {sending ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Sending
+          </>
+        ) : (
+          "Email me a link"
+        )}
+      </button>
       <p className="text-xs text-muted-foreground">
-        Hermes keeps your Telegram chat and the routes you watch or hold. No wallet. Send /stop to Herald to end it.
+        Hermes keeps your address and the routes you watch or hold. Never your wallet. Each alert email has a link to stop
+        them.
       </p>
+    </form>
+  )
+}
+
+// Waiting for the link. Hermes checks every few seconds and when the page comes back, so it can be opened anywhere.
+function EmailSent({
+  address,
+  message,
+  onResend,
+  onChange,
+}: {
+  address: string
+  message?: string
+  onResend: () => Promise<void>
+  onChange: () => void
+}) {
+  const [resending, setResending] = useState(false)
+  return (
+    <>
+      <p className="flex items-start gap-2.5">
+        <Mail className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          Hermes sent a link to <span className="break-all font-semibold">{address}</span>. Open it to turn alerts on. It
+          can take a minute, and may land in spam.
+        </span>
+      </p>
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
+        Waiting for the link. You can open it on any device.
+      </p>
+      {message && <p className="text-[13px] text-destructive">{message}</p>}
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={async () => {
+            setResending(true)
+            await onResend()
+            setResending(false)
+          }}
+          disabled={resending}
+          className="btn-frame h-11 w-full text-sm disabled:opacity-60"
+        >
+          {resending ? "Sending..." : "Send it again"}
+        </button>
+        <button type="button" onClick={onChange} className="h-10 w-full text-sm text-muted-foreground hover:text-foreground">
+          Use another address
+        </button>
+      </div>
     </>
   )
 }

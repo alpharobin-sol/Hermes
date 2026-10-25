@@ -43,6 +43,12 @@ services:
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
+      # Email alerts, sent through Resend (resend.com). Off without a key: alerts then go to phones only.
+      # The sending domain (hermesagg.xyz) must be verified in Resend first.
+      - key: RESEND_API_KEY
+        sync: false
+      # Optional: ALERTS_FROM_EMAIL (default "Hermes <alerts@hermesagg.xyz>"), EMAIL_DAILY_LIMIT (default 100,
+      # Resend's free plan)
       # Herald, the Telegram group's bot (backend/src/herald). Off without a token.
       # The token from @BotFather for @HermesAggHeraldBot
       - key: TELEGRAM_BOT_TOKEN
@@ -54,5 +60,4 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       # Optional: HERALD_MODEL (default claude-opus-5-5), HERALD_DAILY_ANSWERS (default 300),
-      # HERALD_AUTO_ANSWER=false to answer only when mentioned, replied to or asked with /ask,
-      # TELEGRAM_BOT_USERNAME if the bot is ever renamed (alert links open t.me/HermesAggHeraldBot by default)
+      # HERALD_AUTO_ANSWER=false to answer only when mentioned, replied to or asked with /ask

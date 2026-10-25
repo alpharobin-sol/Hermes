@@ -1,11 +1,11 @@
-// lib/alerts.ts: phone alerts through the browser's push notifications
+// lib/alerts.ts: alerts through the browser's push notifications, or by email
 
 import { getFullUrl } from "./api/yield-api"
 
 const WATCHED_KEY = "hermes.alerts.routes"
 const HELD_KEY = "hermes.alerts.held" // the routes the wallet holds, from Portfolio
 const FOLLOW_KEY = "hermes.alerts.positions" // "1" while this device follows the wallet's positions
-const TELEGRAM_KEY = "hermes.alerts.telegram" // the link token Herald knows this device by
+const EMAIL_KEY = "hermes.alerts.email" // this device's address and the token Hermes knows it by
 
 export type AlertsSupport = "supported" | "needs-home-screen" | "unsupported"
 
@@ -89,12 +89,22 @@ export function writeFollowing(on: boolean) {
   write(FOLLOW_KEY, on ? "1" : null)
 }
 
-export function readTelegramToken(): string | null {
+export interface EmailAlerts {
+  token: string
+  address: string
+}
+
+export function readEmail(): EmailAlerts | null {
   try {
-    return localStorage.getItem(TELEGRAM_KEY)
+    const saved = JSON.parse(localStorage.getItem(EMAIL_KEY) ?? "null")
+    return typeof saved?.token === "string" && typeof saved?.address === "string" ? saved : null
   } catch {
     return null
   }
+}
+
+function writeEmail(value: EmailAlerts | null) {
+  write(EMAIL_KEY, value ? JSON.stringify(value) : null)
 }
 
 export interface AlertLists {
@@ -133,7 +143,7 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 }
 
 /**
- * Send this device's lists to every channel it has: its push subscription and its Telegram link.
+ * Send this device's lists to every way it gets alerts: its push subscription and its email address.
  * Returns the lists Hermes now keeps.
  */
 export async function saveAlerts(lists: AlertLists): Promise<AlertLists> {
@@ -143,12 +153,16 @@ export async function saveAlerts(lists: AlertLists): Promise<AlertLists> {
     const json = await post("/api/alerts/subscribe", { subscription: subscription.toJSON(), ...lists })
     saved = { routes: json.routes ?? lists.routes, held: json.held ?? lists.held }
   }
-  const token = readTelegramToken()
-  if (token) {
-    const json = await post("/api/alerts/telegram", { token, ...lists })
-    // Hermes no longer had the link: the new one waits to be opened in Telegram
-    write(TELEGRAM_KEY, json.token)
-    saved = { routes: json.routes ?? saved.routes, held: json.held ?? saved.held }
+  const email = readEmail()
+  if (email) {
+    const res = await fetch(getFullUrl("/api/alerts/email/save"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: email.token, ...lists }),
+    })
+    // Unsubscribed from an email, or never confirmed: this device no longer has an address
+    if (res.status === 404) writeEmail(null)
+    else if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Hermes could not update alerts. Try again shortly.")
   }
   write(WATCHED_KEY, JSON.stringify(saved.routes))
   write(HELD_KEY, JSON.stringify(saved.held))
@@ -188,51 +202,66 @@ export async function watchRoutes(lists: AlertLists): Promise<AlertLists> {
   return saveAlerts(lists)
 }
 
-// ---------- Telegram ----------
+// ---------- Email ----------
 
-export interface TelegramLink {
-  token: string
-  url: string // opens Herald in Telegram with the token
-  linked: boolean
+// The ways alerts can arrive right now. Email is off until Hermes has a mail service set up.
+export async function alertChannels(): Promise<{ push: boolean; email: boolean }> {
+  const res = await fetch(getFullUrl("/api/alerts/channels"), { cache: "no-store" }).catch(() => null)
+  const json = await res?.json().catch(() => null)
+  return res?.ok && json?.success ? { push: !!json.push, email: !!json.email } : { push: true, email: false }
 }
 
 /**
- * Start (or refresh) this device's Telegram link with these lists. The user opens the link in Telegram and Herald
- * ties their chat to it.
+ * Email alerts for this address: Hermes emails it a link, and alerts begin once the link is opened. Again with
+ * the same address, it sends the link again.
  */
-export async function startTelegramLink(lists: AlertLists): Promise<TelegramLink> {
-  const json = await post("/api/alerts/telegram", { token: readTelegramToken(), ...lists })
-  write(TELEGRAM_KEY, json.token)
-  return { token: json.token, url: json.url, linked: !!json.linked }
+export async function startEmailAlerts(address: string, lists: AlertLists): Promise<{ token: string; confirmed: boolean }> {
+  const current = readEmail()
+  const sameAddress = current?.address.toLowerCase() === address.trim().toLowerCase()
+  const json = await post("/api/alerts/email/start", { token: sameAddress ? current!.token : null, email: address.trim(), ...lists })
+  writeEmail({ token: json.token, address: address.trim() })
+  return { token: json.token, confirmed: !!json.confirmed }
 }
 
-// Whether the link has been opened in Telegram. Null when Hermes can't say right now.
-export async function telegramLinked(token: string): Promise<boolean | null> {
-  const res = await fetch(getFullUrl(`/api/alerts/telegram/${token}`), { cache: "no-store" }).catch(() => null)
+// Whether the address is confirmed: waiting for the link, confirmed, gone (unsubscribed or expired), or unknown
+export async function emailStatus(token: string): Promise<"confirmed" | "waiting" | "gone" | null> {
+  const res = await fetch(getFullUrl(`/api/alerts/email/${token}`), { cache: "no-store" }).catch(() => null)
+  if (res?.status === 404) return "gone"
   const json = await res?.json().catch(() => null)
-  return res?.ok && json?.success ? !!json.linked : null
+  return res?.ok && json?.success ? (json.confirmed ? "confirmed" : "waiting") : null
 }
 
-export async function unlinkTelegram(): Promise<void> {
-  const token = readTelegramToken()
-  if (token) await post("/api/alerts/telegram/unlink", { token }).catch(() => {})
-  write(TELEGRAM_KEY, null)
+// The link in the confirmation email
+export async function confirmEmailLink(token: string): Promise<void> {
+  await post("/api/alerts/email/confirm", { token })
 }
 
-// Turn alerts off on this device: Hermes forgets its push subscription and its Telegram link and sends nothing more
+// Stop the emails: this device's address, or the one an unsubscribe link names
+export async function unsubscribeEmail(token = readEmail()?.token): Promise<void> {
+  if (!token) return
+  await post("/api/alerts/email/unsubscribe", { token })
+  if (readEmail()?.token === token) writeEmail(null)
+}
+
+export function forgetEmail() {
+  writeEmail(null)
+}
+
+// Turn alerts off on this device: Hermes forgets its push subscription and its email address and sends nothing more
 export async function turnOffAlerts(): Promise<void> {
   const subscription = await currentSubscription()
   if (subscription) {
     await post("/api/alerts/unsubscribe", { endpoint: subscription.endpoint }).catch(() => {})
     await subscription.unsubscribe().catch(() => {})
   }
-  await unlinkTelegram()
+  await unsubscribeEmail().catch(() => {})
+  writeEmail(null)
   write(WATCHED_KEY, null)
   write(HELD_KEY, null)
   writeFollowing(false)
 }
 
-// Turn off this browser's notifications only. Telegram keeps going.
+// Turn off this browser's notifications only. Email keeps going.
 export async function turnOffPush(): Promise<void> {
   const subscription = await currentSubscription()
   if (!subscription) return

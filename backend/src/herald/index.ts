@@ -5,7 +5,6 @@ import type { RequestHandler } from 'express';
 import { logger } from '../utils/logger';
 import { answer, answersEnabled, mayAnswer, Question } from './answers';
 import { GROUP_INVITE, impersonates, inspect, Strikes } from './spam';
-import { linkTelegramChat, routeNames, telegramWatching, unlinkTelegramChat } from '../services/alerts';
 
 /**
  * HERALD
@@ -123,22 +122,6 @@ function helpText(answering: boolean): string {
     '',
     'Docs: hermesagg.xyz/docs',
   ].join('\n');
-}
-
-// What a linked chat hears about
-function alertsText(lists: { routes: string[]; held: string[] }, lead: string): string {
-  const lines = [lead];
-  if (lists.held.length > 0) lines.push(`Your positions: ${routeNames(lists.held).join(', ')}`);
-  const watched = lists.routes.filter((id) => !lists.held.includes(id));
-  if (watched.length > 0) lines.push(`Routes you watch: ${routeNames(watched).join(', ')}`);
-  if (lists.held.length === 0 && watched.length === 0) lines.push('No routes yet. Tap the bell under a route in Hermes, or turn on alerts for your positions in Portfolio.');
-  lines.push(
-    '',
-    'Herald messages you here when a rate falls, a better top rated route opens, a token trades below its value, deposits leave, a reserve is nearly all borrowed, or a route leaves Top rated. At most one alert of each kind per route a day.',
-    '',
-    '/alerts lists them, /stop turns them off.'
-  );
-  return lines.join('\n');
 }
 
 export interface HeraldOptions {
@@ -330,40 +313,10 @@ export function createHeraldBot(options: HeraldOptions): Bot {
 
   // ---------- Private chats ----------
 
-  // Alerts by Telegram: Hermes's Settings open Herald with a link token (/start <token>), which ties this chat to
-  // the routes that device watches and holds. /stop ends it, /alerts lists it. Anything else gets the help.
-  const noPreview = { link_preview_options: { is_disabled: true } };
   bot.chatType('private').on('message', async (ctx) => {
-    const text = ctx.msg.text?.trim() ?? '';
-    try {
-      const start = /^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{24,64})$/.exec(text);
-      if (start) {
-        const linked = await linkTelegramChat(start[1], ctx.chat.id);
-        await ctx.reply(
-          linked ? alertsText(linked, 'Alerts are on.') : 'That link has expired. In Hermes, open Settings and link Telegram again.',
-          noPreview
-        );
-        return;
-      }
-      if (/^\/stop(?:@\w+)?$/i.test(text)) {
-        const stopped = await unlinkTelegramChat(ctx.chat.id);
-        await ctx.reply(stopped ? 'Alerts are off. Hermes will send nothing more here. Link again from Settings in Hermes.' : 'No Hermes alerts come to this chat.');
-        return;
-      }
-      if (/^\/alerts(?:@\w+)?$/i.test(text)) {
-        const watching = await telegramWatching(ctx.chat.id);
-        await ctx.reply(
-          watching ? alertsText(watching, 'Alerts come here for:') : 'No Hermes alerts come to this chat. In Hermes, open Settings and link Telegram.',
-          noPreview
-        );
-        return;
-      }
-    } catch (error) {
-      logger.warn(`Herald alerts: ${error instanceof Error ? error.message : error}`);
-      await quietly(ctx.reply('Hermes alerts are unavailable right now. Try again shortly.'));
-      return;
-    }
-    await ctx.reply(`${helpText(answering())}\n\nAlerts in this chat: in Hermes, open Settings and link Telegram.\n\nThe Hermes group: ${GROUP_INVITE}`, noPreview);
+    await ctx.reply(`${helpText(answering())}\n\nThe Hermes group: ${GROUP_INVITE}`, {
+      link_preview_options: { is_disabled: true },
+    });
   });
 
   // ---------- The group ----------
