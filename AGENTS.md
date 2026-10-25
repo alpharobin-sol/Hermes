@@ -12,6 +12,8 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Custody (owner's decision, 23 Oct 2026): Hermes can hold funds for automation only. A user opts in by moving funds into a Hermes vault that auto-allocates, auto-exits and rebalances. The vault needs a Hermes program, an outside security review and caps before real funds go in.
 - "Best APY" means the highest current APY among the routes shown. Never promise a return.
 - Hermes charges no fee today. The fee model is paused until the yield routes are done.
+- Referrals and fees (owner, 25 Oct 2026): nothing may bend Hermes's core mechanics. A referral reward is taken only when the protocol pays it from its own cut, never when it raises what the user pays (that is a fee, and fees wait on the owner's fee decision). Who pays referrals never touches the Safety Score, Top rated or Best quote. Any reward or fee is disclosed: in Docs, and on the route in the deposit dialog. Nothing permanent (a referrer on the user's protocol account) is attached without saying so. Checked on 25 Oct: today's routes would earn nothing this way (7 stake pools pay 0%; BlazeStake's 0.08% would come from the depositor; Marinade's program is paused since 8 May 2026; Kamino pays referrers only on borrowing; Jupiter's is an integrator fee the user pays).
+- Integrating a protocol is not a partnership: say Hermes "routes to" or "integrates with" a protocol, never "partnered with", until a deal is agreed.
 - Never say "audited", "risk-free", "guaranteed" or "safest". The risk tier follows the Safety Score (low from 80, moderate from 60, from TVL when a route has no score), and a lending reserve with 95% or more borrowed or held back is at least moderate.
 
 ## Canonical
@@ -83,6 +85,7 @@ Search and growth
 - [x] Landing page copy and its FAQ with FAQPage structured data (24 Oct)
 - [ ] A page per route (for example "JitoSOL APY today") with its live rate, Safety Score and what can go wrong: Hermes's own data for searches no one else answers live (owner's call)
 - [ ] Links in: Solana ecosystem directories, X threads and articles that link to hermesagg.xyz (owner)
+- [ ] Partnership outreach when Hermes leaves beta (owner's call, 25 Oct): Kamino first (six routes, and an unofficial deposit API), then Marinade (Partnerships form), Jupiter and Sanctum. Ask for an ecosystem listing, a retweet of the integration, official API access, API keys (Lulo) and referral terms paid from their cut. Draft the messages then.
 
 Trust and curation (the wedge)
 
