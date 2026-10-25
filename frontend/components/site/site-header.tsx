@@ -6,6 +6,7 @@ import { LaunchApp } from "./launch-app"
 // The landing page's header, like Gloam's: the logo, the page's sections and Docs, and one way into the app.
 // No wallet here: the app is where you connect.
 const LINKS = [
+  { href: "/routes", label: "Routes" },
   { href: "/#how", label: "How it works" },
   { href: "/#safety", label: "Safety Score" },
   { href: "/#alerts", label: "Alerts" },

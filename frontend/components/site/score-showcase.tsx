@@ -11,13 +11,21 @@ export interface ShowcaseRoute {
 }
 
 // Low risk from 80, moderate from 60, the same bands the app uses
-const scoreColor = (score: number) => (score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-destructive")
+export const scoreColor = (score: number) => (score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-destructive")
 
-// The top scoring route's Safety Score, part by part, the way the app's Why panel shows it
-export function ScoreShowcase({ route }: { route: ShowcaseRoute }) {
+// A route's Safety Score, part by part, the way the app's Why panel shows it. The landing page shows the top scorer.
+export function ScoreShowcase({
+  route,
+  label = "Top score right now",
+  note = "Live from the Hermes API. Every route in the app opens this under Why.",
+}: {
+  route: ShowcaseRoute
+  label?: string | null
+  note?: string | null
+}) {
   return (
     <div className="flex w-full max-w-[520px] flex-col items-center gap-4">
-      <span className="label-roman">Top score right now</span>
+      {label && <span className="label-roman">{label}</span>}
 
       <div className="plaque w-full shadow-[0_28px_60px_-34px_rgba(43,20,14,0.55)]">
         <div className="plaque-inner">
@@ -76,7 +84,7 @@ export function ScoreShowcase({ route }: { route: ShowcaseRoute }) {
           </ul>
         </div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">Live from the Hermes API. Every route in the app opens this under Why.</p>
+      {note && <p className="text-center text-xs text-muted-foreground">{note}</p>}
     </div>
   )
 }

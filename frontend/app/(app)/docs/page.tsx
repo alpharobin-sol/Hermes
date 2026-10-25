@@ -130,6 +130,18 @@ export default function Docs() {
                 Hermes builds each deposit through the protocol itself or through a Jupiter swap, whichever gives you
                 more. The deposit dialog shows every path it checked.
               </p>
+              <p>
+                Every route has its own page.{" "}
+                <Link href="/routes" className={LINK}>
+                  Routes
+                </Link>{" "}
+                lists them by token, and each page (for example{" "}
+                <Link href="/routes/jitosol" className={LINK}>
+                  JitoSOL
+                </Link>
+                ) shows its live APY, its Safety Score part by part, what can go wrong, how to get out and the other routes
+                for the same token. Launch app there opens Hermes on that route.
+              </p>
             </Section>
 
             <Section id="safety-score">

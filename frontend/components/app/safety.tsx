@@ -75,26 +75,6 @@ export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId
   return [...top, ...extra]
 }
 
-// A plain line on how the route can lose money and how to get out, from what Hermes knows about it now
-export function whatCanGoWrong(route: YieldRoute): string {
-  // A recent incident that lowered the score leads the line
-  const incident = route.safety?.deductions?.find((deduction) => deduction.key === "incident" && deduction.points < 0)
-  const lead = incident ? `${incident.detail} ` : ""
-  return lead + baseRisk(route)
-}
-
-function baseRisk(route: YieldRoute): string {
-  if (route.curator) {
-    const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
-    return `Your ${route.token} is lent through Kamino reserves that ${route.curator} picks. A withdrawal waits when those reserves are mostly borrowed.${now} A bug or bad debt in Kamino, or a poor pick by the curator, could lose funds.`
-  }
-  if (route.category === "lending") {
-    const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
-    return `Your ${route.token} is lent to borrowers. A withdrawal waits when most of the reserve is borrowed.${now} A bug or bad debt in ${route.name} could lose funds.`
-  }
-  return `${route.receipt ?? "The token"} can trade below its SOL value for a while, and a bug in ${route.name}'s program could lose funds. You can swap back to SOL at the market price at any time.`
-}
-
 // Unscored routes sort last
 const scoreOf = (route: YieldRoute) => route.safety?.score ?? -1
 

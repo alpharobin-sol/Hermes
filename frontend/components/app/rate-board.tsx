@@ -5,6 +5,7 @@ import { AlertCircle, RotateCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { RiskTier, YieldRoute } from "@/lib/api/yield-api"
+import { HIGH_UTILIZATION, borrowedPercent, exitTight, typeLabel, withdrawablePercent } from "@/lib/route-copy"
 import { formatTokenAmount } from "./tokens"
 import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
 import type { RouteQuote } from "@/lib/api/deposit-api"
@@ -26,35 +27,11 @@ export const RISK_LEVELS: { value: RiskTier; label: string; color: string; text:
   { value: "high", label: "High", color: "bg-destructive", text: "text-destructive" },
 ]
 
-export const CATEGORY_LABELS: Record<YieldRoute["category"], string> = {
-  "liquid-staking": "Liquid staking",
-  lending: "Lending",
-}
+// The route type as shown, from the shared route words
+export { typeLabel }
 
-// The route type as shown: a lending route with a curator is a vault
-export function typeLabel(route: YieldRoute): string {
-  return route.curator ? "Lending vault" : CATEGORY_LABELS[route.category]
-}
-
-// Above this share borrowed, a lending reserve may not have liquidity for withdrawals
-export const HIGH_UTILIZATION = 0.95
-
-export function borrowedPercent(route: YieldRoute): number | null {
-  return typeof route.utilization === "number" ? Math.min(100, Math.round(route.utilization * 100)) : null
-}
-
-// Lending sources that report what can leave right now instead of what is borrowed (Jupiter Lend, vaults)
-export function withdrawablePercent(route: YieldRoute): number | null {
-  return typeof route.utilization !== "number" && typeof route.withdrawable === "number"
-    ? Math.round(route.withdrawable * 100)
-    : null
-}
-
-// Little can be withdrawn right now: 95% or more of the reserve is borrowed or held back
-export function exitTight(route: YieldRoute): boolean {
-  if (typeof route.utilization === "number") return route.utilization >= HIGH_UTILIZATION
-  return typeof route.withdrawable === "number" && route.withdrawable <= 1 - HIGH_UTILIZATION
-}
+// Borrowed share, what can leave now and when the exit is tight, from the shared route words
+export { HIGH_UTILIZATION, borrowedPercent, exitTight, withdrawablePercent }
 
 export function formatApy(route: YieldRoute): string {
   return `${(route.apy * 100).toFixed(2)}%`
