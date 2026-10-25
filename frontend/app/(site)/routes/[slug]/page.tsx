@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils"
 import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { isTopRated, TOP_RATED_MIN_SCORE } from "@/lib/top-rated"
 import {
+  apyWindowText,
   borrowedPercent,
   exitTight,
   explainRoute,
   routeLabel,
   routeSlug,
+  sourceName,
   typeLabel,
   whatCanGoWrong,
   withdrawablePercent,
@@ -130,7 +132,7 @@ function questions(route: YieldRoute): { question: string; answer: string }[] {
   return [
     {
       question: `What is the ${label} APY today?`,
-      answer: `${percent(route.apy)} as of ${readAt(route)}, from ${route.source === "On-chain" ? "the chain" : route.source}. ${moves} It is today's rate, not a promise of what you will earn.`,
+      answer: `${percent(route.apy)} as of ${readAt(route)}, from ${sourceName(route)}${route.apyWindow ? `, measured over ${route.apyWindow}` : ""}. ${moves} It is today's rate, not a promise of what you will earn.`,
     },
     {
       question: `What is ${label}'s Safety Score?`,
@@ -329,8 +331,7 @@ function Hero({ route, sameToken }: { route: YieldRoute; sameToken: YieldRoute[]
       <p className="mt-3 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
         <LiveDot className="shrink-0" />
         <span>
-          Read {readAt(route)} · APY and deposits from {route.source === "On-chain" ? "the chain" : route.source} · refreshed every
-          minute
+          Read {readAt(route)} · APY{apyWindowText(route)} and deposits from {sourceName(route)} · refreshed every minute
         </span>
       </p>
     </section>

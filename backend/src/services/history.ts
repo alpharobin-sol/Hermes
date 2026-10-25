@@ -5,7 +5,8 @@ import { dbReady, pool } from './db';
  * HERMES HISTORY
  * Hermes records every route's rate and deposits every 10 minutes in its own Postgres (DATABASE_URL, Supabase
  * in production), so history comes from Hermes's own live reads instead of an aggregator.
- * It feeds the Safety Score's outflows and INF's APY. Without DATABASE_URL it stays off and nothing else changes.
+ * It feeds the Safety Score's outflows, INF's APY and each stake pool's value by epoch (APYs over several epochs).
+ * Without DATABASE_URL it stays off and nothing else changes.
  * Never in the quote path: rates and quotes are live reads held in memory, and history writes run in the background.
  */
 
@@ -118,6 +119,58 @@ export async function tokenValueNear(routeId: string, target: Date, newest: Date
     return row ? { at: new Date(row.taken_at).getTime(), value: Number(row.token_value) } : null;
   } catch (error) {
     logger.warn(`Could not read token value history for ${routeId}: ${error instanceof Error ? error.message : error}`);
+    return null;
+  }
+}
+
+export interface EpochValue {
+  pool: string; // stake pool address
+  epoch: number;
+  value: number; // SOL per token after that epoch's update
+}
+
+/**
+ * Record stake pools' SOL per token by epoch. A value already recorded for an epoch stays.
+ */
+export async function recordEpochValues(rows: EpochValue[]): Promise<boolean> {
+  if (rows.length === 0 || !(await dbReady())) return false;
+  const values: unknown[] = [];
+  const placeholders = rows.map((row, i) => {
+    values.push(row.pool, row.epoch, row.value);
+    return `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`;
+  });
+  try {
+    await pool!.query(
+      `insert into stake_pool_epochs (pool, epoch, token_value) values ${placeholders.join(', ')} on conflict do nothing`,
+      values
+    );
+    return true;
+  } catch (error) {
+    logger.warn(`Could not record stake pool epochs: ${error instanceof Error ? error.message : error}`);
+    return false;
+  }
+}
+
+/**
+ * Each stake pool's SOL per token for the last `epochs` epochs Hermes recorded, by pool then epoch. Null when history
+ * is off or unreachable.
+ */
+export async function recentEpochValues(epochs: number): Promise<Map<string, Map<number, number>> | null> {
+  if (!(await dbReady())) return null;
+  try {
+    const result = await pool!.query(
+      `select pool, epoch, token_value from stake_pool_epochs
+       where epoch >= (select max(epoch) from stake_pool_epochs) - $1`,
+      [epochs]
+    );
+    const byPool = new Map<string, Map<number, number>>();
+    for (const row of result.rows) {
+      if (!byPool.has(row.pool)) byPool.set(row.pool, new Map());
+      byPool.get(row.pool)!.set(Number(row.epoch), Number(row.token_value));
+    }
+    return byPool;
+  } catch (error) {
+    logger.warn(`Could not read stake pool epochs: ${error instanceof Error ? error.message : error}`);
     return null;
   }
 }

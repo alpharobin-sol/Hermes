@@ -23,6 +23,7 @@ export interface YieldRoute {
   safety: SafetyScore | null; // null while any part of the score is missing
   website: string;
   source: string; // where apy and tvl come from
+  apyWindow: string | null; // how far back the APY looks, when it is measured from past values ("the last 10 epochs")
   updatedAt: string;
   utilization: number | null; // lending only: share of the supply that is borrowed, 1 = all of it
   withdrawable: number | null; // lending only: share of the supply that can be withdrawn right now
@@ -107,6 +108,7 @@ export async function getYieldRoutes(
       safety,
       website: route.website,
       source: rate.source ?? SOURCE_LABELS[route.source.kind],
+      apyWindow: rate.apyWindow ?? null,
       updatedAt: new Date(rate.updatedAt).toISOString(),
       utilization: rate.utilization ?? null,
       withdrawable: rate.withdrawable ?? null,

@@ -41,6 +41,12 @@ export function hostOf(url: string): string {
   }
 }
 
+// Where a route's APY and TVL come from, in words: "the chain", "Kamino"
+export const sourceName = (route: YieldRoute) => (route.source === "On-chain" ? "the chain" : route.source)
+
+// The window an APY measured from past values covers, the one the protocol's own app shows: " over the last 10 epochs"
+export const apyWindowText = (route: YieldRoute) => (route.apyWindow ? ` over ${route.apyWindow}` : "")
+
 // Plain labels for new users: what a route type is, where its yield comes from and how you get out
 export function explainRoute(route: YieldRoute): { what: string; yieldFrom: string; out: string } {
   if (route.curator) {

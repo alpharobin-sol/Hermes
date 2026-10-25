@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { markStep } from "@/lib/onboarding"
+import { apyWindowText, sourceName } from "@/lib/route-copy"
 import { RISK_LEVELS } from "./rate-board"
 
 export type SortBy = "safety" | "apy"
@@ -127,7 +128,7 @@ export function SortToggle({ value, onChange, compact = false }: { value: SortBy
 // Ends with where the APY and TVL come from: the route rows and cards leave the source out
 export function SafetyBreakdown({ route, className }: { route: YieldRoute; className?: string }) {
   const level = riskLevel(route)
-  const source = ` APY and TVL from ${route.source}.`
+  const source = ` APY${apyWindowText(route)} and TVL from ${sourceName(route)}.`
 
   if (!route.safety) {
     return (
