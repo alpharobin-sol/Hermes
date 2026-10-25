@@ -7,6 +7,7 @@ import { RotateCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getFullUrl, YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { isTopRated } from "@/lib/top-rated"
+import { takePortfolioChanged } from "@/lib/portfolio-changed"
 import { formatTokenAmount } from "./tokens"
 import { WithdrawDialog } from "./withdraw-dialog"
 import { MoveDialog, moveTargets } from "./move-dialog"
@@ -58,7 +59,9 @@ export function usePortfolio(address: string | null, active: boolean) {
     if (!address || !active) return
     const controller = new AbortController()
     setState((prev) => ({ status: "loading", portfolio: prev.portfolio?.address === address ? prev.portfolio : null }))
-    fetch(getFullUrl(`/api/portfolio/${address}`), { signal: controller.signal })
+    // A refresh (the button, or after a transaction) asks the API to read again, not to repeat its minute-old answer
+    const fresh = takePortfolioChanged() || tick > 0
+    fetch(getFullUrl(`/api/portfolio/${address}${fresh ? "?fresh=1" : ""}`), { signal: controller.signal, cache: "no-store" })
       .then((res) => res.json())
       .then((json) => {
         if (json?.success && json.portfolio) setState({ status: "ready", portfolio: json.portfolio })
@@ -82,6 +85,13 @@ export function formatUsd(value: number): string {
 
 function signed(value: number, token: string): string {
   return `${value < 0 ? "−" : "+"}${formatTokenAmount(Math.abs(value), token)} ${token}`
+}
+
+// Read the positions again once a transaction lands, and once more a few seconds later: the RPC is several nodes, and
+// the first read can reach one that hasn't seen the transaction yet
+function afterTransaction(refresh: () => void) {
+  refresh()
+  setTimeout(refresh, 5_000)
 }
 
 // Hermes proposes a reroute when a top rated route for the same token pays at least half a point more today
@@ -291,7 +301,7 @@ export function PortfolioSection({
           open={moveOpen}
           onOpenChange={setMoveOpen}
           onDone={() => {
-            onRefresh()
+            afterTransaction(onRefresh)
             onWithdrawn?.()
           }}
         />
@@ -302,7 +312,7 @@ export function PortfolioSection({
           open={withdrawOpen}
           onOpenChange={setWithdrawOpen}
           onDone={() => {
-            onRefresh()
+            afterTransaction(onRefresh)
             onWithdrawn?.()
           }}
         />

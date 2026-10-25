@@ -16,6 +16,7 @@ import { whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { HorizonSummary } from "./live-quotes"
 import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
+import { markPortfolioChanged } from "@/lib/portfolio-changed"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -204,6 +205,7 @@ export function DepositDialog({
 
       if (controller.signal.aborted) return
       setStatus("success")
+      markPortfolioChanged()
       onDeposited?.()
     } catch (err) {
       if (controller.signal.aborted) return

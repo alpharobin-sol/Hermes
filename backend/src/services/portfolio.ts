@@ -65,6 +65,8 @@ export interface Portfolio {
 }
 
 const CACHE_MS = 60_000;
+// A fresh read (the refresh button, or right after a transaction) still reuses one this new, so taps can't stack up reads
+const FRESH_MS = 3_000;
 const RETRY_NOTE = "Earned didn't load. Try again.";
 const MAX_WALLETS = 2000;
 const LAMPORTS = 1e9;
@@ -693,10 +695,10 @@ const answers = new Map<string, { at: number; portfolio: Promise<Portfolio> }>()
  * The wallet's positions in Hermes's routes. Kept 60 seconds per wallet. An answer with a missing source, a missing
  * price or an earned that didn't load isn't kept, so the next request tries again.
  */
-export function getPortfolio(address: string): Promise<Portfolio> {
+export function getPortfolio(address: string, fresh = false): Promise<Portfolio> {
   const now = Date.now();
   const hit = answers.get(address);
-  if (hit && now - hit.at < CACHE_MS) return hit.portfolio;
+  if (hit && now - hit.at < (fresh ? FRESH_MS : CACHE_MS)) return hit.portfolio;
   if (answers.size >= MAX_WALLETS) {
     for (const [key, entry] of answers) if (now - entry.at >= CACHE_MS) answers.delete(key);
     if (answers.size >= MAX_WALLETS) answers.delete(answers.keys().next().value!);
