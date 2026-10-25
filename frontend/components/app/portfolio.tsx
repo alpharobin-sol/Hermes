@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowUpRight, RotateCw } from "lucide-react"
+import { RotateCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { getFullUrl, YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
@@ -269,15 +269,6 @@ export function PortfolioSection({
                       Reroute
                     </button>
                   )}
-                  <a
-                    href={p.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground"
-                  >
-                    {new URL(p.website).host.replace(/^www\./, "")}
-                    <ArrowUpRight className="size-3.5" aria-hidden="true" />
-                  </a>
                 </div>
               </li>
             )
