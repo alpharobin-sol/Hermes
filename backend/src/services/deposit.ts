@@ -130,7 +130,8 @@ export class DepositService {
    */
   private async checkSolBalance(route: RouteConfig, amount: string | number, user: PublicKey): Promise<void> {
     const network = solanaNetwork();
-    const reserve = solReserve(route);
+    const reserve = await solReserve(route);
+    if (reserve === null) throw new DepositError("Can't read the network's account rent right now. Try again shortly.", 503);
     const balance = new Decimal(await this.getConnection(network).getBalance(user)).div(1e9);
     if (new Decimal(amount).plus(reserve).gt(balance)) {
       const most = Decimal.max(0, balance.minus(reserve)).toDecimalPlaces(6, Decimal.ROUND_DOWN);

@@ -221,8 +221,8 @@ export default function Docs() {
                   a reserve can leave at once when most of it is lent out, and Hermes shows how much can leave right now.
                 </li>
                 <li>
-                  Taking everything out of Kamino Lend or Project 0 closes the account and returns the one-time rent you
-                  paid on your first deposit.
+                  Taking everything out of Kamino Lend, Project 0 or Jupiter Lend closes the account and returns the
+                  one-time rent you paid on your first deposit.
                 </li>
               </List>
               <p>
@@ -325,7 +325,7 @@ export default function Docs() {
               </p>
               <p>
                 Each route keeps back the SOL its deposit needs for fees and the accounts it opens, so the deposit can
-                pay for itself: about 0.0053 SOL for a staking token or Jupiter Lend, about 0.033 SOL for a first
+                pay for itself: about 0.0042 SOL for a staking token or Jupiter Lend, about 0.033 SOL for a first
                 Kamino Lend deposit. A USDC or USDT deposit needs that SOL in your wallet beside it. The deposit box shows
                 how much you can deposit.
               </p>

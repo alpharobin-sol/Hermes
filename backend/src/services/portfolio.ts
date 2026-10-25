@@ -655,6 +655,10 @@ async function readPortfolio(address: string): Promise<Portfolio> {
   const positions = found.map(({ route, ...rest }): Position => {
     const live = routes.find((r) => r.id === route.id);
     const price = prices.get(route.token) ?? null;
+    // A protocol rounds a position's value down to its token's smallest unit, so a fresh deposit can read one unit
+    // short of what went in. Within a unit of zero is that rounding, not a loss.
+    const unit = 10 ** -TOKENS[route.token].decimals;
+    if (rest.earned !== null && Math.abs(rest.earned) < unit * 1.5) rest.earned = 0;
     return {
       ...rest,
       name: route.name,

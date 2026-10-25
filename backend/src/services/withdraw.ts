@@ -40,7 +40,8 @@ import { closeInstruction, Project0Deposit, project0Position, withdrawInstructio
  *   account. Checked like a Kamino deposit (only the programs it uses, no top-level token transfer, wrapped SOL only
  *   between the user's own accounts), then simulated: SOL must not leave the wallet beyond fees.
  * - Jupiter Lend: Jupiter's withdraw instruction, or for the whole position its redeem instruction (every jl token,
- *   no dust). Jupiter Lend's program only and the user the only signer, like the deposit.
+ *   no dust) and a close of the emptied jl account, its rent back. Jupiter Lend's program only and the user the only
+ *   signer, like the deposit.
  * - Kamino vaults: Kamino's transaction API unstakes the shares and redeems them for the token. Checked like the
  *   vault's deposit: this vault, this farm, the shares asked for, and the user's own token accounts only.
  * - Project 0: Hermes builds the withdrawal from the program's interface, out of the wallet's own Project 0 account
@@ -72,7 +73,7 @@ export interface WithdrawQuote {
   held: string; // the whole position, in inputToken
   available: string | null; // lending: what the reserve can pay out right now, in the route's token
   position: string | null; // lending: "Kamino Lend", "Jupiter Lend", "Project 0" or the vault's name
-  rentBackSol: string | null; // a full Kamino or Project 0 exit closes the account and returns its rent, in SOL
+  rentBackSol: string | null; // a full Kamino, Project 0 or Jupiter Lend exit closes the account and returns its rent, in SOL
 }
 
 export interface WithdrawTransaction {
@@ -487,11 +488,12 @@ async function buildJupiterLend(route: RouteConfig, request: WithdrawRequest, us
   const receiptAccount = getAssociatedTokenAddressSync(new PublicKey(route.receipt!.mint), user, true);
 
   // The whole position redeems every jl token, so no dust is left. Part of it withdraws an amount of the token.
-  const [withdrawal, assetInfo] = await Promise.all([
+  const [withdrawal, assetInfo, receiptInfo] = await Promise.all([
     request.all
       ? fetchJupiterLendInstructions('/earn/redeem-instructions', { asset: token.mint, signer: user.toBase58(), shares: position.shares.toString() }, user)
       : fetchJupiterLendInstructions('/earn/withdraw-instructions', { asset: token.mint, signer: user.toBase58(), amount: raw(quote.inAmount, token.decimals).toString() }, user),
     connection.getAccountInfo(assetAccount),
+    connection.getAccountInfo(receiptAccount),
   ]);
   // It must burn from and pay into the wallet's own token accounts
   const touched = withdrawal.flatMap((ix) => ix.keys.map((key) => key.pubkey));
@@ -503,6 +505,11 @@ async function buildJupiterLend(route: RouteConfig, request: WithdrawRequest, us
   const setup = [createAssociatedTokenAccountIdempotentInstruction(user, assetAccount, user, new PublicKey(token.mint))];
   // SOL lands as wrapped SOL. A wrapped SOL account made here is closed after, so SOL arrives as SOL.
   const cleanup = isSol && !assetInfo ? [createCloseAccountInstruction(assetAccount, user, user)] : [];
+  // Everything out redeems every jl token the account holds, so it closes too and its rent comes back, the way a full
+  // Kamino or Project 0 exit does. Only when the account holds exactly what is redeemed: a close fails on any left.
+  const closeReceipt = request.all && receiptInfo !== null && tokenAmount(receiptInfo.data) === position.shares;
+  if (closeReceipt) cleanup.push(createCloseAccountInstruction(receiptAccount, user, user, [], receiptInfo.owner));
+  const rentBack = closeReceipt ? new Decimal(ui(BigInt(receiptInfo.lamports), 9)) : new Decimal(0);
   const budget = await depositBudgetInstructions(connection, [receiptAccount], JUPITER_LEND_WITHDRAW_UNITS);
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   const transaction = new VersionedTransaction(
@@ -519,9 +526,11 @@ async function buildJupiterLend(route: RouteConfig, request: WithdrawRequest, us
         : `Jupiter Lend can't pay this out right now. Try a smaller amount or try later.`,
     isSol && !!assetInfo
   );
-  logger.info(`Built Jupiter Lend withdrawal: ${quote.inAmount} ${token.symbol}${request.all ? ' (all)' : ''}`);
+  // SOL that lands as SOL includes the closed account's rent. That is shown on its own.
+  const withdrawn = isSol && !assetInfo ? received.minus(rentBack) : received;
+  logger.info(`Built Jupiter Lend withdrawal: ${withdrawn.toFixed()} ${token.symbol}${rentBack.gt(0) ? `, ${rentBack.toFixed()} SOL rent back` : ''}`);
   return {
-    quote: { ...quote, outAmount: received.toFixed(), minOutAmount: received.toFixed() },
+    quote: { ...quote, outAmount: withdrawn.toFixed(), minOutAmount: withdrawn.toFixed(), rentBackSol: rentBack.gt(0) ? rentBack.toFixed() : null },
     transaction: Buffer.from(transaction.serialize()).toString('base64'),
     lastValidBlockHeight,
   };
