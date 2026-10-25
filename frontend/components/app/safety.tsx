@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
+import { markStep } from "@/lib/onboarding"
 import { RISK_LEVELS } from "./rate-board"
 
 export type SortBy = "safety" | "apy"
@@ -35,6 +36,7 @@ export function ViewToggle({ value, onChange, compact = false }: { value: View; 
     <div
       role="group"
       aria-label="Routes to show"
+      data-tour="view"
       className={cn("flex gap-0.5 rounded-[4px] border p-0.5", compact ? "border-frame" : "border-border p-[3px]")}
     >
       {VIEW_OPTIONS.map((option) => (
@@ -149,14 +151,19 @@ export function SafetyBreakdown({ route, className }: { route: YieldRoute; class
 
   if (!route.safety) {
     return (
-      <p className={cn("text-xs leading-relaxed text-muted-foreground", className)}>
+      <p data-tour="score" className={cn("text-xs leading-relaxed text-muted-foreground", className)}>
         Not scored right now: some of the data behind the Safety Score is unavailable. The risk level comes from TVL.{source}
       </p>
     )
   }
 
   return (
-    <details className={cn("group rounded-[2px] border border-hairline bg-card", className)}>
+    <details
+      data-tour="score"
+      // Opening Why is the Getting started checklist's Safety Score step
+      onToggle={(event) => event.currentTarget.open && markStep("safety")}
+      className={cn("group rounded-[2px] border border-hairline bg-card", className)}
+    >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
         <span className="flex items-baseline gap-2">
           <span className="label-roman text-[10px]">Safety Score</span>

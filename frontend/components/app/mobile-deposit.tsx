@@ -361,7 +361,7 @@ function RouteChoices({
         <HorizonToggle value={horizon} onChange={onHorizon} compact />
       </div>
 
-      <div role="radiogroup" aria-label={`${token} routes`}>
+      <div role="radiogroup" aria-label={`${token} routes`} data-tour="routes">
         {routes.length === 0 && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             No {token} route is top rated right now.{" "}
