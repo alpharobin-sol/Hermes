@@ -149,7 +149,13 @@ export function WithdrawDialog({
       if (outcome.kind === "stopped") return
       if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
       if (outcome.kind === "expired") {
-        throw new Error(`Your wallet didn't send the withdrawal, so nothing left your position.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`)
+        // reason set: the wallet errored without sending. reason null: no answer and nothing seen on chain, so Hermes
+        // can't promise nothing was sent (a refreshed blockhash could still land); don't invite a blind retry.
+        throw new Error(
+          outcome.reason
+            ? `Your wallet couldn't send the withdrawal: ${outcome.reason}. Nothing left your position. Try again.`
+            : "Your wallet didn't answer, and Hermes didn't see the withdrawal land. If your wallet shows it was sent, check it on Solscan before trying again."
+        )
       }
       setSignature(outcome.signature)
       if (outcome.failed) throw new Error("The withdrawal failed on-chain. Nothing left your position.")

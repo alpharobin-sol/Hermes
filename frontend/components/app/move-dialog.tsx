@@ -200,7 +200,13 @@ export function MoveDialog({
     if (outcome.kind === "stopped") return null
     if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
     if (outcome.kind === "expired") {
-      throw new Error(`Your wallet didn't send it, so nothing moved.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`)
+      // reason set: the wallet errored without sending. reason null: no answer and nothing seen on chain, so Hermes
+      // can't promise nothing was sent (a refreshed blockhash could still land); don't invite a blind retry.
+      throw new Error(
+        outcome.reason
+          ? `Your wallet couldn't send it: ${outcome.reason}. Nothing moved. Try again.`
+          : "Your wallet didn't answer, and Hermes didn't see it land. If your wallet shows it was sent, check it on Solscan before trying again."
+      )
     }
     setSignature(outcome.signature)
     if (outcome.failed) throw new Error("failed on-chain")

@@ -162,7 +162,12 @@ export function DepositDialog({
           if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
           if (outcome.kind === "expired") {
             throw new Error(
-              `Your wallet didn't send the deposit, so nothing left your wallet.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`
+              // reason set: the wallet reported an error without sending, so nothing left the wallet.
+              // reason null: the wallet never answered and Hermes saw nothing land, so it can't promise nothing was
+              // sent (a wallet that refreshes the blockhash could still land it). Don't invite a blind retry.
+              outcome.reason
+                ? `Your wallet couldn't send the deposit: ${outcome.reason}. Nothing left your wallet. Try again.`
+                : "Your wallet didn't answer, and Hermes didn't see the deposit land. If your wallet shows it was sent, check it on Solscan before trying again, so you don't deposit twice."
             )
           }
           setSignature(outcome.signature)
