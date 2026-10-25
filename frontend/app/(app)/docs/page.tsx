@@ -343,6 +343,10 @@ export default function Docs() {
                 </a>
                 .
               </p>
+              <p>
+                In the Telegram group, Herald, Hermes&apos;s bot, welcomes new members and removes scams. Admins never DM
+                first, and no one from Hermes will ever ask for your seed phrase or private key.
+              </p>
             </Section>
           </div>
         </article>
