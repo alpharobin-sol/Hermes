@@ -29,6 +29,15 @@ interface SendOptions {
 const POLL_MS = 2_500
 // Blocks a blockhash stays valid. A wallet that refreshes the blockhash when it signs gets this many more.
 const BLOCKHASH_LIFE = 150
+// A block height this far from the transaction's own is the RPC's mistake, not the chain's. Then time decides.
+const PLAUSIBLE_BLOCKS = 10_000
+const FALLBACK_MS = 4 * 60_000
+
+// The chain's block height. Read through getEpochInfo: publicnode (Oct 2026) answers getBlockHeight with the slot,
+// about 22 million higher, which made every transaction look long expired.
+async function blockHeight(connection: Connection): Promise<number> {
+  return (await connection.getEpochInfo("confirmed")).blockHeight ?? Number.NaN
+}
 // After this long without the wallet's answer, a dialog says what it is waiting for
 const SLOW_WALLET_MS = 20_000
 
@@ -143,6 +152,7 @@ export async function sendAndWatch({
   onSigned,
 }: SendOptions): Promise<SendOutcome> {
   // The wallet opens first: a phone opens it only right after the tap
+  const started = Date.now()
   let walletSignature: string | null = null
   let walletError: unknown = null
   // An answer that arrives mid-round skips the next pause. One that arrives during a pause ends it.
@@ -194,8 +204,11 @@ export async function sendAndWatch({
           checked.add(entry.signature)
         }
       }
-      // Past the deadline: a last look for the wallet's signature, then nothing more can land
-      if ((await connection.getBlockHeight("confirmed")) > deadline) {
+      // Past the deadline: a last look for the wallet's signature, then nothing more can land. A height reading that
+      // makes no sense next to the transaction's own falls back to time, so a bad RPC can't end the wait early.
+      const height = await blockHeight(connection)
+      const past = Math.abs(height - lastValidBlockHeight) < PLAUSIBLE_BLOCKS ? height > deadline : Date.now() - started > FALLBACK_MS
+      if (past) {
         if (walletSignature) {
           const status = await statusOf(walletSignature)
           if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {

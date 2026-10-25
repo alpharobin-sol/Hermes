@@ -247,23 +247,21 @@ export function MoveDialog({
           if (!sig) return
           continue
         }
+        // Sent through the app's connection, then followed on the chain like a wallet's send
         const sig = await connection.sendRawTransaction(signed[i].serialize())
         setSignature(sig)
         setStatus("step2-confirming")
-        let result
-        try {
-          result = await connection.confirmTransaction(
-            { signature: sig, blockhash: transactions[i].message.recentBlockhash, lastValidBlockHeight: built.lastValidBlockHeight },
-            "confirmed"
-          )
-        } catch (confirmErr) {
-          console.warn("Could not confirm move step 2", confirmErr)
-          // Sent but not checked. Never offer a retry here: it could deposit twice.
-          setStatus("unconfirmed")
-          onDone()
-          return
-        }
-        if (result.value.err) throw new Error("Step 2 failed on-chain. Nothing was deposited.")
+        const outcome = await sendAndWatch({
+          connection,
+          sendTransaction: async () => sig,
+          transaction: signed[i],
+          user: publicKey,
+          lastValidBlockHeight: built.lastValidBlockHeight,
+          signal,
+        })
+        if (outcome.kind === "stopped") return
+        if (outcome.kind !== "landed") throw new Error("Step 2 didn't land. Nothing was deposited.")
+        if (outcome.failed) throw new Error("Step 2 failed on-chain. Nothing was deposited.")
       }
       if (signal.aborted) return
       setStatus("success")
