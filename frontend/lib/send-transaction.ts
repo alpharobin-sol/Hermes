@@ -32,6 +32,9 @@ const BLOCKHASH_LIFE = 150
 // A block height this far from the transaction's own is the RPC's mistake, not the chain's. Then time decides.
 const PLAUSIBLE_BLOCKS = 10_000
 const FALLBACK_MS = 4 * 60_000
+// 150 blocks take at least a minute, so nothing Hermes built can expire sooner. Whatever the RPC says, the wait lasts
+// at least this long.
+const MIN_WAIT_MS = 60_000
 
 // The chain's block height. Read through getEpochInfo: publicnode (Oct 2026) answers getBlockHeight with the slot,
 // about 22 million higher, which made every transaction look long expired.
@@ -206,8 +209,10 @@ export async function sendAndWatch({
       }
       // Past the deadline: a last look for the wallet's signature, then nothing more can land. A height reading that
       // makes no sense next to the transaction's own falls back to time, so a bad RPC can't end the wait early.
+      const waited = Date.now() - started
       const height = await blockHeight(connection)
-      const past = Math.abs(height - lastValidBlockHeight) < PLAUSIBLE_BLOCKS ? height > deadline : Date.now() - started > FALLBACK_MS
+      const past =
+        waited > MIN_WAIT_MS && (Math.abs(height - lastValidBlockHeight) < PLAUSIBLE_BLOCKS ? height > deadline : waited > FALLBACK_MS)
       if (past) {
         if (walletSignature) {
           const status = await statusOf(walletSignature)
