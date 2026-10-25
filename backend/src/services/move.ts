@@ -8,6 +8,7 @@ import { connection, getRate, http } from './rates';
 import { createJupiterClient } from './jupiter';
 import { DepositError } from './errors';
 import depositService, { assertUserOnlySigner, DepositQuote, DepositTransaction } from './deposit';
+import { solReserve } from './sol-reserve';
 import { buildWithdrawal, quoteWithdrawal, WithdrawQuote } from './withdraw';
 
 /**
@@ -72,9 +73,6 @@ export interface MoveFinish extends DepositTransaction {
 
 // A move swaps into a new route, so it is held to the deposit's limit on price impact
 const MAX_MOVE_IMPACT_PCT = Number(process.env.DEPOSIT_MAX_PRICE_IMPACT_PCT || 1);
-// SOL a two-step move leaves in the wallet for fees, and for a Kamino account's one-time rent
-const FEE_RESERVE_SOL = 0.01;
-const KAMINO_RENT_RESERVE_SOL = 0.03;
 // The first step must be recent: finishing a move is not a way to deposit an old withdrawal again
 const FINISH_WINDOW_SECONDS = 30 * 60;
 
@@ -297,8 +295,8 @@ export async function buildMove(request: MoveRequest): Promise<MoveTransaction> 
 }
 
 /**
- * Step 2 of a two-step move: the deposit of what step 1 paid into the wallet. SOL keeps a little back for fees, and
- * for a Kamino account's rent, when the wallet holds little else.
+ * Step 2 of a two-step move: the deposit of what step 1 paid into the wallet. SOL keeps the new route's hold-back
+ * (its fees and the accounts its deposit opens) when the wallet holds little else.
  */
 export async function finishMove(request: MoveRequest & { signature: string }): Promise<MoveFinish> {
   const { from, to, user } = resolve(request);
@@ -312,7 +310,8 @@ export async function finishMove(request: MoveRequest & { signature: string }): 
   let amount = received;
   let kept: Decimal | null = null;
   if (token.mint === TOKENS.SOL.mint) {
-    const reserve = FEE_RESERVE_SOL + (to.direct?.kind === 'kamino-lend' ? KAMINO_RENT_RESERVE_SOL : 0);
+    // The new route's hold-back: its fees and the accounts its deposit opens
+    const reserve = solReserve(to);
     const spendable = new Decimal(await connection.getBalance(user)).div(1e9).minus(reserve);
     if (spendable.lt(amount)) {
       amount = Decimal.max(0, spendable).toDecimalPlaces(9, Decimal.ROUND_DOWN);

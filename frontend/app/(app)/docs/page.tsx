@@ -323,6 +323,12 @@ export default function Docs() {
                 SOL for a Kamino vault. A first Project 0 deposit pays about 0.0124 SOL, back when you take everything
                 out.
               </p>
+              <p>
+                Each route keeps back the SOL its deposit needs for fees and the accounts it opens, so the deposit can
+                pay for itself: about 0.0053 SOL for a staking token or Jupiter Lend, about 0.033 SOL for a first
+                Kamino Lend deposit. A USDC or USDT deposit needs that SOL in your wallet beside it. The deposit box shows
+                how much you can deposit.
+              </p>
             </Section>
 
             <Section id="contact">

@@ -25,7 +25,8 @@ function getAssociatedTokenAddress(owner: PublicKey, mint: PublicKey): PublicKey
 
 export type TokenBalances = Record<string, number>
 
-// Fee buffer kept back from MAX so the deposit transaction can still pay for itself
+// SOL kept back from MAX until a route is picked. Each route then has its own hold-back (`solReserve`): its fees and
+// the accounts its deposit opens.
 export const SOL_FEE_RESERVE = 0.01
 
 export function useTokenBalances() {

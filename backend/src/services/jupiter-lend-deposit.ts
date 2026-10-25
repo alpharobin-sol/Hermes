@@ -34,8 +34,6 @@ import { createJupiterClient } from './jupiter';
 export const JUPITER_LEND_PROGRAM = new PublicKey('jup3YeL8QhtSx1e253b2FDvsMNC87fDrgQZivbrndc9');
 // Measured on mainnet: a first deposit (token accounts plus deposit) uses 62k to 78k compute units
 const JUPITER_LEND_COMPUTE_UNITS = 150_000;
-// SOL kept back for the token account rent and fees
-const FEE_BUFFER_LAMPORTS = 10_000_000;
 
 const lendApi = createJupiterClient('lend/v1', process.env.JUPITER_LEND_API_URL);
 
@@ -132,9 +130,8 @@ export async function buildJupiterLendDeposit(connection: Connection, params: Ju
   const assetAccount = getAssociatedTokenAddressSync(new PublicKey(asset.mint), user, true);
   const receiptAccount = getAssociatedTokenAddressSync(new PublicKey(receipt.mint), user, true);
 
-  const [depositInstructions, balance, assetInfo, receiptInfo] = await Promise.all([
+  const [depositInstructions, assetInfo, receiptInfo] = await Promise.all([
     fetchDepositInstructions(params),
-    connection.getBalance(user),
     connection.getAccountInfo(assetAccount),
     connection.getAccountInfo(receiptAccount),
   ]);
@@ -146,11 +143,8 @@ export async function buildJupiterLendDeposit(connection: Connection, params: Ju
     throw new DepositError("Jupiter Lend's deposit service returned an unexpected transaction. Try again shortly.", 502);
   }
 
-  if (isSol) {
-    if (amount.plus(FEE_BUFFER_LAMPORTS).gt(balance)) {
-      throw new DepositError(`Insufficient balance: you have ${balance / 1e9} SOL. Keep 0.01 SOL for fees.`, 422);
-    }
-  } else if (new Decimal(tokenAmount(assetInfo?.data).toString()).lt(amount)) {
+  // A SOL deposit's balance was checked against the route's hold-back before it got here
+  if (!isSol && new Decimal(tokenAmount(assetInfo?.data).toString()).lt(amount)) {
     throw new DepositError(`Insufficient ${asset.symbol} balance for this deposit.`, 422);
   }
 
