@@ -59,6 +59,14 @@ const STEAKHOUSE_USDC = {
   shares: { symbol: 'kVUSDC', mint: '7D8C5pDFxug58L9zkwK7bCiDg4kD4AygzbcZUmf5usHS', decimals: 6 },
 };
 
+// Project 0 (formerly marginfi): its main group and the bank Hermes lends each token to. Hermes opens one account per
+// token for the wallet, a PDA at a fixed index, so a Project 0 position from Hermes never shares an account with loans.
+export const PROJECT0_GROUP = '4qp6Fx6tnZkY5Wropq9wUYgtFxXKwE6viZxFHg3rdAG8';
+const PROJECT0_BANKS: Partial<Record<InputToken, { bank: string; accountIndex: number }>> = {
+  USDC: { bank: '2s37akK2eyBbp8DZgCm7RtsaEz8eJP3Nxd4urLHQv7yB', accountIndex: 4801 },
+  USDT: { bank: 'HmpMfL8942u22htC4EMiWgLX931g3sacXFR6KjuLgKLV', accountIndex: 4802 },
+};
+
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
   | { kind: 'stake-pool'; pool: string } // SPL stake pool account on chain (SPL program or Sanctum's forks)
@@ -67,6 +75,7 @@ export type RateSource =
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana, only where no live source exists
   | { kind: 'kamino'; reserve: string } // Kamino Lend main market reserve
   | { kind: 'kamino-vault'; vault: string } // Kamino lending vault
+  | { kind: 'project0'; bank: string } // Project 0 bank account on chain
   | { kind: 'jupiter-lend'; mint: string }; // Jupiter Lend earn token
 
 // A deposit straight into the protocol. LST deposits are quoted against Jupiter on mainnet.
@@ -75,6 +84,7 @@ export type DirectDeposit =
   | { kind: 'marinade' } // Marinade liquid staking program, mainnet only
   | { kind: 'kamino-lend'; market: string; reserve: string } // supply to a Kamino Lend reserve, mainnet only
   | { kind: 'kamino-vault'; vault: string; farm: string; shares: TokenInfo } // deposit into a Kamino vault, mainnet only
+  | { kind: 'project0'; group: string; bank: string; accountIndex: number } // lend to a Project 0 bank, mainnet only
   | { kind: 'jupiter-lend' }; // supply to Jupiter Lend Earn for its jl token, mainnet only
 
 export interface RouteConfig {
@@ -277,6 +287,26 @@ export const ROUTES: RouteConfig[] = [
       deposit: { 'mainnet-beta': 'beta' },
     },
   ]),
+
+  // Project 0 (formerly marginfi): the deposit is a position in the wallet's own Project 0 account
+  ...(['USDC', 'USDT'] as InputToken[]).map((token): RouteConfig => {
+    const { bank, accountIndex } = PROJECT0_BANKS[token]!;
+    return {
+      id: `project0-${token.toLowerCase()}`,
+      protocol: 'project0',
+      incidents: ['marginfi', 'Project 0'],
+      name: 'Project 0',
+      category: 'lending',
+      token,
+      direct: { kind: 'project0', group: PROJECT0_GROUP, bank, accountIndex },
+      website: 'https://app.0.xyz',
+      source: { kind: 'project0', bank },
+      // The same program as marginfi, which DefiLlama first recorded on this date
+      trackedSince: '2023-02-22',
+      trackedFrom: "DefiLlama's first record, as marginfi",
+      deposit: { 'mainnet-beta': 'beta' },
+    };
+  }),
 
   // Lending vaults: Kamino spreads the deposit across Kamino Lend reserves the curator picks
   {

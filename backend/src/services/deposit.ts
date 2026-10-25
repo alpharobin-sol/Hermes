@@ -9,6 +9,7 @@ import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
 import { buildKaminoDeposit, KaminoDepositPlan } from './kamino-deposit';
 import { buildJupiterLendDeposit, quoteJupiterLendDeposit } from './jupiter-lend-deposit';
 import { buildKaminoVaultDeposit, KaminoVault, KaminoVaultDepositPlan } from './kamino-vault';
+import { buildProject0Deposit, Project0Deposit, Project0DepositPlan } from './project0';
 import { DepositError } from './errors';
 import { createJupiterClient } from './jupiter';
 
@@ -25,6 +26,8 @@ import { createJupiterClient } from './jupiter';
  *   user's Kamino account rather than a token in the wallet.
  * - USDC -> Kamino vaults (Steakhouse USDC): built by Kamino's transaction API too. The vault's shares are staked in
  *   its farm for the user, so nothing reaches the wallet either.
+ * - USDC, USDT -> Project 0 (formerly marginfi): built by Hermes from the program's interface, into the wallet's own
+ *   Project 0 account for that token. A position, not a token in the wallet.
  * - SOL, USDC, USDT -> Jupiter Lend Earn: built from Jupiter's deposit instruction, minting a jl token
  *   (jlWSOL, jlUSDC, jlUSDT) into the wallet. Quoted against a Jupiter swap to the same jl token.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
@@ -223,6 +226,15 @@ export class DepositService {
       return { quote: { ...this.positionQuote(route, network, amount), setupCostSol: plan?.setupCostSol ?? null } };
     }
 
+    if (direct.kind === 'project0') {
+      const amount = toUiAmount(request.amount, TOKENS[route.token].decimals);
+      // With a wallet, build the deposit now: it checks the balance and measures the account's one-time rent
+      const plan = request.userPublicKey
+        ? await this.buildProject0Plan(route, amount, new PublicKey(request.userPublicKey))
+        : null;
+      return { quote: { ...this.positionQuote(route, network, amount), setupCostSol: plan?.setupCostSol ?? null } };
+    }
+
     if (direct.kind === 'jupiter-lend') {
       const token = TOKENS[route.token];
       const receipt = route.receipt!;
@@ -320,6 +332,12 @@ export class DepositService {
     const token = TOKENS[route.token];
     const raw = BigInt(new Decimal(amount).mul(new Decimal(10).pow(token.decimals)).floor().toFixed(0));
     return buildKaminoVaultDeposit(this.getConnection('mainnet-beta'), route.direct as KaminoVault, token, raw, user);
+  }
+
+  private buildProject0Plan(route: RouteConfig, amount: string, user: PublicKey): Promise<Project0DepositPlan> {
+    const token = TOKENS[route.token];
+    const raw = BigInt(new Decimal(amount).mul(new Decimal(10).pow(token.decimals)).floor().toFixed(0));
+    return buildProject0Deposit(this.getConnection('mainnet-beta'), route.direct as Project0Deposit, token, raw, user);
   }
 
   private async quoteSwap(route: RouteConfig, request: DepositRequest): Promise<Candidate> {
@@ -441,6 +459,20 @@ export class DepositService {
       };
     }
 
+    // The Project 0 builder simulates the deposit itself
+    if (direct.kind === 'project0') {
+      const plan = await this.buildProject0Plan(route, quote.inAmount, user);
+      const transaction = Buffer.from(plan.transaction.serialize()).toString('base64');
+      logger.info(`Built Project 0 deposit: ${quote.inAmount} ${route.token}, one-time rent ${plan.setupCostSol} SOL`);
+      return {
+        quote: { ...quote, setupCostSol: plan.setupCostSol },
+        transaction,
+        transactions: [transaction],
+        lastValidBlockHeight: plan.lastValidBlockHeight,
+        prioritizationFeeLamports: 0,
+      };
+    }
+
     // Jupiter Lend's builder checks the balance and simulates itself
     if (direct.kind === 'jupiter-lend') {
       const token = TOKENS[route.token];
@@ -530,6 +562,8 @@ function directLabel(route: RouteConfig): string {
       return 'Kamino Lend main market';
     case 'kamino-vault':
       return route.curator ? `Kamino vault, curated by ${route.curator}` : 'Kamino vault';
+    case 'project0':
+      return 'Project 0 main pool';
     case 'jupiter-lend':
       return 'Jupiter Lend Earn';
     default:

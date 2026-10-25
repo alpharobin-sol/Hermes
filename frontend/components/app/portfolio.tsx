@@ -287,9 +287,9 @@ export function PortfolioSection({
 
       {positions.length > 0 && (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Live from your wallet, Kamino and Jupiter Lend. Earned is what a position is worth now minus what you paid in,
-          network fees aside.
-          {missingEarned && " Earned for staking tokens and Jupiter Lend is coming soon."}
+          Live from your wallet, Kamino, Jupiter Lend and Project 0. Earned is what a position is worth now minus what
+          you paid in, network fees aside.
+          {missingEarned && " Earned for staking tokens, Jupiter Lend and Project 0 is coming soon."}
         </p>
       )}
       {moving && (

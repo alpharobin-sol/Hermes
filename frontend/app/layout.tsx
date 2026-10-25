@@ -48,6 +48,8 @@ export const metadata: Metadata = {
     "mSOL APY",
     "Kamino Lend",
     "Jupiter Lend",
+    "Project 0",
+    "marginfi",
     "USDC yield Solana",
     "Solana yield aggregator",
     "Safety Score",

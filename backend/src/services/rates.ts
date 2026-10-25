@@ -4,9 +4,10 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { StakePoolLayout } from '@solana/spl-stake-pool';
 import { logger } from '../utils/logger';
 import { cached } from './cache';
-import { KAMINO_MAIN_MARKET, RateSource, ROUTES, TOKENS } from '../registry/routes';
+import { KAMINO_MAIN_MARKET, PROJECT0_GROUP, RateSource, ROUTES, TOKENS } from '../registry/routes';
 import { tokenValueNear } from './history';
 import { jupiterBase, jupiterHeaders } from './jupiter';
+import { readBank } from './project0';
 
 /**
  * Live APY and TVL for every route in the registry, read from the chain or the protocol itself:
@@ -15,6 +16,7 @@ import { jupiterBase, jupiterHeaders } from './jupiter';
  *   and from DefiLlama only until that history is a day old (Sanctum's APY API returns 0).
  * - mSOL: Marinade's API. Kamino Lend: Kamino's API. Jupiter Lend: Jupiter's API.
  * - Kamino vaults: Kamino's API for where the vault lends, and each reserve's free liquidity on chain.
+ * - Project 0: each bank's own account on chain (its API refuses outside callers).
  * Fast sources refresh every minute. When a source is down, routes that depend on it drop out.
  * Hermes never fills the gap with an estimate.
  */
@@ -334,6 +336,37 @@ const kaminoVaultRates = rateSource('Kamino vaults', async () => {
   return new Map(await Promise.all(vaults.map(async (vault) => [vault, await kaminoVaultRate(vault)] as const)));
 });
 
+// Keyed by bank address. Each Project 0 bank's account on chain: deposits and borrows from its shares, the lending APR
+// the bank cached at its last update (what lenders earn at today's borrowing), and the oracle price it last used for
+// TVL. Jupiter's price stands in when the bank hasn't read its oracle for a day.
+const project0Rates = rateSource('Project 0 on chain', async () => {
+  const routes = ROUTES.filter((route) => route.source.kind === 'project0');
+  const banks = routes.map((route) => (route.source.kind === 'project0' ? route.source.bank : ''));
+  const infos = await connection.getMultipleAccountsInfo(banks.map((bank) => new PublicKey(bank)));
+  const rates: RateMap = new Map();
+  const now = Date.now();
+  for (const [i, info] of infos.entries()) {
+    const route = routes[i];
+    if (!info) continue;
+    const bank = readBank(info.owner, info.data, PROJECT0_GROUP);
+    if (bank.mint !== TOKENS[route.token].mint || !bank.deposits.gt(0)) continue;
+    const price = bank.price > 0 && now - bank.priceAt < DAY_MS ? bank.price : (await tokenPrices.get())?.get(route.token);
+    if (!price) continue;
+    const deposits = bank.deposits.toNumber();
+    const utilization = Math.min(1, bank.borrowed.div(bank.deposits).toNumber());
+    rates.set(banks[i], {
+      // The APR compounds as interest accrues into the share value
+      apy: Math.expm1(bank.lendingApr),
+      tvl: deposits * price,
+      utilization,
+      withdrawable: Math.max(0, 1 - utilization),
+      deposits,
+      updatedAt: now,
+    });
+  }
+  return rates;
+});
+
 // Keyed by token mint
 const jupiterLendRates = rateSource('Jupiter Lend', async () => {
   const response = await http.get(`${process.env.JUPITER_LEND_API_URL || jupiterBase('lend/v1')}/earn/tokens`, {
@@ -366,6 +399,7 @@ export const SOURCE_LABELS: Record<RateSource['kind'], string> = {
   defillama: 'DefiLlama',
   kamino: 'Kamino',
   'kamino-vault': 'Kamino',
+  project0: 'On-chain',
   'jupiter-lend': 'Jupiter Lend',
 };
 
@@ -386,6 +420,8 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
       return (await kaminoRates.get())?.get(source.reserve);
     case 'kamino-vault':
       return (await kaminoVaultRates.get())?.get(source.vault);
+    case 'project0':
+      return (await project0Rates.get())?.get(source.bank);
     case 'jupiter-lend':
       return (await jupiterLendRates.get())?.get(source.mint);
   }
@@ -395,5 +431,5 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
  * Fetch every source whose cache is due, so requests hit a warm cache
  */
 export async function refreshRates(): Promise<void> {
-  await Promise.all([stakePoolRates, infinityRates, marinadeRates, kaminoRates, kaminoVaultRates, jupiterLendRates].map((source) => source.get()));
+  await Promise.all([stakePoolRates, infinityRates, marinadeRates, kaminoRates, kaminoVaultRates, project0Rates, jupiterLendRates].map((source) => source.get()));
 }

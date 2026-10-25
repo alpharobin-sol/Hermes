@@ -27,6 +27,7 @@ import { JUPITER_LEND_PROGRAM, tokenAmount } from './jupiter-lend-deposit';
 import { depositBudgetInstructions } from './compute-budget';
 import { kaminoDeposit, kaminoVaultShares } from './portfolio';
 import { KaminoVault, kaminoVaultTransaction } from './kamino-vault';
+import { closeInstruction, Project0Deposit, project0Position, withdrawInstruction } from './project0';
 
 /**
  * HERMES WITHDRAWALS
@@ -42,6 +43,8 @@ import { KaminoVault, kaminoVaultTransaction } from './kamino-vault';
  *   no dust). Jupiter Lend's program only and the user the only signer, like the deposit.
  * - Kamino vaults: Kamino's transaction API unstakes the shares and redeems them for the token. Checked like the
  *   vault's deposit: this vault, this farm, the shares asked for, and the user's own token accounts only.
+ * - Project 0: Hermes builds the withdrawal from the program's interface, out of the wallet's own Project 0 account
+ *   for that token. The whole position also closes the account, which returns its rent.
  *
  * Lending withdrawals are limited by what the reserve can pay out right now, so the quote says how much that is.
  * Every withdrawal is simulated before the user signs it, and what lands is read from the simulation.
@@ -68,8 +71,8 @@ export interface WithdrawQuote {
   value: string | null; // staking tokens: what they are worth in their pool, in SOL, so the exit cost shows
   held: string; // the whole position, in inputToken
   available: string | null; // lending: what the reserve can pay out right now, in the route's token
-  position: string | null; // lending: "Kamino Lend", "Jupiter Lend" or the vault's name
-  rentBackSol: string | null; // a full Kamino exit closes the Kamino account and returns its rent, in SOL
+  position: string | null; // lending: "Kamino Lend", "Jupiter Lend", "Project 0" or the vault's name
+  rentBackSol: string | null; // a full Kamino or Project 0 exit closes the account and returns its rent, in SOL
 }
 
 export interface WithdrawTransaction {
@@ -84,6 +87,8 @@ const MAX_SETUP_SOL = 0.01;
 // Measured by simulation: a Kamino withdrawal with reserve and account refreshes uses about 150k compute units
 const KAMINO_WITHDRAW_UNITS = 400_000;
 const JUPITER_LEND_WITHDRAW_UNITS = 200_000;
+// Measured by simulation: a Project 0 withdrawal with its health check, or a full one with the account's close
+const PROJECT0_WITHDRAW_UNITS = 200_000;
 
 const swapApi = createJupiterClient('swap/v1', process.env.JUPITER_API_URL);
 const lendApi = createJupiterClient('lend/v1', process.env.JUPITER_LEND_API_URL);
@@ -385,6 +390,52 @@ async function buildVault(route: RouteConfig, request: WithdrawRequest, user: Pu
   };
 }
 
+async function quoteProject0(route: RouteConfig, request: WithdrawRequest, user: PublicKey) {
+  const token = TOKENS[route.token];
+  const direct = route.direct as Project0Deposit;
+  const [{ bank, position }, available] = await Promise.all([project0Position(connection, direct, token, user), availableNow(route)]);
+  if (position.borrows) throw new DepositError('This wallet borrows from the Project 0 account Hermes uses. Manage it at app.0.xyz.', 422);
+  const held = new Decimal(ui(position.amount.toFixed(0), token.decimals));
+  const amount = request.all ? held : new Decimal(request.amount!).toDecimalPlaces(token.decimals, Decimal.ROUND_DOWN);
+  checkAmount(route, amount, held, available, 'Project 0');
+  return { quote: lendingQuote(route, amount.toFixed(), held.toFixed(), available, 'Project 0'), bank, position };
+}
+
+async function buildProject0(route: RouteConfig, request: WithdrawRequest, user: PublicKey): Promise<WithdrawTransaction> {
+  const { quote, bank, position } = await quoteProject0(route, request, user);
+  const token = TOKENS[route.token];
+  const direct = route.direct as Project0Deposit;
+  const all = request.all || new Decimal(quote.inAmount).gte(quote.held);
+  const destination = getAssociatedTokenAddressSync(new PublicKey(token.mint), user, true);
+  const instructions = [
+    createAssociatedTokenAccountIdempotentInstruction(user, destination, user, new PublicKey(token.mint)),
+    withdrawInstruction(direct, bank, position.account, user, destination, all ? null : raw(quote.inAmount, token.decimals)),
+    // An emptied account closes, so its rent comes back. One that holds something else stays open.
+    ...(all && !position.others ? [closeInstruction(position.account, user)] : []),
+  ];
+  const budget = await depositBudgetInstructions(connection, [new PublicKey(direct.bank)], PROJECT0_WITHDRAW_UNITS);
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  const transaction = new VersionedTransaction(
+    new TransactionMessage({ payerKey: user, recentBlockhash: blockhash, instructions: [...budget, ...instructions] }).compileToV0Message()
+  );
+  const { received, solChange } = await simulateWithdrawal(transaction, user, token, (logs) => {
+    const text = logs.join(' ');
+    if (/insufficient lamports|no record of a prior credit/i.test(text)) return 'Not enough SOL for the network fee.';
+    // The bank's vault can't cover the transfer: the rest of the deposits are lent out
+    if (/insufficient funds|liquidity/i.test(text)) {
+      return `Project 0's ${token.symbol} bank can't pay this out right now: it is lent out. Try a smaller amount or try later.`;
+    }
+    return 'Project 0 rejected this withdrawal in simulation. Try again shortly, or manage it at app.0.xyz.';
+  });
+  const rentBack = all && !position.others ? Decimal.max(0, solChange) : new Decimal(0);
+  logger.info(`Built Project 0 withdrawal: ${received.toFixed()} ${token.symbol}${rentBack.gt(0) ? `, ${rentBack.toFixed()} SOL rent back` : ''}`);
+  return {
+    quote: { ...quote, outAmount: received.toFixed(), minOutAmount: received.toFixed(), rentBackSol: rentBack.gt(0.00001) ? rentBack.toFixed() : null },
+    transaction: Buffer.from(transaction.serialize()).toString('base64'),
+    lastValidBlockHeight,
+  };
+}
+
 async function jupiterLendPosition(route: RouteConfig, user: PublicKey) {
   const { data } = await lendApi.get('/earn/positions', { params: { users: user.toBase58() } });
   const position = (Array.isArray(data) ? data : []).find((p: any) => p.token?.address === route.receipt!.mint);
@@ -483,6 +534,7 @@ export async function quoteWithdrawal(request: WithdrawRequest): Promise<Withdra
   if (route.category === 'liquid-staking') return (await quoteStaked(route, request, user)).quote;
   if (route.source.kind === 'kamino') return quoteKamino(route, request, user);
   if (route.source.kind === 'kamino-vault') return (await quoteVault(route, request, user)).quote;
+  if (route.source.kind === 'project0') return (await quoteProject0(route, request, user)).quote;
   if (route.source.kind === 'jupiter-lend') return (await quoteJupiterLend(route, request, user)).quote;
   throw new DepositError(`Hermes can't withdraw from ${route.name} yet.`, 422);
 }
@@ -492,6 +544,7 @@ export async function buildWithdrawal(request: WithdrawRequest): Promise<Withdra
   if (route.category === 'liquid-staking') return buildStaked(route, request, user);
   if (route.source.kind === 'kamino') return buildKamino(route, request, user);
   if (route.source.kind === 'kamino-vault') return buildVault(route, request, user);
+  if (route.source.kind === 'project0') return buildProject0(route, request, user);
   if (route.source.kind === 'jupiter-lend') return buildJupiterLend(route, request, user);
   throw new DepositError(`Hermes can't withdraw from ${route.name} yet.`, 422);
 }
