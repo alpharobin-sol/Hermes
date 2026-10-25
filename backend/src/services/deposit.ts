@@ -8,6 +8,7 @@ import { buildStakePoolDeposit, quoteStakePoolDeposit, StakePoolTarget } from '.
 import { buildMarinadeDeposit, quoteMarinadeDeposit } from './marinade-deposit';
 import { buildKaminoDeposit, KaminoDepositPlan } from './kamino-deposit';
 import { buildJupiterLendDeposit, quoteJupiterLendDeposit } from './jupiter-lend-deposit';
+import { buildKaminoVaultDeposit, KaminoVault, KaminoVaultDepositPlan } from './kamino-vault';
 import { DepositError } from './errors';
 import { createJupiterClient } from './jupiter';
 
@@ -22,6 +23,8 @@ import { createJupiterClient } from './jupiter';
  *   against the Jupiter swap API and build whichever gives more of the token. Other LSTs go through Jupiter.
  * - SOL, USDC, USDT -> Kamino Lend: supplied through Kamino's transaction API, held as a position in the
  *   user's Kamino account rather than a token in the wallet.
+ * - USDC -> Kamino vaults (Steakhouse USDC): built by Kamino's transaction API too. The vault's shares are staked in
+ *   its farm for the user, so nothing reaches the wallet either.
  * - SOL, USDC, USDT -> Jupiter Lend Earn: built from Jupiter's deposit instruction, minting a jl token
  *   (jlWSOL, jlUSDC, jlUSDT) into the wallet. Quoted against a Jupiter swap to the same jl token.
  * Devnet (SOLANA_NETWORK=devnet): SOL -> stake pools that exist on devnet, deposited directly.
@@ -211,6 +214,15 @@ export class DepositService {
       };
     }
 
+    if (direct.kind === 'kamino-vault') {
+      const amount = toUiAmount(request.amount, TOKENS[route.token].decimals);
+      // With a wallet, build the deposit now: it checks the balance and measures the one-time account rent
+      const plan = request.userPublicKey
+        ? await this.buildVaultPlan(route, amount, new PublicKey(request.userPublicKey))
+        : null;
+      return { quote: { ...this.positionQuote(route, network, amount), setupCostSol: plan?.setupCostSol ?? null } };
+    }
+
     if (direct.kind === 'jupiter-lend') {
       const token = TOKENS[route.token];
       const receipt = route.receipt!;
@@ -302,6 +314,12 @@ export class DepositService {
       amount,
       user,
     });
+  }
+
+  private buildVaultPlan(route: RouteConfig, amount: string, user: PublicKey): Promise<KaminoVaultDepositPlan> {
+    const token = TOKENS[route.token];
+    const raw = BigInt(new Decimal(amount).mul(new Decimal(10).pow(token.decimals)).floor().toFixed(0));
+    return buildKaminoVaultDeposit(this.getConnection('mainnet-beta'), route.direct as KaminoVault, token, raw, user);
   }
 
   private async quoteSwap(route: RouteConfig, request: DepositRequest): Promise<Candidate> {
@@ -409,6 +427,20 @@ export class DepositService {
       };
     }
 
+    // The vault builder checks the transaction and simulates it
+    if (direct.kind === 'kamino-vault') {
+      const plan = await this.buildVaultPlan(route, quote.inAmount, user);
+      const transaction = Buffer.from(plan.transaction.serialize()).toString('base64');
+      logger.info(`Built Kamino vault deposit: ${quote.inAmount} ${route.token} into ${route.id}, one-time rent ${plan.setupCostSol} SOL`);
+      return {
+        quote: { ...quote, setupCostSol: plan.setupCostSol },
+        transaction,
+        transactions: [transaction],
+        lastValidBlockHeight: plan.lastValidBlockHeight,
+        prioritizationFeeLamports: 0,
+      };
+    }
+
     // Jupiter Lend's builder checks the balance and simulates itself
     if (direct.kind === 'jupiter-lend') {
       const token = TOKENS[route.token];
@@ -496,6 +528,8 @@ function directLabel(route: RouteConfig): string {
       return 'Marinade liquid staking';
     case 'kamino-lend':
       return 'Kamino Lend main market';
+    case 'kamino-vault':
+      return route.curator ? `Kamino vault, curated by ${route.curator}` : 'Kamino vault';
     case 'jupiter-lend':
       return 'Jupiter Lend Earn';
     default:

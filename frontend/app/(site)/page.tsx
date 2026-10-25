@@ -52,6 +52,8 @@ const TOKENS = [
 ]
 
 const TYPE: Record<YieldRoute["category"], string> = { "liquid-staking": "Liquid staking", lending: "Lending" }
+// A lending route with a curator is a vault
+const typeOf = (route: YieldRoute) => (route.curator ? "Lending vault" : TYPE[route.category])
 
 const percent = (apy: number) => `${(apy * 100).toFixed(2)}%`
 
@@ -118,7 +120,7 @@ const AUDIENCES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: CircleDollarSign,
     title: "Stablecoin savers",
-    body: "Lend USDC or USDT on Kamino and Jupiter Lend. No impermanent loss, and you see how much of each reserve is borrowed.",
+    body: "Lend USDC or USDT on Kamino and Jupiter Lend, or through a curated Kamino vault. No impermanent loss, and you see how much can be withdrawn.",
   },
   {
     icon: Activity,
@@ -176,12 +178,12 @@ const FAQS = [
   {
     question: "Does Hermes hold my funds?",
     answer:
-      "No. Each deposit goes straight from your wallet to the protocol in a transaction you sign, and so does each withdrawal. What you get back, like JitoSOL or a Kamino position, is yours. Hermes has no vault and never sees your keys.",
+      "No. Each deposit goes straight from your wallet to the protocol in a transaction you sign, and so does each withdrawal. What you get back, like JitoSOL or a Kamino position, is yours. Hermes has no vault of its own and never sees your keys.",
   },
   {
     question: "Which routes can I use?",
     answer:
-      "Ten liquid staking tokens, including JitoSOL, mSOL and INF, plus Kamino Lend and Jupiter Lend for SOL, USDC and USDT. Every route on Hermes deposits inside Hermes. They are in beta, capped at 10 SOL per deposit, or 1,000 USDC or USDT for lending.",
+      "Ten liquid staking tokens, including JitoSOL, mSOL and INF, Kamino Lend and Jupiter Lend for SOL, USDC and USDT, and Kamino's Steakhouse USDC vault. Every route on Hermes deposits inside Hermes. They are in beta, capped at 10 SOL per deposit, or 1,000 USDC or USDT for lending.",
   },
   {
     question: "What can go wrong?",
@@ -273,7 +275,7 @@ function boardColumns(routes: YieldRoute[]): BoardColumn[] {
       .filter((route) => route.token === token.symbol && isTopRated(route))
       .sort(bySafety)
       .slice(0, 4)
-      .map((route) => ({ id: route.id, name: route.name, type: TYPE[route.category], apy: route.apy, score: route.safety?.score ?? 0 })),
+      .map((route) => ({ id: route.id, name: route.name, type: typeOf(route), apy: route.apy, score: route.safety?.score ?? 0 })),
   })).filter((column) => column.routes.length > 0)
 }
 
@@ -627,7 +629,7 @@ function topScored(routes: YieldRoute[]): ShowcaseRoute | null {
   return {
     id: top.id,
     name: top.name,
-    subtitle: `${top.receipt ?? top.token} · ${TYPE[top.category]}`,
+    subtitle: `${top.receipt ?? top.token} · ${typeOf(top)}`,
     score: top.safety.score,
     parts: top.safety.parts,
     deductions: top.safety.deductions ?? [],

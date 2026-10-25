@@ -15,6 +15,7 @@ export interface YieldRoute {
   category: Category;
   token: InputToken; // what the user deposits
   receipt: string | null; // token the user receives, e.g. JitoSOL
+  curator: string | null; // a lending vault's curator, who picks the reserves it lends to
   apy: number; // decimal
   tvl: number; // USD
   risk: RiskTier; // band of the Safety Score, or from TVL while the route has no score
@@ -79,7 +80,7 @@ export async function getYieldRoutes(
     // No rate, no row
     if (!rate) return null;
     const safety = safetyScore(route, rate);
-    // Share of deposits that can't leave right now: borrowed (Kamino) or not withdrawable (Jupiter Lend)
+    // Share of deposits that can't leave right now: borrowed (Kamino) or not withdrawable (Jupiter Lend, vaults)
     const locked = rate.utilization ?? (rate.withdrawable !== undefined ? 1 - rate.withdrawable : undefined);
 
     return {
@@ -89,6 +90,7 @@ export async function getYieldRoutes(
       category: route.category,
       token: route.token,
       receipt: route.receipt?.symbol ?? null,
+      curator: route.curator ?? null,
       apy: rate.apy,
       tvl: rate.tvl,
       risk: riskTier(rate.tvl, locked, safety?.score),

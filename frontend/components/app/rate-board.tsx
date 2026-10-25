@@ -31,6 +31,11 @@ export const CATEGORY_LABELS: Record<YieldRoute["category"], string> = {
   lending: "Lending",
 }
 
+// The route type as shown: a lending route with a curator is a vault
+export function typeLabel(route: YieldRoute): string {
+  return route.curator ? "Lending vault" : CATEGORY_LABELS[route.category]
+}
+
 // Above this share borrowed, a lending reserve may not have liquidity for withdrawals
 export const HIGH_UTILIZATION = 0.95
 
@@ -38,7 +43,7 @@ export function borrowedPercent(route: YieldRoute): number | null {
   return typeof route.utilization === "number" ? Math.min(100, Math.round(route.utilization * 100)) : null
 }
 
-// Lending sources that report what can leave right now instead of what is borrowed (Jupiter Lend)
+// Lending sources that report what can leave right now instead of what is borrowed (Jupiter Lend, vaults)
 export function withdrawablePercent(route: YieldRoute): number | null {
   return typeof route.utilization !== "number" && typeof route.withdrawable === "number"
     ? Math.round(route.withdrawable * 100)

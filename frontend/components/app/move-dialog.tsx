@@ -201,7 +201,7 @@ export function MoveDialog({
           signature: step1Signature,
         })
         setFinish(built)
-        if (built.quote.setupCostSol && !signNow) {
+        if (Number(built.quote.setupCostSol) > 0 && !signNow) {
           setStatus("step2-ready")
           return
         }

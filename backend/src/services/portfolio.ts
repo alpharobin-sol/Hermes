@@ -23,6 +23,9 @@ import { getYieldRoutes } from './yields';
  * - Jupiter Lend: Jupiter's API for what the wallet's jl tokens are worth. Earned: that value minus what was paid in,
  *   from the wallet's history like liquid staking. Jupiter's own earnings figure stops at the wallet's last
  *   transaction, so Hermes doesn't use it.
+ * - Kamino vaults: the wallet's vault shares from Kamino's API, staked or not, worth the shares times what one share
+ *   holds. Earned: that value minus what was paid in, from Kamino's record of the wallet's vault deposits and
+ *   withdrawals. Shares that came another way leave earned out.
  *
  * A source that fails is named in `unavailable`, never counted as empty. Each wallet's answer is kept 60 seconds.
  */
@@ -68,6 +71,7 @@ const lendApi = createJupiterClient('lend/v1', process.env.JUPITER_LEND_API_URL)
 const LST_ROUTES = ROUTES.filter((route) => route.category === 'liquid-staking' && route.receipt);
 const KAMINO_ROUTES = ROUTES.filter((route) => route.source.kind === 'kamino');
 const JUPITER_LEND_ROUTES = ROUTES.filter((route) => route.source.kind === 'jupiter-lend' && route.receipt);
+const VAULT_ROUTES = ROUTES.filter((route) => route.source.kind === 'kamino-vault');
 
 // ---------- Wallet history, for what liquid staking has earned ----------
 
@@ -398,6 +402,19 @@ export async function kaminoDeposit(owner: string, reserve: string): Promise<{ a
   };
 }
 
+/**
+ * The vault shares the wallet holds in each Kamino vault, staked or not, from Kamino's API. In shares, UI units.
+ */
+export async function kaminoVaultShares(owner: string): Promise<Map<string, number>> {
+  const { data } = await http.get(`${kaminoApi}/kvaults/users/${owner}/positions`);
+  const shares = new Map<string, number>();
+  for (const position of Array.isArray(data) ? data : []) {
+    const total = Number(position?.totalShares);
+    if (typeof position?.vaultAddress === 'string' && total > 0) shares.set(position.vaultAddress, total);
+  }
+  return shares;
+}
+
 async function jupiterLend(owner: string): Promise<Found[]> {
   const { data } = await lendApi.get('/earn/positions', { params: { users: owner } });
   const held = (Array.isArray(data) ? data : []).flatMap((position: any) => {
@@ -434,6 +451,65 @@ async function jupiterLend(owner: string): Promise<Found[]> {
   );
 }
 
+// What a vault position has earned, from Kamino's record of the wallet's deposits into and withdrawals from the vault.
+// Shares change hands at what they hold, so the cost basis works like a staking token's.
+function vaultEarned(transactions: any[], shares: number, tokenValue: number, decimals: number): Earned {
+  const found: Change[] = transactions
+    .map((t) => ({ at: Date.parse(t?.createdOn), kind: t?.instruction, shares: Number(t?.numberOfShares), tokens: Number(t?.tokenAmount) }))
+    .filter((t) => Number.isFinite(t.at) && t.shares > 0 && t.tokens > 0 && (t.kind === 'deposit' || t.kind === 'withdraw'))
+    .sort((a, b) => a.at - b.at)
+    .map((t) => (t.kind === 'deposit' ? { at: t.at, tokens: t.shares, paid: -t.tokens } : { at: t.at, tokens: -t.shares, paid: t.tokens }));
+  const basis = costBasis(found, tokenValue, decimals);
+  if (Math.abs(basis.held - shares) > Math.max(10 ** -decimals * 10, shares * 1e-6)) {
+    return { earned: null, note: "Earned unknown: Kamino's record of this vault doesn't match the shares held.", since: null };
+  }
+  if (basis.unknownCost) return { earned: null, note: 'Earned unknown: some shares came another way.', since: basis.since };
+  return { earned: shares * tokenValue - basis.cost, note: null, since: basis.since };
+}
+
+async function kaminoVaults(owner: string): Promise<Found[]> {
+  const shares = await kaminoVaultShares(owner);
+  const held = VAULT_ROUTES.flatMap((route) => {
+    const amount = route.source.kind === 'kamino-vault' ? shares.get(route.source.vault) : undefined;
+    return amount ? [{ route, amount }] : [];
+  });
+  if (held.length === 0) return [];
+
+  let transactions: any[] | null = null;
+  try {
+    const { data } = await http.get(`${kaminoApi}/kvaults/users/${owner}/transactions`);
+    transactions = Array.isArray(data) ? data : null;
+  } catch (error) {
+    logger.info(`Kamino vault history failed for ${owner}: ${error instanceof Error ? error.message : error}`);
+  }
+
+  return Promise.all(
+    held.map(async ({ route, amount }): Promise<Found> => {
+      const vault = route.source.kind === 'kamino-vault' ? route.source.vault : '';
+      const tokenValue = (await getRate(route.source))?.tokenValue ?? null;
+      const decimals = route.direct?.kind === 'kamino-vault' ? route.direct.shares.decimals : TOKENS[route.token].decimals;
+      const earned: Earned = !tokenValue
+        ? { earned: null, note: null, since: null }
+        : transactions
+          ? vaultEarned(transactions.filter((t) => t?.kvault === vault), amount, tokenValue, decimals)
+          : { earned: null, note: RETRY_NOTE, since: null };
+      const value = tokenValue ? amount * tokenValue : null;
+      return {
+        route,
+        routeId: route.id,
+        // Shown in the token, like Kamino Lend: the shares are staked for the wallet, not a token it sees
+        holding: { amount: value ?? amount, symbol: value !== null ? route.token : 'shares' },
+        value,
+        earned: earned.earned,
+        earnedNote: earned.note,
+        since: earned.since ? new Date(earned.since).toISOString() : null,
+        source: 'Kamino',
+        note: null,
+      };
+    })
+  );
+}
+
 // ---------- The answer ----------
 
 async function readPortfolio(address: string): Promise<Portfolio> {
@@ -441,6 +517,7 @@ async function readPortfolio(address: string): Promise<Portfolio> {
   const sources: [string, Promise<Found[]>][] = [
     ['your token accounts', liquidStaking(owner)],
     ['Kamino', kamino(address)],
+    ['Kamino vaults', kaminoVaults(address)],
     ['Jupiter Lend', jupiterLend(address)],
   ];
   const [settled, routes, fetched] = await Promise.all([

@@ -157,7 +157,7 @@ async function noticesFor(route: YieldRoute, all: YieldRoute[]): Promise<Map<Ale
   if (route.category === 'lending' && typeof route.withdrawable === 'number' && route.withdrawable <= EXIT_TIGHT_WITHDRAWABLE) {
     notices.set('exit-tight', {
       title: `${route.name}: withdrawals may wait`,
-      body: `Only ${Math.round(route.withdrawable * 100)}% of the ${route.token} reserve can be withdrawn right now.`,
+      body: `Only ${Math.round(route.withdrawable * 100)}% of ${route.curator ? 'the vault' : `the ${route.token} reserve`} can be withdrawn right now.`,
     });
   }
 

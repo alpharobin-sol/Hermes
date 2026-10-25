@@ -11,7 +11,7 @@ import { DepositAPI, type DepositQuote, type RouteQuote } from "@/lib/api/deposi
 import type { YieldRoute } from "@/lib/api/yield-api"
 import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
-import { CATEGORY_LABELS, HIGH_UTILIZATION, Medallion, exitTight, formatApy, withdrawablePercent } from "./rate-board"
+import { HIGH_UTILIZATION, Medallion, exitTight, formatApy, typeLabel, withdrawablePercent } from "./rate-board"
 import { whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { HorizonSummary } from "./live-quotes"
@@ -192,7 +192,7 @@ export function DepositDialog({
             <div className="flex min-w-0 flex-col gap-0.5">
               <DialogTitle className="font-display text-[26px] font-bold leading-[1.1]">Deposit into {route.name}</DialogTitle>
               <DialogDescription className="text-[13px] text-muted-foreground">
-                {CATEGORY_LABELS[route.category]}
+                {typeLabel(route)}
                 {route.receipt && ` · get ${route.receipt}`} · {formatApy(route)} APY
               </DialogDescription>
             </div>
@@ -215,8 +215,10 @@ export function DepositDialog({
                       {formatTokenAmount(quote.outAmount)} {quote.outputToken.symbol} in {quote.position}
                     </span>
                     <span className="text-xs leading-relaxed text-muted-foreground">
-                      A position in your own {quote.position} account, not a token in your wallet. Withdraw it from your
-                      Portfolio, or at {hostOf(route.website)}.
+                      {route.curator
+                        ? "Vault shares, staked in Kamino for your wallet rather than held in it."
+                        : `A position in your own ${quote.position} account, not a token in your wallet.`}{" "}
+                      Withdraw it from your Portfolio, or at {hostOf(route.website)}.
                     </span>
                   </>
                 ) : quote ? (

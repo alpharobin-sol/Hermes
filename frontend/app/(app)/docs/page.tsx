@@ -114,6 +114,12 @@ export default function Docs() {
                 protocol whenever the reserve has room.
               </p>
               <p>
+                <strong>Lending vault.</strong> A Kamino vault lends your USDC across several Kamino reserves. Its curator
+                picks the reserves and how much goes to each: Steakhouse Financial for the Steakhouse USDC vault. You hold
+                vault shares, staked in Kamino for your wallet, and they grow as interest comes in. The vault takes a
+                share of the interest as its fee, and its APY on Hermes is after that fee.
+              </p>
+              <p>
                 Hermes builds each deposit through the protocol itself or through a Jupiter swap, whichever gives you
                 more. The deposit dialog shows every path it checked.
               </p>
@@ -208,8 +214,8 @@ export default function Docs() {
                   their pool, so you see the exit cost before you sign.
                 </li>
                 <li>
-                  Kamino Lend and Jupiter Lend pay your USDC, USDT or SOL back. Only part of a reserve can leave at once
-                  when most of it is lent out, and Hermes shows how much can leave right now.
+                  Kamino Lend, Jupiter Lend and the Kamino vault pay your USDC, USDT or SOL back. Only part of a reserve
+                  can leave at once when most of it is lent out, and Hermes shows how much can leave right now.
                 </li>
                 <li>
                   Taking everything out of Kamino closes your Kamino account and returns the one-time rent you paid on
@@ -272,7 +278,8 @@ export default function Docs() {
               </p>
               <p>
                 Earned is what a position is worth now minus what you paid in, network fees aside. Kamino reports its own
-                interest. For staking tokens and Jupiter Lend, Hermes reads your wallet&apos;s history. When tokens came
+                interest, and its record of your vault deposits and withdrawals. For staking tokens and Jupiter Lend,
+                Hermes reads your wallet&apos;s history. When tokens came
                 from another wallet or another token, Hermes says it can&apos;t tell what they cost instead of guessing.
               </p>
             </Section>
@@ -304,7 +311,8 @@ export default function Docs() {
               </p>
               <p>
                 In beta, each deposit is capped at 10 SOL, or 1,000 USDC or USDT for lending. A first Kamino deposit also
-                pays a one-time account rent in SOL, shown before you sign.
+                pays a one-time account rent in SOL, shown before you sign: about 0.03 SOL for Kamino Lend, about 0.007
+                SOL for a Kamino vault.
               </p>
             </Section>
 

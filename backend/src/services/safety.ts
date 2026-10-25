@@ -180,6 +180,23 @@ async function kaminoOutflow(reserve: string): Promise<Outflow> {
   return { fall: largestFall(series), days: series.length, source: 'Kamino' };
 }
 
+// A Kamino vault's hourly history. Its TVL is in USD, which is the token for the stablecoin vaults Hermes lists.
+async function kaminoVaultOutflow(vault: string): Promise<Outflow> {
+  const kaminoApi = process.env.KAMINO_API_URL || 'https://api.kamino.finance';
+  const end = new Date();
+  const start = new Date(end.getTime() - OUTFLOW_WINDOW_MS);
+  const response = await http.get(`${kaminoApi}/kvaults/${vault}/metrics/history`, {
+    params: { start: start.toISOString(), end: end.toISOString() },
+  });
+  const history = (Array.isArray(response.data) ? response.data : [])
+    .map((point: any) => ({ at: Date.parse(point?.timestamp), tvl: Number(point?.tvl) }))
+    .filter((point: { at: number; tvl: number }) => Number.isFinite(point.at) && point.tvl > 0);
+  const days = new Set(history.map((point: { at: number }) => Math.floor(point.at / DAY_MS))).size;
+
+  if (days < MIN_POINTS) throw new Error(`only ${days} days of history`);
+  return { fall: largestFall(history.map((point: { tvl: number }) => point.tvl)), days, source: 'Kamino' };
+}
+
 // Hermes's own history, once it covers at least two weeks of the window. Deposits are recorded in the route's
 // token, so price moves don't count.
 async function hermesOutflow(route: RouteConfig): Promise<Outflow | null> {
@@ -199,7 +216,12 @@ function outflows(route: RouteConfig): Cached<Outflow> | undefined {
 
   let entry = outflowCaches.get(route.id);
   if (!entry) {
-    const fallback = source.kind === 'kamino' ? () => kaminoOutflow(source.reserve) : () => defillamaOutflow(route);
+    const fallback =
+      source.kind === 'kamino'
+        ? () => kaminoOutflow(source.reserve)
+        : source.kind === 'kamino-vault'
+          ? () => kaminoVaultOutflow(source.vault)
+          : () => defillamaOutflow(route);
     const fetcher = async () => (await hermesOutflow(route)) ?? fallback();
     entry = cached(`deposit history for ${route.id}`, fetcher, {
       ttlMs: HOUR_MS,
@@ -263,13 +285,17 @@ function exitPart(route: RouteConfig, rate: Rate): SafetyPart | undefined {
         source: SOURCE_LABELS[route.source.kind],
       };
     }
-    // Sources that report what can leave now rather than what is borrowed (Jupiter Lend)
+    // Sources that report what can leave now rather than what is borrowed (Jupiter Lend, Kamino vaults)
     if (rate.withdrawable === undefined) return undefined;
+    const rest =
+      route.source.kind === 'kamino-vault'
+        ? 'The rest is lent to borrowers in the Kamino reserves the vault uses.'
+        : `The rest is lent out or held back by ${route.name}'s withdrawal limit.`;
     return {
       ...base,
       points: points(1 - rate.withdrawable, 1, 0.9),
-      detail: `${formatPercent(rate.withdrawable)} of deposits (${formatUsd(rate.tvl * rate.withdrawable)}) can be withdrawn now. The rest is lent out or held back by ${route.name}'s withdrawal limit.`,
-      source: SOURCE_LABELS[route.source.kind],
+      detail: `${formatPercent(rate.withdrawable)} of deposits (${formatUsd(rate.tvl * rate.withdrawable)}) can be withdrawn now. ${rest}`,
+      source: route.source.kind === 'kamino-vault' ? 'Kamino, on chain' : SOURCE_LABELS[route.source.kind],
     };
   }
 
@@ -455,7 +481,7 @@ export function safetyScore(route: RouteConfig, rate: Rate): SafetyScore | null 
       points: points(years, 0, 4),
       max: PART_MAX,
       detail: `Deposits tracked since ${monthYear(trackedSince)}.`,
-      source: "DefiLlama's first record",
+      source: route.trackedFrom ?? "DefiLlama's first record",
     },
     {
       key: 'outflows',
