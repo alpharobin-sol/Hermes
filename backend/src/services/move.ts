@@ -311,7 +311,8 @@ export async function finishMove(request: MoveRequest & { signature: string }): 
   let kept: Decimal | null = null;
   if (token.mint === TOKENS.SOL.mint) {
     // The new route's hold-back: its fees and the accounts its deposit opens
-    const reserve = solReserve(to);
+    const reserve = await solReserve(to);
+    if (reserve === null) throw new DepositError("Can't read the network's account rent right now. Try again shortly.", 503);
     const spendable = new Decimal(await connection.getBalance(user)).div(1e9).minus(reserve);
     if (spendable.lt(amount)) {
       amount = Decimal.max(0, spendable).toDecimalPlaces(9, Decimal.ROUND_DOWN);

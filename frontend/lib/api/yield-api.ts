@@ -61,7 +61,7 @@ export interface YieldRoute {
   name: string;
   category: "liquid-staking" | "lending";
   curator?: string | null; // a lending vault's curator, who picks the reserves it lends to
-  solReserve?: number; // SOL a deposit needs beyond the amount (fees, accounts it opens): kept back from SOL, needed beside USDC or USDT
+  solReserve?: number | null; // SOL a deposit needs beyond the amount (fees, accounts it opens): kept back from SOL, needed beside USDC or USDT
   token: string; // what the user deposits
   receipt: string | null; // token the user receives, e.g. JitoSOL
   apy: number; // decimal
