@@ -5,6 +5,7 @@ import { getRate, refreshRates, SOURCE_LABELS } from './rates';
 import { refreshSafetyInputs, safetyScore, SafetyScore } from './safety';
 import { recordSnapshots, Snapshot } from './history';
 import { exitCost, refreshExitCosts } from './exit-cost';
+import { solReserve } from './sol-reserve';
 
 export type RiskTier = 'low' | 'moderate' | 'high';
 
@@ -28,6 +29,7 @@ export interface YieldRoute {
   deposit: DepositStatus | null; // in-app deposit on the network the API runs on
   depositCap: number | null; // largest single deposit while in beta on mainnet, in `token`
   exitCost: number | null; // share of value lost leaving today: 0 for lending, a swap back to SOL for liquid staking
+  solReserve: number; // SOL a deposit needs beyond the amount (fees, accounts it opens): kept back from SOL, needed beside USDC or USDT
 }
 
 // A lending reserve this borrowed or held back may not have liquidity for withdrawals
@@ -103,6 +105,7 @@ export async function getYieldRoutes(
       deposit: depositStatus(route, network),
       depositCap: depositCap(route, network),
       exitCost: exitCost(route, rate),
+      solReserve: solReserve(route),
     };
   });
 

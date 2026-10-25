@@ -148,9 +148,10 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     .sort()
   const live = useLiveQuotes(selectedToken.symbol, numericAmount, quoteIds, reviewOpen)
 
-  // Keep some SOL back so the deposit can pay its own fees
+  // Keep the route's hold-back so the deposit can pay its fees and the accounts it opens
+  const solReserve = selectedRoute?.solReserve ?? SOL_FEE_RESERVE
   const spendableBalance =
-    selectedToken.symbol === "SOL" ? Math.max(0, selectedToken.balance - SOL_FEE_RESERVE) : selectedToken.balance
+    selectedToken.symbol === "SOL" ? Math.max(0, selectedToken.balance - solReserve) : selectedToken.balance
 
   // Only judge the amount once the wallet's balance for this token has loaded
   const balanceKnown = isConnected && balances[selectedToken.symbol] !== undefined
@@ -162,6 +163,13 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         : numericAmount > spendableBalance
           ? "fee-reserve"
           : null
+
+  // A USDC or USDT deposit pays its fees and any first-deposit rent in SOL. The wallet's SOL when it is short of that.
+  const solBalance = balances.SOL
+  const solShort =
+    isConnected && selectedToken.symbol !== "SOL" && selectedRoute?.solReserve != null && solBalance !== undefined && solBalance < selectedRoute.solReserve
+      ? solBalance
+      : null
 
   const quickAmount = (pct: string) => {
     const percentage = pct === "Max" ? 100 : Number.parseInt(pct.replace("%", ""))
@@ -227,6 +235,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         balanceKnown={balanceKnown}
         spendable={spendableBalance}
         balanceIssue={balanceIssue}
+        solShort={solShort}
         onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
         isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
         routes={visibleRoutes}
@@ -280,6 +289,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         balanceKnown={balanceKnown}
         spendable={spendableBalance}
         balanceIssue={balanceIssue}
+        solShort={solShort}
         onQuickAmount={(pct) => setAmount(String(quickAmount(pct)))}
         isQuickActive={(pct) => balanceKnown && numericAmount > 0 && numericAmount === quickAmount(pct)}
         route={loading || error ? null : selectedRoute}

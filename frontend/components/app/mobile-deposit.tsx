@@ -38,6 +38,7 @@ interface MobileDepositProps {
   balanceKnown: boolean
   spendable: number
   balanceIssue: BalanceIssue
+  solShort: number | null // the wallet's SOL, when a USDC or USDT deposit needs more for fees and rent
   onQuickAmount: (pct: string) => void
   isQuickActive: (pct: string) => boolean
   routes: YieldRoute[] // for the token, in the view, in sortBy order
@@ -72,6 +73,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     balanceKnown,
     spendable,
     balanceIssue,
+    solShort,
     onQuickAmount,
     isQuickActive,
     routes,
@@ -161,7 +163,7 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             </button>
           ))}
         </div>
-        <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
+        <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
 
         {showRoutes ? (
           <RouteChoices

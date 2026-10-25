@@ -12,6 +12,7 @@ import { buildKaminoVaultDeposit, KaminoVault, KaminoVaultDepositPlan } from './
 import { buildProject0Deposit, Project0Deposit, Project0DepositPlan } from './project0';
 import { DepositError } from './errors';
 import { createJupiterClient } from './jupiter';
+import { solReserve } from './sol-reserve';
 
 /**
  * HERMES DEPOSIT ROUTER
@@ -39,9 +40,6 @@ const MAX_PRICE_IMPACT_PCT = Number(process.env.DEPOSIT_MAX_PRICE_IMPACT_PCT || 
 
 // A swap must beat a direct deposit by at least this share (0.01%) to be built instead
 const DIRECT_TIE_SHARE = 0.0001;
-
-// SOL kept back for the token account rent and fees
-const FEE_BUFFER_LAMPORTS = 10_000_000;
 
 export interface DepositRequest {
   routeId: string;
@@ -118,12 +116,30 @@ export class DepositService {
    */
   async buildTransaction(request: DepositRequest, userPublicKey: string): Promise<DepositTransaction> {
     const route = this.resolveRoute(request);
+    if (route.token === 'SOL') await this.checkSolBalance(route, request.amount, new PublicKey(userPublicKey));
     const best = await this.bestCandidate(route, request);
 
     if (best.quote.method === 'direct') {
       return this.buildDirectTransaction(route, best.quote, userPublicKey);
     }
     return this.buildSwapTransaction(best, userPublicKey);
+  }
+
+  /**
+   * A SOL deposit leaves the route's hold-back in the wallet: the fees and the accounts the deposit opens
+   */
+  private async checkSolBalance(route: RouteConfig, amount: string | number, user: PublicKey): Promise<void> {
+    const network = solanaNetwork();
+    const reserve = solReserve(route);
+    const balance = new Decimal(await this.getConnection(network).getBalance(user)).div(1e9);
+    if (new Decimal(amount).plus(reserve).gt(balance)) {
+      const most = Decimal.max(0, balance.minus(reserve)).toDecimalPlaces(6, Decimal.ROUND_DOWN);
+      const hint = network === 'devnet' ? ' Get devnet SOL at faucet.solana.com.' : '';
+      throw new DepositError(
+        `Not enough SOL: keep ${reserve} SOL for fees and the accounts this deposit opens. You can deposit up to ${most.toFixed()} SOL.${hint}`,
+        422
+      );
+    }
   }
 
   /**
@@ -494,14 +510,9 @@ export class DepositService {
       };
     }
 
+    // The SOL balance was checked against the route's hold-back before quoting
     const lamports = toLamports(quote.inAmount);
     const connection = this.getConnection(network);
-
-    const balance = await connection.getBalance(user);
-    if (lamports.plus(FEE_BUFFER_LAMPORTS).gt(balance)) {
-      const hint = network === 'devnet' ? ', or get devnet SOL at faucet.solana.com' : '';
-      throw new DepositError(`Insufficient balance: you have ${balance / 1e9} SOL. Keep 0.01 SOL for fees${hint}.`, 422);
-    }
 
     const plan = direct.kind === 'spl-stake-pool'
       ? await buildStakePoolDeposit(connection, stakePoolTarget(route, direct.pool), lamports, user, {

@@ -28,6 +28,7 @@ interface DepositPanelProps {
   balanceKnown: boolean
   spendable: number
   balanceIssue: BalanceIssue
+  solShort: number | null // the wallet's SOL, when a USDC or USDT deposit needs more for fees and rent
   onQuickAmount: (pct: string) => void
   isQuickActive: (pct: string) => boolean
   route: YieldRoute | null
@@ -46,6 +47,7 @@ export function DepositPanel({
   balanceKnown,
   spendable,
   balanceIssue,
+  solShort,
   onQuickAmount,
   isQuickActive,
   route,
@@ -125,7 +127,7 @@ export function DepositPanel({
               </button>
             ))}
           </div>
-          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} route={route} overCap={overCap} />
+          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
         </div>
 
         {/* The route, like the phone card: what it is and its APY. The rest is in the Why panel and the dialog. */}
@@ -186,22 +188,31 @@ export function AmountMessages({
   token,
   spendable,
   balanceIssue,
+  solShort,
   route,
   overCap,
 }: {
   token: Token
   spendable: number
   balanceIssue: BalanceIssue
+  solShort: number | null
   route: YieldRoute | null
   overCap: boolean
 }) {
+  const reserve = route?.solReserve ?? SOL_FEE_RESERVE
   return (
     <>
       {balanceIssue && (
         <p className="text-xs text-destructive">
           {balanceIssue === "insufficient"
             ? `Insufficient ${token.symbol} balance. You have ${formatTokenAmount(token.balance, token.symbol)} ${token.symbol}.`
-            : `Keep ${SOL_FEE_RESERVE} SOL for network fees. You can deposit up to ${formatTokenAmount(spendable, "SOL")} SOL.`}
+            : `Keep ${reserve} SOL for fees and the accounts this deposit opens. You can deposit up to ${formatTokenAmount(spendable, "SOL")} SOL.`}
+        </p>
+      )}
+      {solShort !== null && route && (
+        <p className="text-xs text-warning">
+          A first deposit here needs about {reserve} SOL for fees and account rent. You have{" "}
+          {formatTokenAmount(solShort, "SOL")} SOL.
         </p>
       )}
       {overCap && route?.depositCap != null && (
