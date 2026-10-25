@@ -17,6 +17,7 @@ import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
 import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 import { Onboarding } from "./onboarding"
+import { SplitDialog, splitAmounts, splitCandidates, splitCap, splitReserve, type SplitSize, type SplitState } from "./split"
 
 const RATE_REFRESH_MS = 60 * 1000
 
@@ -58,6 +59,10 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   const [horizon, setHorizon] = useState<Horizon>("1y")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  // Top rated split: even parts across the highest-scoring top rated routes, signed in one approval
+  const [splitOn, setSplitOn] = useState(false)
+  const [splitSize, setSplitSize] = useState<SplitSize>(3)
+  const [splitReviewOpen, setSplitReviewOpen] = useState(false)
   const mobileCardRef = useRef<HTMLElement>(null)
 
   // Rates refresh every minute, like a live swap quote, without the loading state. A failed refresh keeps the
@@ -105,11 +110,11 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     return () => controller.abort()
   }, [reloadKey, setIsLoading])
 
-  // The minute refresh pauses while the deposit dialog is open, so the route under review never changes or drops out
+  // The minute refresh pauses while a deposit or split dialog is open, so the routes under review never change or drop out
   const reviewOpenRef = useRef(false)
   useEffect(() => {
-    reviewOpenRef.current = reviewOpen
-  }, [reviewOpen])
+    reviewOpenRef.current = reviewOpen || splitReviewOpen
+  }, [reviewOpen, splitReviewOpen])
   useEffect(() => {
     const timer = setInterval(() => {
       if (reviewOpenRef.current || document.hidden) return
@@ -159,10 +164,23 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     .filter((route) => route.deposit)
     .map((route) => route.id)
     .sort()
-  const live = useLiveQuotes(selectedToken.symbol, numericAmount, quoteIds, reviewOpen)
+  const live = useLiveQuotes(selectedToken.symbol, numericAmount, quoteIds, reviewOpen || splitReviewOpen)
 
-  // Keep the route's hold-back so the deposit can pay its fees and the accounts it opens
-  const solReserve = selectedRoute?.solReserve ?? SOL_FEE_RESERVE
+  // The split's routes and parts, and quotes for one part's amount
+  const candidates = useMemo(() => splitCandidates(forToken), [forToken])
+  const splitActive = splitOn && candidates.length >= 2
+  const splitRoutes = candidates.slice(0, Math.min(splitSize, candidates.length))
+  const splitParts = splitActive && numericAmount > 0 ? splitAmounts(amount, splitRoutes.length, selectedToken.symbol) : []
+  const splitLive = useLiveQuotes(
+    selectedToken.symbol,
+    splitParts.length > 0 ? Number(splitParts[0]) : 0,
+    splitActive ? splitRoutes.map((route) => route.id).sort() : [],
+    reviewOpen || splitReviewOpen
+  )
+  const splitCapValue = splitCap(splitRoutes)
+
+  // Keep the route's hold-back (every part's, for a split) so the deposit can pay its fees and the accounts it opens
+  const solReserve = splitActive ? splitReserve(splitRoutes, SOL_FEE_RESERVE) : (selectedRoute?.solReserve ?? SOL_FEE_RESERVE)
   const spendableBalance =
     selectedToken.symbol === "SOL" ? Math.max(0, selectedToken.balance - solReserve) : selectedToken.balance
 
@@ -179,10 +197,26 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
 
   // A USDC or USDT deposit pays its fees and any first-deposit rent in SOL. The wallet's SOL when it is short of that.
   const solBalance = balances.SOL
+  const neededSol = splitActive ? solReserve : selectedRoute?.solReserve
   const solShort =
-    isConnected && selectedToken.symbol !== "SOL" && selectedRoute?.solReserve != null && solBalance !== undefined && solBalance < selectedRoute.solReserve
-      ? solBalance
-      : null
+    isConnected && selectedToken.symbol !== "SOL" && neededSol != null && solBalance !== undefined && solBalance < neededSol ? solBalance : null
+
+  const split: SplitState = {
+    available: candidates.length >= 2,
+    on: splitActive,
+    onChange: setSplitOn,
+    size: splitSize,
+    onSize: setSplitSize,
+    maxSize: Math.min(3, candidates.length),
+    routes: splitRoutes,
+    amounts: splitParts,
+    live: splitLive,
+    horizon,
+    onHorizon: setHorizon,
+    cap: splitCapValue,
+    overCap: splitActive && splitCapValue != null && numericAmount > splitCapValue,
+    reserve: solReserve,
+  }
 
   const quickAmount = (pct: string) => {
     const percentage = pct === "Max" ? 100 : Number.parseInt(pct.replace("%", ""))
@@ -198,9 +232,11 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     setAmount("")
   }
 
-  // On phones the list sits under the deposit card, so picking a route brings the card back into view
+  // On phones the list sits under the deposit card, so picking a route brings the card back into view. Picking one
+  // route means a single deposit, so it ends a split.
   const handleSelect = (id: string) => {
     setSelectedId(id)
+    setSplitOn(false)
     if (window.matchMedia("(max-width: 1023px)").matches) {
       mobileCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     }
@@ -218,7 +254,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       setWalletModalVisible(true)
       return
     }
-    setReviewOpen(true)
+    if (splitActive) setSplitReviewOpen(true)
+    else setReviewOpen(true)
   }
 
   return (
@@ -269,7 +306,11 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         horizon={horizon}
         onHorizon={setHorizon}
         route={loading || error ? null : selectedRoute}
-        onSelectRoute={setSelectedId}
+        onSelectRoute={(id) => {
+          setSelectedId(id)
+          setSplitOn(false)
+        }}
+        split={split}
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
         onConnect={() => setWalletModalVisible(true)}
         onReview={handleReview}
@@ -290,7 +331,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         onHorizon={setHorizon}
         routes={visibleRoutes}
         totalForToken={forToken.length}
-        selectedId={selectedRoute?.id ?? null}
+        // During a split no single route is picked. Picking one ends the split.
+        selectedId={splitActive ? null : (selectedRoute?.id ?? null)}
         onSelect={handleSelect}
         amount={numericAmount}
         loading={loading}
@@ -316,6 +358,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         ratesStatus={loading ? "loading" : error ? "error" : "ready"}
         onConnect={() => setWalletModalVisible(true)}
         onReview={handleReview}
+        split={split}
         className="max-lg:hidden"
       />
 
@@ -328,6 +371,18 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
           route={selectedRoute}
           amount={numericAmount}
           liveQuote={live.byRoute[selectedRoute.id]}
+          onDeposited={refreshBalances}
+        />
+      )}
+
+      {splitReviewOpen && splitActive && (
+        <SplitDialog
+          open={splitReviewOpen}
+          onOpenChange={setSplitReviewOpen}
+          token={selectedToken.symbol}
+          routes={splitRoutes}
+          amounts={splitParts}
+          live={splitLive}
           onDeposited={refreshBalances}
         />
       )}

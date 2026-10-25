@@ -13,6 +13,7 @@ import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
+import { SplitAction, SplitCard, SplitMessages, SplitSwitch, type SplitState } from "./split"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -35,6 +36,7 @@ interface DepositPanelProps {
   ratesStatus: "loading" | "error" | "ready"
   onConnect: () => void
   onReview: () => void
+  split?: SplitState // the Top rated split, when the token has two or more top rated routes
   className?: string
 }
 
@@ -54,9 +56,11 @@ export function DepositPanel({
   ratesStatus,
   onConnect,
   onReview,
+  split,
   className,
 }: DepositPanelProps) {
-  const overCap = isOverCap(route, numericAmount)
+  const splitting = !!split?.on
+  const overCap = splitting ? split!.overCap : isOverCap(route, numericAmount)
   const [explainType, setExplainType] = useState(false)
 
   return (
@@ -127,11 +131,19 @@ export function DepositPanel({
               </button>
             ))}
           </div>
-          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
+          {splitting ? (
+            <SplitMessages split={split!} token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} />
+          ) : (
+            <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
+          )}
         </div>
 
+        {split && <SplitSwitch split={split} />}
+
+        {splitting && <SplitCard split={split!} token={token.symbol} />}
+
         {/* The route, like the phone card: what it is and its APY. The rest is in the Why panel and the dialog. */}
-        {route && (
+        {route && !splitting && (
           <div className="flex flex-col gap-3 rounded-[2px] border border-frame bg-accent p-4">
             <div className="flex items-center gap-3">
               <Medallion route={route} className="bg-card" />
@@ -151,28 +163,42 @@ export function DepositPanel({
           </div>
         )}
 
-        {route && <SafetyBreakdown route={route} />}
+        {route && !splitting && <SafetyBreakdown route={route} />}
 
-        {route?.deposit && <RouteAlertToggle route={route} />}
+        {route?.deposit && !splitting && <RouteAlertToggle route={route} />}
 
-        {route && <RouteNotes route={route} />}
+        {route && !splitting && <RouteNotes route={route} />}
 
-        <PrimaryAction
-          route={route}
-          ratesStatus={ratesStatus}
-          token={token.symbol}
-          isConnected={isConnected}
-          numericAmount={numericAmount}
-          balanceIssue={balanceIssue}
-          overCap={overCap}
-          onConnect={onConnect}
-          onReview={onReview}
-        />
-        {/* The header's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
-        {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
-          <p className="-mt-1.5 text-center text-xs text-muted-foreground">
-            Max {route.depositCap.toLocaleString()} {route.token} per deposit
-          </p>
+        {splitting ? (
+          <SplitAction
+            split={split!}
+            token={token.symbol}
+            isConnected={isConnected}
+            numericAmount={numericAmount}
+            balanceIssue={balanceIssue}
+            onConnect={onConnect}
+            onReview={onReview}
+          />
+        ) : (
+          <>
+            <PrimaryAction
+              route={route}
+              ratesStatus={ratesStatus}
+              token={token.symbol}
+              isConnected={isConnected}
+              numericAmount={numericAmount}
+              balanceIssue={balanceIssue}
+              overCap={overCap}
+              onConnect={onConnect}
+              onReview={onReview}
+            />
+            {/* The header's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
+            {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
+              <p className="-mt-1.5 text-center text-xs text-muted-foreground">
+                Max {route.depositCap.toLocaleString()} {route.token} per deposit
+              </p>
+            )}
+          </>
         )}
       </div>
     </aside>

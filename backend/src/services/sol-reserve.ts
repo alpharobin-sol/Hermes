@@ -37,6 +37,26 @@ const FIRST_DEPOSIT_BYTES: Partial<Record<DirectDeposit['kind'], number>> = {
   project0: 2440, // the Project 0 account: 0.0124 SOL
 };
 
+// What one first deposit opens, in SOL: accounts that stay open after it, and accounts it opens and closes again
+function accounts(route: RouteConfig, perByte: number): { stays: number; temporary: number } {
+  const tokenAccount = (TOKEN_ACCOUNT_BYTES + ACCOUNT_OVERHEAD) * perByte;
+  const wrapsSol = route.token === 'SOL';
+  if (route.category === 'liquid-staking') {
+    // the staking token's account, and wrapped SOL when Jupiter swaps
+    return { stays: tokenAccount, temporary: tokenAccount };
+  }
+  if (route.direct?.kind === 'jupiter-lend') {
+    // the jl token's account
+    return { stays: tokenAccount, temporary: wrapsSol ? tokenAccount : 0 };
+  }
+  if (route.direct) {
+    return { stays: (FIRST_DEPOSIT_BYTES[route.direct.kind] ?? 0) * perByte, temporary: wrapsSol ? tokenAccount : 0 };
+  }
+  return { stays: 0, temporary: 0 };
+}
+
+const roundUp = (sol: number) => Math.ceil(sol * 1e4) / 1e4;
+
 /**
  * SOL the route keeps back from a SOL deposit, or needs in the wallet for a USDC or USDT deposit, rounded up to
  * 0.0001 SOL. null while the network's rent can't be read.
@@ -44,22 +64,24 @@ const FIRST_DEPOSIT_BYTES: Partial<Record<DirectDeposit['kind'], number>> = {
 export async function solReserve(route: RouteConfig): Promise<number | null> {
   const perByte = await rentPerByte.get();
   if (!perByte) return null;
-  const tokenAccount = (TOKEN_ACCOUNT_BYTES + ACCOUNT_OVERHEAD) * perByte;
   const walletMinimum = ACCOUNT_OVERHEAD * perByte; // the least a wallet may hold
-  const wrapsSol = route.token === 'SOL';
-  let stays = 0; // accounts that stay open after the deposit
-  let temporary = 0; // accounts the deposit opens and closes again
-  if (route.category === 'liquid-staking') {
-    stays = tokenAccount; // the staking token's account
-    temporary = tokenAccount; // wrapped SOL, when Jupiter swaps
-  } else if (route.direct?.kind === 'jupiter-lend') {
-    stays = tokenAccount; // the jl token's account
-    temporary = wrapsSol ? tokenAccount : 0;
-  } else if (route.direct) {
-    stays = (FIRST_DEPOSIT_BYTES[route.direct.kind] ?? 0) * perByte;
-    temporary = wrapsSol ? tokenAccount : 0;
-  }
+  const { stays, temporary } = accounts(route, perByte);
   const during = stays + temporary + NETWORK_FEES;
   const after = stays + NETWORK_FEES + walletMinimum;
-  return Math.ceil(Math.max(during, after) * 1e4) / 1e4;
+  return roundUp(Math.max(during, after));
+}
+
+/**
+ * The same for a split: deposits sent one after another, so the accounts each opens for good add up, while a
+ * temporary account (wrapped SOL) is closed before the next part opens its own. Each part pays its own fees.
+ */
+export async function splitSolReserve(routes: RouteConfig[]): Promise<number | null> {
+  const perByte = await rentPerByte.get();
+  if (!perByte) return null;
+  const walletMinimum = ACCOUNT_OVERHEAD * perByte;
+  const each = routes.map((route) => accounts(route, perByte));
+  const stays = each.reduce((sum, part) => sum + part.stays, 0);
+  const temporary = Math.max(0, ...each.map((part) => part.temporary));
+  const fees = NETWORK_FEES * routes.length;
+  return roundUp(Math.max(stays + temporary + fees, stays + fees + walletMinimum));
 }

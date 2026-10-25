@@ -26,6 +26,7 @@ import {
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
 import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
+import { SplitAction, SplitCard, SplitMessages, SplitSwitch, type SplitState } from "./split"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -57,6 +58,7 @@ interface MobileDepositProps {
   live: LiveQuotes
   horizon: Horizon // what the figures count over once an amount is typed
   onHorizon: (horizon: Horizon) => void
+  split?: SplitState // the Top rated split, when the token has two or more top rated routes
 }
 
 // Phones and tablets: one card, the way a swap app works. With an amount typed, every route shows in the card,
@@ -92,11 +94,13 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     live,
     horizon,
     onHorizon,
+    split,
   },
   ref
 ) {
   const [tokenSheet, setTokenSheet] = useState(false)
-  const overCap = isOverCap(route, numericAmount)
+  const splitting = !!split?.on
+  const overCap = splitting ? split!.overCap : isOverCap(route, numericAmount)
   const showRoutes = numericAmount > 0 && ratesStatus === "ready"
 
   return (
@@ -163,9 +167,17 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             </button>
           ))}
         </div>
-        <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
+        {splitting ? (
+          <SplitMessages split={split!} token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} />
+        ) : (
+          <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
+        )}
 
-        {showRoutes ? (
+        {split && <SplitSwitch split={split} />}
+
+        {splitting ? (
+          <SplitCard split={split!} token={token.symbol} showHorizon />
+        ) : showRoutes ? (
           <RouteChoices
             live={live}
             routes={routes}
@@ -194,28 +206,42 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
           />
         )}
 
-        {route && <SafetyBreakdown route={route} />}
+        {route && !splitting && <SafetyBreakdown route={route} />}
 
-        {route?.deposit && <RouteAlertToggle route={route} />}
+        {route?.deposit && !splitting && <RouteAlertToggle route={route} />}
 
-        {route && <RouteNotes route={route} />}
+        {route && !splitting && <RouteNotes route={route} />}
 
-        <PrimaryAction
-          route={route}
-          ratesStatus={ratesStatus}
-          token={token.symbol}
-          isConnected={isConnected}
-          numericAmount={numericAmount}
-          balanceIssue={balanceIssue}
-          overCap={overCap}
-          onConnect={onConnect}
-          onReview={onReview}
-        />
-        {/* The toolbar's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
-        {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
-          <p className="-mt-0.5 text-center text-xs text-muted-foreground">
-            Max {route.depositCap.toLocaleString()} {route.token} per deposit
-          </p>
+        {splitting ? (
+          <SplitAction
+            split={split!}
+            token={token.symbol}
+            isConnected={isConnected}
+            numericAmount={numericAmount}
+            balanceIssue={balanceIssue}
+            onConnect={onConnect}
+            onReview={onReview}
+          />
+        ) : (
+          <>
+            <PrimaryAction
+              route={route}
+              ratesStatus={ratesStatus}
+              token={token.symbol}
+              isConnected={isConnected}
+              numericAmount={numericAmount}
+              balanceIssue={balanceIssue}
+              overCap={overCap}
+              onConnect={onConnect}
+              onReview={onReview}
+            />
+            {/* The toolbar's Mainnet beta pill already says real funds. Only the cap needs saying here. */}
+            {route?.deposit === "beta" && !IS_DEVNET && route.depositCap != null && (
+              <p className="-mt-0.5 text-center text-xs text-muted-foreground">
+                Max {route.depositCap.toLocaleString()} {route.token} per deposit
+              </p>
+            )}
+          </>
         )}
       </div>
 

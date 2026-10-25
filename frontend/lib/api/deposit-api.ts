@@ -37,6 +37,23 @@ export interface DepositTransaction {
   prioritizationFeeLamports: number;
 }
 
+// A Top rated split: one deposit per part, each built and simulated, for one approval in the wallet
+export interface SplitPartBuild extends DepositTransaction {
+  routeId: string
+  amount: string // UI units, what this part deposits
+}
+
+export interface SplitBuild {
+  parts: SplitPartBuild[]
+  solReserve: number | null // SOL the whole split keeps back for fees and the accounts it opens (SOL splits)
+}
+
+export interface SplitParams {
+  token: string
+  userPublicKey: string
+  parts: { routeId: string; amount: string }[]
+}
+
 export interface DepositParams {
   routeId: string;
   amount: number;
@@ -111,6 +128,14 @@ export class DepositAPI {
   static async buildTransaction(params: DepositParams & { userPublicKey: string }) {
     const built = await post<DepositTransaction>("/api/deposit/build", { ...params, amount: String(params.amount) });
     assertSameNetwork(built.quote.network);
+    return built;
+  }
+
+  // Every part of a split at once. The API checks each route is top rated and the whole split fits the beta cap and
+  // the wallet's SOL.
+  static async buildSplit(params: SplitParams) {
+    const built = await post<SplitBuild>("/api/deposit/split", params);
+    for (const part of built.parts) assertSameNetwork(part.quote.network);
     return built;
   }
 }

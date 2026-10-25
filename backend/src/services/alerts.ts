@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import { ROUTES } from '../registry/routes';
 import { dbReady, pool } from './db';
 import { readingNear } from './history';
-import { getYieldRoutes, YieldRoute } from './yields';
+import { getYieldRoutes, isTopRated, TOP_RATED_MIN_SCORE, YieldRoute } from './yields';
 import { emailAlertsOn, emailTargets, sendAlertEmail } from './email';
 import { sendTelegramAlert, telegramAlertsOn, telegramTargets, unlinkTelegramChat } from './telegram-alerts';
 
@@ -30,7 +30,6 @@ import { sendTelegramAlert, telegramAlertsOn, telegramTargets, unlinkTelegramCha
 
 export type AlertKind = 'apy-drop' | 'better-route' | 'exit-tight' | 'left-top-rated' | 'depeg' | 'outflow';
 
-const TOP_RATED_MIN_SCORE = 80;
 const APY_DROP_SHARE = 0.2;
 const APY_DROP_MIN = 0.005; // half a percentage point
 const BETTER_ROUTE_GAP = 0.01; // one percentage point
@@ -154,7 +153,6 @@ const percent = (value: number) => `${(value * 100).toFixed(2)}%`;
 const points = (value: number) => (value * 100).toFixed(2);
 const amount = (value: number) =>
   value >= 1e6 ? `${(value / 1e6).toFixed(2)}M` : value >= 1e3 ? `${(value / 1e3).toFixed(1)}K` : value.toFixed(value >= 10 ? 0 : 2);
-const isTopRated = (route: YieldRoute) => !!route.safety && route.safety.score >= TOP_RATED_MIN_SCORE && route.risk === 'low';
 
 /**
  * What Hermes sees for one route now, before it is worded for a watcher or a holder

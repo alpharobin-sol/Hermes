@@ -112,17 +112,25 @@ export class DepositService {
   }
 
   /**
-   * Quote a deposit and build the unsigned transaction for the user's wallet
+   * Quote a deposit and build the unsigned transaction for the user's wallet. A split checks the wallet's SOL for
+   * all its parts at once, so it skips the check for one.
    */
-  async buildTransaction(request: DepositRequest, userPublicKey: string): Promise<DepositTransaction> {
+  async buildTransaction(request: DepositRequest, userPublicKey: string, opts?: { skipSolCheck?: boolean }): Promise<DepositTransaction> {
     const route = this.resolveRoute(request);
-    if (route.token === 'SOL') await this.checkSolBalance(route, request.amount, new PublicKey(userPublicKey));
+    if (route.token === 'SOL' && !opts?.skipSolCheck) await this.checkSolBalance(route, request.amount, new PublicKey(userPublicKey));
     const best = await this.bestCandidate(route, request);
 
     if (best.quote.method === 'direct') {
       return this.buildDirectTransaction(route, best.quote, userPublicKey);
     }
     return this.buildSwapTransaction(best, userPublicKey);
+  }
+
+  /**
+   * The wallet's SOL on this network
+   */
+  async walletSol(userPublicKey: string): Promise<Decimal> {
+    return new Decimal(await this.getConnection(solanaNetwork()).getBalance(new PublicKey(userPublicKey))).div(1e9);
   }
 
   /**
