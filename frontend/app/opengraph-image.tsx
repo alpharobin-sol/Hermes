@@ -53,16 +53,6 @@ async function topRated(): Promise<YieldRoute[]> {
   }
 }
 
-const readAt = (routes: YieldRoute[]) =>
-  new Date(Math.max(...routes.map((route) => new Date(route.updatedAt).getTime()))).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }) + " UTC"
-
 function Diamond({ color = C.gilt, size = 10 }: { color?: string; size?: number }) {
   return <div style={{ width: size, height: size, background: color, transform: "rotate(45deg)" }} />
 }
@@ -150,9 +140,7 @@ export default async function Image() {
               )}
 
               <div style={{ marginTop: 18, display: "flex", fontFamily: "Inter", fontSize: 18, color: C.sienna }}>
-                {live
-                  ? `hermesagg.xyz  ·  APY and Safety Score, read ${readAt(routes)}`
-                  : "hermesagg.xyz  ·  Deposit from your own wallet"}
+                {live ? "hermesagg.xyz" : "hermesagg.xyz  ·  Deposit from your own wallet"}
               </div>
             </div>
 
