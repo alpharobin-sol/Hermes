@@ -104,6 +104,8 @@ const ALERT_KINDS = [
   { title: "A better route", body: "A top rated route for the same token pays a point or more above it." },
   { title: "Reserve nearly all borrowed", body: "5% or less of a lending reserve can be withdrawn right now." },
   { title: "Score drop", body: `The route's Safety Score falls below ${TOP_RATED_MIN_SCORE}.` },
+  { title: "Depeg", body: "A staking token sells for 1% or more below its SOL value." },
+  { title: "Deposits leaving", body: "15% or more of a route's deposits leave in a day." },
 ]
 
 const AUDIENCES: { icon: LucideIcon; title: string; body: string }[] = [
@@ -158,7 +160,7 @@ const ROADMAP = [
   {
     status: "Live",
     title: "Signals and Reroute",
-    body: "Phone alerts and Reroute are live: Hermes proposes a better top rated route and you sign. Next: alerts for your own positions, and Telegram.",
+    body: "Alerts for the routes you watch and the positions you hold, on your phone or Telegram, and Reroute: Hermes proposes a better top rated route and you sign.",
   },
   {
     status: "Later",
@@ -213,7 +215,7 @@ const FAQS = [
   {
     question: "Can Hermes alert me?",
     answer:
-      "Yes. Tap the bell under a route to get alerts on your phone or computer when its rate falls, a better top rated route opens, its reserve is nearly all borrowed, or its score drops below 80. On iPhone, add Hermes to your Home Screen first. Hermes stores only your device's notification address and the routes you watch, never your wallet.",
+      "Yes. Tap the bell under a route, or turn on alerts for your positions in Portfolio. Hermes tells your phone, your computer or your Telegram when a rate falls, a better top rated route opens, a staking token trades below its value, deposits leave, a reserve is nearly all borrowed, or a score drops below 80. On iPhone, add Hermes to your Home Screen first, or use Telegram. Hermes stores your notification address or Telegram chat and the routes you watch or hold, never your wallet.",
   },
   {
     question: "Does Hermes charge a fee?",
@@ -718,14 +720,15 @@ function Alerts() {
         </span>
         <h2 className="mt-4 font-display text-[34px] font-semibold leading-[1.06] md:text-[50px]">Alerts, not another dashboard</h2>
         <p className="mt-3.5 max-w-[520px] text-[15px] leading-relaxed text-muted-foreground md:text-[17px]">
-          You should not have to watch rates all day. Tap the bell under a route and Hermes checks it every 10 minutes. Your
-          phone hears about it when something changes.
+          You should not have to watch rates all day. Tap the bell under a route, or turn on alerts for your positions, and
+          Hermes checks every 10 minutes. Your phone or your Telegram hears about it when something changes.
         </p>
         <ul className="m-0 mt-6 flex list-none flex-col gap-2.5 p-0 text-[15px]">
           {[
-            "Web push: no app and no Telegram needed.",
-            "Android in Chrome. iPhone from the Home Screen, iOS 16.4 or later.",
-            "Hermes keeps your device's notification address and the routes you watch. Never your wallet.",
+            "On your phone or computer, or on Telegram through Herald, the Hermes bot.",
+            "Android in Chrome. iPhone from the Home Screen, iOS 16.4 or later, or Telegram.",
+            "Alerts for your positions follow your wallet: a route joins when you deposit and leaves when you withdraw.",
+            "Hermes keeps your notification address or Telegram chat and the routes you watch or hold. Never your wallet.",
           ].map((line) => (
             <li key={line} className="flex items-start gap-3">
               <span className="diamond mt-2 shrink-0" aria-hidden="true" />

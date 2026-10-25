@@ -3,6 +3,9 @@
 import { getFullUrl } from "./api/yield-api"
 
 const WATCHED_KEY = "hermes.alerts.routes"
+const HELD_KEY = "hermes.alerts.held" // the routes the wallet holds, from Portfolio
+const FOLLOW_KEY = "hermes.alerts.positions" // "1" while this device follows the wallet's positions
+const TELEGRAM_KEY = "hermes.alerts.telegram" // the link token Herald knows this device by
 
 export type AlertsSupport = "supported" | "needs-home-screen" | "unsupported"
 
@@ -53,21 +56,50 @@ export class AlertsError extends Error {
   }
 }
 
-export function readWatched(): string[] {
+function readList(key: string): string[] {
   try {
-    const value = JSON.parse(localStorage.getItem(WATCHED_KEY) ?? "[]")
+    const value = JSON.parse(localStorage.getItem(key) ?? "[]")
     return Array.isArray(value) ? value.filter((id) => typeof id === "string") : []
   } catch {
     return []
   }
 }
 
-function writeWatched(routes: string[]) {
+function write(key: string, value: string | null) {
   try {
-    localStorage.setItem(WATCHED_KEY, JSON.stringify(routes))
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, value)
   } catch {
-    // Private mode: the server still has the list
+    // Private mode: the server still has the lists
   }
+}
+
+export const readWatched = () => readList(WATCHED_KEY)
+export const readHeld = () => readList(HELD_KEY)
+
+export function readFollowing(): boolean {
+  try {
+    return localStorage.getItem(FOLLOW_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+export function writeFollowing(on: boolean) {
+  write(FOLLOW_KEY, on ? "1" : null)
+}
+
+export function readTelegramToken(): string | null {
+  try {
+    return localStorage.getItem(TELEGRAM_KEY)
+  } catch {
+    return null
+  }
+}
+
+export interface AlertLists {
+  routes: string[] // routes this device watches
+  held: string[] // routes its wallet holds
 }
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
@@ -101,10 +133,34 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 }
 
 /**
- * Watch these routes. Asks for notification permission and subscribes the device the first time.
- * Returns the routes Hermes now watches for this device.
+ * Send this device's lists to every channel it has: its push subscription and its Telegram link.
+ * Returns the lists Hermes now keeps.
  */
-export async function watchRoutes(routes: string[]): Promise<string[]> {
+export async function saveAlerts(lists: AlertLists): Promise<AlertLists> {
+  let saved = lists
+  const subscription = await currentSubscription()
+  if (subscription) {
+    const json = await post("/api/alerts/subscribe", { subscription: subscription.toJSON(), ...lists })
+    saved = { routes: json.routes ?? lists.routes, held: json.held ?? lists.held }
+  }
+  const token = readTelegramToken()
+  if (token) {
+    const json = await post("/api/alerts/telegram", { token, ...lists })
+    // Hermes no longer had the link: the new one waits to be opened in Telegram
+    write(TELEGRAM_KEY, json.token)
+    saved = { routes: json.routes ?? saved.routes, held: json.held ?? saved.held }
+  }
+  write(WATCHED_KEY, JSON.stringify(saved.routes))
+  write(HELD_KEY, JSON.stringify(saved.held))
+  return saved
+}
+
+/**
+ * Turn on this browser's notifications for these lists. Asks for notification permission and subscribes the
+ * device the first time. Returns the lists Hermes now keeps.
+ */
+export async function watchRoutes(lists: AlertLists): Promise<AlertLists> {
+  const routes = [...lists.routes, ...lists.held]
   // Ask before any other await, so the prompt still counts as coming from the tap
   if (routes.length > 0 && Notification.permission !== "granted" && (await askPermission()) !== "granted") {
     throw new AlertsError("Notifications are blocked for Hermes in this browser.", true)
@@ -129,18 +185,57 @@ export async function watchRoutes(routes: string[]): Promise<string[]> {
       )
     }
   }
-  const json = await post("/api/alerts/subscribe", { subscription: subscription.toJSON(), routes })
-  const watched: string[] = Array.isArray(json.routes) ? json.routes : routes
-  writeWatched(watched)
-  return watched
+  return saveAlerts(lists)
 }
 
-// Turn alerts off on this device: Hermes forgets it and sends nothing more
+// ---------- Telegram ----------
+
+export interface TelegramLink {
+  token: string
+  url: string // opens Herald in Telegram with the token
+  linked: boolean
+}
+
+/**
+ * Start (or refresh) this device's Telegram link with these lists. The user opens the link in Telegram and Herald
+ * ties their chat to it.
+ */
+export async function startTelegramLink(lists: AlertLists): Promise<TelegramLink> {
+  const json = await post("/api/alerts/telegram", { token: readTelegramToken(), ...lists })
+  write(TELEGRAM_KEY, json.token)
+  return { token: json.token, url: json.url, linked: !!json.linked }
+}
+
+// Whether the link has been opened in Telegram. Null when Hermes can't say right now.
+export async function telegramLinked(token: string): Promise<boolean | null> {
+  const res = await fetch(getFullUrl(`/api/alerts/telegram/${token}`), { cache: "no-store" }).catch(() => null)
+  const json = await res?.json().catch(() => null)
+  return res?.ok && json?.success ? !!json.linked : null
+}
+
+export async function unlinkTelegram(): Promise<void> {
+  const token = readTelegramToken()
+  if (token) await post("/api/alerts/telegram/unlink", { token }).catch(() => {})
+  write(TELEGRAM_KEY, null)
+}
+
+// Turn alerts off on this device: Hermes forgets its push subscription and its Telegram link and sends nothing more
 export async function turnOffAlerts(): Promise<void> {
   const subscription = await currentSubscription()
   if (subscription) {
     await post("/api/alerts/unsubscribe", { endpoint: subscription.endpoint }).catch(() => {})
     await subscription.unsubscribe().catch(() => {})
   }
-  writeWatched([])
+  await unlinkTelegram()
+  write(WATCHED_KEY, null)
+  write(HELD_KEY, null)
+  writeFollowing(false)
+}
+
+// Turn off this browser's notifications only. Telegram keeps going.
+export async function turnOffPush(): Promise<void> {
+  const subscription = await currentSubscription()
+  if (!subscription) return
+  await post("/api/alerts/unsubscribe", { endpoint: subscription.endpoint }).catch(() => {})
+  await subscription.unsubscribe().catch(() => {})
 }

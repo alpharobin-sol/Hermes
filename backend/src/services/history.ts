@@ -126,6 +126,7 @@ export interface PastReading {
   at: number; // ms timestamp
   apy: number;
   safetyScore: number | null;
+  deposits: number | null; // in the route's token
 }
 
 /**
@@ -135,14 +136,19 @@ export async function readingNear(routeId: string, target: Date): Promise<PastRe
   if (!(await dbReady())) return null;
   try {
     const result = await pool!.query(
-      `select taken_at, apy, safety_score from rate_snapshots
+      `select taken_at, apy, safety_score, deposits from rate_snapshots
        where route_id = $1 and taken_at between $2::timestamptz - interval '3 hours' and $2::timestamptz + interval '3 hours'
        order by abs(extract(epoch from taken_at - $2::timestamptz)) limit 1`,
       [routeId, target]
     );
     const row = result.rows[0];
     return row
-      ? { at: new Date(row.taken_at).getTime(), apy: Number(row.apy), safetyScore: row.safety_score === null ? null : Number(row.safety_score) }
+      ? {
+          at: new Date(row.taken_at).getTime(),
+          apy: Number(row.apy),
+          safetyScore: row.safety_score === null ? null : Number(row.safety_score),
+          deposits: row.deposits === null ? null : Number(row.deposits),
+        }
       : null;
   } catch (error) {
     logger.warn(`Could not read history for ${routeId}: ${error instanceof Error ? error.message : error}`);

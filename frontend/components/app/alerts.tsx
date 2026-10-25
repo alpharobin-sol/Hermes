@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
-import { Bell, BellRing, Check, Loader2 } from "lucide-react"
+import { Bell, BellRing, Check, Loader2, Send } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
@@ -14,17 +14,29 @@ import {
   currentSubscription,
   notificationPermission,
   platform,
+  readFollowing,
+  readHeld,
+  readTelegramToken,
   readWatched,
   registration,
+  saveAlerts,
+  startTelegramLink,
+  telegramLinked,
   turnOffAlerts,
+  turnOffPush,
+  unlinkTelegram as unlinkTelegramChat,
   watchRoutes,
+  writeFollowing,
+  type AlertLists,
   type AlertsSupport,
   type Platform,
+  type TelegramLink,
 } from "@/lib/alerts"
 
-// Phone alerts: this device's on/off state and the routes it watches, shared by the route bells and Settings.
-// Turning alerts on for the first time goes through a guide: what Hermes sends, then the browser's prompt, and the
-// steps to allow notifications when the browser hides or blocks the prompt.
+// Alerts: the routes this device watches and the routes its wallet holds, and the two ways they arrive: this
+// browser's notifications and Telegram, through Herald. Shared by the route bells, Portfolio and Settings.
+// Turning alerts on for the first time goes through a guide: what Hermes sends, then the browser's prompt, the
+// steps to allow notifications when the browser hides or blocks the prompt, or Telegram instead.
 
 type GuideStep =
   | "ask" // what alerts cover, before the browser's prompt
@@ -33,44 +45,66 @@ type GuideStep =
   | "blocked" // notifications are blocked for Hermes in this browser
   | "working"
   | "on"
-  | "allowed" // allowed from Settings, no route picked yet
+  | "allowed" // allowed from Settings, nothing to watch yet
   | "failed"
   | "home-screen"
   | "unsupported"
+  | "telegram" // open Herald in Telegram with this device's link
+  | "telegram-on"
 
 interface Guide {
   step: GuideStep
-  route: YieldRoute | null // the route whose bell was tapped, null from Settings
+  route: YieldRoute | null // the route whose bell was tapped
+  positions: string[] | null // the wallet's routes, when the guide turns on alerts for positions
   message?: string
 }
 
 interface AlertsState {
   support: AlertsSupport
-  enabled: boolean // this device is subscribed
+  enabled: boolean // alerts reach this device, its Telegram, or both
+  push: boolean // this browser's notifications are on
+  telegram: boolean // a Telegram chat is linked
   watched: string[]
+  held: string[]
+  following: boolean // the held list follows the wallet's positions
   busy: boolean
   error: string | null
   toggle: (route: YieldRoute) => Promise<void>
+  followPositions: (routes: string[]) => void
+  stopFollowing: () => Promise<void>
+  syncHeld: (routes: string[], complete: boolean) => void
+  addHeld: (routeId: string) => void
   turnOff: () => Promise<void>
-  showGuide: (step: "blocked" | "home-screen" | "unsupported") => void
+  turnOffPush: () => Promise<void>
+  unlinkTelegram: () => Promise<void>
+  showGuide: (step: "ask" | "blocked" | "home-screen" | "unsupported" | "telegram") => void
 }
 
 const AlertsContext = createContext<AlertsState | null>(null)
 
 const FALLBACK_ERROR = "Hermes could not update alerts. Try again shortly."
+const TELEGRAM_POLL_MS = 2500
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id))
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [support, setSupport] = useState<AlertsSupport>("unsupported")
-  const [enabled, setEnabled] = useState(false)
+  const [push, setPush] = useState(false)
+  const [telegram, setTelegram] = useState(false)
   const [watched, setWatched] = useState<string[]>([])
+  const [held, setHeld] = useState<string[]>([])
+  const [following, setFollowing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [guide, setGuide] = useState<Guide | null>(null)
+  const [telegramLink, setTelegramLink] = useState<TelegramLink | null>(null)
+  const enabled = push || telegram
 
-  const watchedRef = useRef(watched)
+  // The latest values, for callbacks that outlive a render (a prompt answered later, Portfolio's sync)
+  const latest = useRef({ watched, held, following, enabled })
   useEffect(() => {
-    watchedRef.current = watched
-  }, [watched])
+    latest.current = { watched, held, following, enabled }
+  }, [watched, held, following, enabled])
   // Each guide opening gets an id, so a prompt answered late can't change a guide opened since
   const guideId = useRef(0)
   const subscribingFor = useRef(-1)
@@ -78,77 +112,114 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const found = alertsSupport()
     setSupport(found)
-    if (found !== "supported") return
+    setFollowing(readFollowing())
+    const token = readTelegramToken()
     // Keep the worker registered so the browser can show alerts while Hermes is closed
-    registration().catch(() => {})
-    currentSubscription()
-      .then((subscription) => {
-        setEnabled(!!subscription)
-        setWatched(subscription ? readWatched() : [])
-      })
-      .catch(() => {})
+    if (found === "supported") registration().catch(() => {})
+    Promise.all([
+      found === "supported" ? currentSubscription().catch(() => null) : Promise.resolve(null),
+      token ? telegramLinked(token) : Promise.resolve(false),
+    ]).then(([subscription, linked]) => {
+      // When Hermes can't say, a kept link counts as linked
+      const onTelegram = linked ?? !!token
+      setPush(!!subscription)
+      setTelegram(onTelegram)
+      if (subscription || onTelegram) {
+        setWatched(readWatched())
+        setHeld(readHeld())
+      }
+    })
   }, [])
 
-  const openGuide = useCallback((step: GuideStep, route: YieldRoute | null): number => {
+  const openGuide = useCallback((step: GuideStep, route: YieldRoute | null, positions: string[] | null = null): number => {
     guideId.current += 1
-    setGuide({ step, route })
+    setGuide({ step, route, positions })
     return guideId.current
   }, [])
 
-  const show = useCallback((id: number, step: GuideStep, route: YieldRoute | null, message?: string) => {
-    if (id === guideId.current) setGuide({ step, route, message })
+  const show = useCallback((id: number, step: GuideStep, route: YieldRoute | null, positions: string[] | null, message?: string) => {
+    if (id === guideId.current) setGuide({ step, route, positions, message })
   }, [])
 
   const closeGuide = useCallback(() => {
     guideId.current += 1
     setGuide(null)
+    setTelegramLink(null)
   }, [])
 
-  // Permission is granted: subscribe this device and watch the route
+  // The lists once the guide's route or positions are added
+  const pendingLists = useCallback((route: YieldRoute | null, positions: string[] | null): AlertLists => {
+    const { watched, held } = latest.current
+    return { routes: route && !watched.includes(route.id) ? [...watched, route.id] : watched, held: positions ?? held }
+  }, [])
+
+  // Save the lists to every channel this device has
+  const save = useCallback(async (lists: AlertLists) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const saved = await saveAlerts(lists)
+      setWatched(saved.routes)
+      setHeld(saved.held)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : FALLBACK_ERROR)
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  // Permission is granted: subscribe this browser for the guide's route or positions
   const subscribeTo = useCallback(
-    async (id: number, route: YieldRoute | null) => {
+    async (id: number, route: YieldRoute | null, positions: string[] | null) => {
       if (subscribingFor.current === id) return
       subscribingFor.current = id
-      if (!route) return show(id, "allowed", null)
-      show(id, "working", route)
+      const lists = pendingLists(route, positions)
+      if (!route && !positions && lists.routes.length + lists.held.length === 0) return show(id, "allowed", null, null)
+      show(id, "working", route, positions)
       try {
-        const current = watchedRef.current
-        setWatched(await watchRoutes(current.includes(route.id) ? current : [...current, route.id]))
-        setEnabled(true)
-        show(id, "on", route)
+        const saved = await watchRoutes(lists)
+        if (positions) {
+          writeFollowing(true)
+          setFollowing(true)
+        }
+        setWatched(saved.routes)
+        setHeld(saved.held)
+        setPush(true)
+        show(id, "on", route, positions)
       } catch (err) {
         subscribingFor.current = -1
-        if (err instanceof AlertsError && err.blocked) show(id, "blocked", route)
-        else show(id, "failed", route, err instanceof Error ? err.message : FALLBACK_ERROR)
+        if (err instanceof AlertsError && err.blocked) show(id, "blocked", route, positions)
+        else show(id, "failed", route, positions, err instanceof Error ? err.message : FALLBACK_ERROR)
       }
     },
-    [show]
+    [show, pendingLists]
   )
 
   // Runs straight from the tap on "Allow alerts"
   const allow = useCallback(() => {
     if (!guide) return
     const id = guideId.current
-    const route = guide.route
+    const { route, positions } = guide
     // First, while the tap still counts: Safari won't ask otherwise, and Chrome may hide the prompt
     const pending = askPermission()
-    show(id, "asking", route)
+    show(id, "asking", route, positions)
     pending
       .then((result) => {
-        if (result === "granted") subscribeTo(id, route)
-        else show(id, result === "denied" ? "blocked" : "dismissed", route)
+        if (result === "granted") subscribeTo(id, route, positions)
+        else show(id, result === "denied" ? "blocked" : "dismissed", route, positions)
       })
-      .catch(() => show(id, "failed", route, "This browser couldn't ask for notifications. Try again, or use Chrome on Android."))
+      .catch(() => show(id, "failed", route, positions, "This browser couldn't ask for notifications. Try again, or use Chrome on Android."))
   }, [guide, show, subscribeTo])
 
   // The user may allow notifications from the browser's settings instead of the prompt: carry on when they do
   const guideStep = guide?.step
   const guideRoute = guide?.route ?? null
+  const guidePositions = guide?.positions ?? null
   useEffect(() => {
     if (guideStep !== "asking" && guideStep !== "dismissed" && guideStep !== "blocked") return
     const id = guideId.current
     const check = () => {
-      if (notificationPermission() === "granted") subscribeTo(id, guideRoute)
+      if (notificationPermission() === "granted") subscribeTo(id, guideRoute, guidePositions)
     }
     let status: PermissionStatus | null = null
     navigator.permissions
@@ -165,37 +236,113 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", check)
       document.removeEventListener("visibilitychange", check)
     }
-  }, [guideStep, guideRoute, subscribeTo])
+  }, [guideStep, guideRoute, guidePositions, subscribeTo])
+
+  // Telegram instead: make this device's link with the guide's lists, for the user to open in Telegram
+  const toTelegram = useCallback(() => {
+    if (!guide) return
+    const id = guideId.current
+    const { route, positions } = guide
+    show(id, "telegram", route, positions)
+    setTelegramLink(null)
+    startTelegramLink(pendingLists(route, positions))
+      .then((link) => {
+        if (id === guideId.current) setTelegramLink(link)
+      })
+      .catch((err) => show(id, "telegram", route, positions, err instanceof Error ? err.message : FALLBACK_ERROR))
+  }, [guide, show, pendingLists])
+
+  // Wait for Herald: the guide carries on once the link is opened in Telegram
+  const linkToken = guideStep === "telegram" ? telegramLink?.token : undefined
+  useEffect(() => {
+    if (!linkToken) return
+    const id = guideId.current
+    let done = false
+    const check = async () => {
+      if (done || document.hidden) return
+      if ((await telegramLinked(linkToken)) !== true || done || id !== guideId.current) return
+      done = true
+      const lists = pendingLists(guideRoute, guidePositions)
+      setTelegram(true)
+      if (guidePositions) {
+        writeFollowing(true)
+        setFollowing(true)
+      }
+      // Saved with the link already. This keeps the browser's copy and any push subscription the same.
+      await saveAlerts(lists).catch(() => {})
+      setWatched(lists.routes)
+      setHeld(lists.held)
+      show(id, "telegram-on", guideRoute, guidePositions)
+    }
+    const timer = setInterval(check, TELEGRAM_POLL_MS)
+    window.addEventListener("focus", check)
+    document.addEventListener("visibilitychange", check)
+    return () => {
+      done = true
+      clearInterval(timer)
+      window.removeEventListener("focus", check)
+      document.removeEventListener("visibilitychange", check)
+    }
+  }, [linkToken, guideRoute, guidePositions, pendingLists, show])
+
+  // A first route or the positions with no channel yet: the guide, starting where this browser stands
+  const startGuide = useCallback(
+    (route: YieldRoute | null, positions: string[] | null) => {
+      if (support !== "supported") return void openGuide(support === "needs-home-screen" ? "home-screen" : "unsupported", route, positions)
+      const permission = notificationPermission()
+      if (permission === "granted") subscribeTo(openGuide("working", route, positions), route, positions)
+      else openGuide(permission === "denied" ? "blocked" : "ask", route, positions)
+    },
+    [support, openGuide, subscribeTo]
+  )
 
   const toggle = useCallback(
     async (route: YieldRoute) => {
       const on = watched.includes(route.id)
-      if (!on && support !== "supported") {
-        openGuide(support === "needs-home-screen" ? "home-screen" : "unsupported", route)
-        return
-      }
-      // A device's first route goes through the guide, which asks for permission and confirms alerts are on
-      if (!on && (!enabled || notificationPermission() !== "granted")) {
-        const permission = notificationPermission()
-        if (permission === "granted") {
-          subscribeTo(openGuide("working", route), route)
-        } else {
-          openGuide(permission === "denied" ? "blocked" : "ask", route)
-        }
-        return
-      }
-      setBusy(true)
-      setError(null)
-      try {
-        setWatched(await watchRoutes(on ? watched.filter((id) => id !== route.id) : [...watched, route.id]))
-        setEnabled(true)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : FALLBACK_ERROR)
-      } finally {
-        setBusy(false)
-      }
+      if (on) return save({ routes: watched.filter((id) => id !== route.id), held })
+      if (!enabled) return startGuide(route, null)
+      // Notifications were blocked since, and there's no Telegram to fall back on
+      if (push && !telegram && notificationPermission() !== "granted") return startGuide(route, null)
+      return save({ routes: [...watched, route.id], held })
     },
-    [watched, support, enabled, openGuide, subscribeTo]
+    [watched, held, enabled, push, telegram, save, startGuide]
+  )
+
+  // Portfolio's bell, from a tap
+  const followPositions = useCallback(
+    (routes: string[]) => {
+      if (!enabled || (push && !telegram && notificationPermission() !== "granted")) return startGuide(null, routes)
+      writeFollowing(true)
+      setFollowing(true)
+      void save({ routes: watched, held: routes })
+    },
+    [enabled, push, telegram, watched, save, startGuide]
+  )
+
+  const stopFollowing = useCallback(async () => {
+    writeFollowing(false)
+    setFollowing(false)
+    await save({ routes: watched, held: [] })
+  }, [watched, save])
+
+  // Portfolio read the wallet's positions. A partial read (a source didn't answer) only adds.
+  const syncHeld = useCallback(
+    (routes: string[], complete: boolean) => {
+      const { following, enabled, held, watched } = latest.current
+      if (!following || !enabled) return
+      const next = complete ? routes : [...new Set([...held, ...routes])]
+      if (!sameSet(next, held)) void save({ routes: watched, held: next })
+    },
+    [save]
+  )
+
+  // A deposit landed in a route
+  const addHeld = useCallback(
+    (routeId: string) => {
+      const { following, enabled, held, watched } = latest.current
+      if (following && enabled && !held.includes(routeId)) void save({ routes: watched, held: [...held, routeId] })
+    },
+    [save]
   )
 
   const turnOff = useCallback(async () => {
@@ -203,19 +350,76 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setError(null)
     try {
       await turnOffAlerts()
-      setEnabled(false)
+      setPush(false)
+      setTelegram(false)
+      setFollowing(false)
       setWatched([])
+      setHeld([])
     } finally {
       setBusy(false)
     }
   }, [])
 
-  const showGuide = useCallback((step: "blocked" | "home-screen" | "unsupported") => void openGuide(step, null), [openGuide])
+  const turnOffBrowser = useCallback(async () => {
+    setBusy(true)
+    try {
+      await turnOffPush()
+      setPush(false)
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const unlinkTelegram = useCallback(async () => {
+    setBusy(true)
+    try {
+      await unlinkTelegramChat()
+      setTelegram(false)
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
+  const showGuide = useCallback(
+    (step: "ask" | "blocked" | "home-screen" | "unsupported" | "telegram") => {
+      if (step !== "telegram") return void openGuide(step, null)
+      // Settings' Link Telegram: straight to the link, with the lists this device has
+      const id = openGuide("telegram", null)
+      setTelegramLink(null)
+      startTelegramLink(pendingLists(null, null))
+        .then((link) => {
+          if (id === guideId.current) setTelegramLink(link)
+        })
+        .catch((err) => show(id, "telegram", null, null, err instanceof Error ? err.message : FALLBACK_ERROR))
+    },
+    [openGuide, pendingLists, show]
+  )
 
   return (
-    <AlertsContext.Provider value={{ support, enabled, watched, busy, error, toggle, turnOff, showGuide }}>
+    <AlertsContext.Provider
+      value={{
+        support,
+        enabled,
+        push,
+        telegram,
+        watched,
+        held,
+        following,
+        busy,
+        error,
+        toggle,
+        followPositions,
+        stopFollowing,
+        syncHeld,
+        addHeld,
+        turnOff,
+        turnOffPush: turnOffBrowser,
+        unlinkTelegram,
+        showGuide,
+      }}
+    >
       {children}
-      <AlertsGuide guide={guide} onClose={closeGuide} onAllow={allow} />
+      <AlertsGuide guide={guide} telegramLink={telegramLink} onClose={closeGuide} onAllow={allow} onTelegram={toTelegram} />
     </AlertsContext.Provider>
   )
 }
@@ -226,7 +430,7 @@ export function useAlerts(): AlertsState {
   return state
 }
 
-// The bell under a route: watch it to get alerts on this device, or stop
+// The bell under a route: watch it to get alerts, or stop
 export function RouteAlertToggle({ route, className }: { route: YieldRoute; className?: string }) {
   const { watched, busy, error, toggle } = useAlerts()
   const on = watched.includes(route.id)
@@ -264,22 +468,73 @@ export function RouteAlertToggle({ route, className }: { route: YieldRoute; clas
   )
 }
 
-// Settings: whether alerts are on for this device, and a way to turn them all off
-export function AlertsSettings() {
-  const { support, enabled, watched, busy, error, turnOff, showGuide } = useAlerts()
-  const blocked = support === "supported" && !enabled && notificationPermission() === "denied"
+// Portfolio's bell: alerts for every route the wallet holds, kept in step with the wallet as it changes
+export function PositionAlertToggle({ routes, className }: { routes: string[]; className?: string }) {
+  const { enabled, following, held, busy, error, followPositions, stopFollowing } = useAlerts()
+  const on = enabled && following
+  const count = on ? held.length : routes.length
+  return (
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <button
+        type="button"
+        onClick={() => (on ? stopFollowing() : followPositions(routes))}
+        disabled={busy}
+        aria-pressed={on}
+        className={cn(
+          "flex min-h-11 w-full items-center gap-2.5 rounded-[4px] border px-3.5 py-2.5 text-left text-sm transition-colors disabled:opacity-60",
+          on ? "border-frame bg-secondary text-foreground" : "border-hairline bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
+        )}
+      >
+        {busy ? (
+          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+        ) : on ? (
+          <BellRing className="size-4 shrink-0" aria-hidden="true" />
+        ) : (
+          <Bell className="size-4 shrink-0" aria-hidden="true" />
+        )}
+        <span className="min-w-0 flex-1">
+          {on ? (
+            <>
+              Alerts on for your {count === 1 ? "position" : `${count} positions`}.{" "}
+              <span className="text-muted-foreground">Tap to stop.</span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-foreground">Alert me about my positions</span>
+              <span className="mt-0.5 block text-xs">A rate drop, a better route, a depeg or deposits leaving.</span>
+            </>
+          )}
+        </span>
+      </button>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
 
-  const status =
+// Settings: what alerts cover on this device, and the two ways they arrive
+export function AlertsSettings() {
+  const { support, enabled, push, telegram, watched, held, following, busy, error, turnOff, turnOffPush, unlinkTelegram, showGuide } =
+    useAlerts()
+  const blocked = support === "supported" && !push && notificationPermission() === "denied"
+
+  const covered = [
+    watched.length > 0 && `${watched.length} ${watched.length === 1 ? "route" : "routes"}`,
+    following && held.length > 0 && `your ${held.length === 1 ? "position" : `${held.length} positions`}`,
+  ].filter(Boolean)
+  const status = !enabled
+    ? "Off. Tap the bell under any route, or turn on alerts for your positions in Portfolio."
+    : covered.length > 0
+      ? `On for ${covered.join(" and ")}. Hermes tells you when a rate falls, a better top rated route opens, a staking token trades below its value, deposits leave, a reserve is nearly all borrowed, or a route leaves Top rated.`
+      : "On, with nothing to watch yet. Tap the bell under a route, or turn on alerts for your positions in Portfolio."
+
+  const browser =
     support === "unsupported"
-      ? "This browser can't show alerts."
+      ? { text: "This browser can't show alerts.", help: "unsupported" as const }
       : support === "needs-home-screen"
-        ? "On iPhone, alerts need Hermes on your Home Screen."
+        ? { text: "On iPhone, they need Hermes on your Home Screen.", help: "home-screen" as const }
         : blocked
-          ? "Notifications are blocked for Hermes in this browser."
-          : enabled && watched.length > 0
-            ? `On for ${watched.length} ${watched.length === 1 ? "route" : "routes"}. Hermes tells you when a rate falls, a better top rated route opens, a reserve is nearly all borrowed, or a route leaves Top rated.`
-            : "Off. Tap the bell under any route to get alerts on this device."
-  const help = support === "needs-home-screen" ? "home-screen" : support === "unsupported" ? "unsupported" : blocked ? "blocked" : null
+          ? { text: "Blocked for Hermes in this browser.", help: "blocked" as const }
+          : { text: push ? "On." : "Off.", help: null }
 
   return (
     <div className="flex flex-col gap-3 p-[18px]">
@@ -287,14 +542,55 @@ export function AlertsSettings() {
         <div className="label-roman">Alerts</div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{status}</p>
       </div>
-      {help && (
-        <button type="button" onClick={() => showGuide(help)} className="btn-frame h-11 px-4 text-sm">
-          Show me how
-        </button>
-      )}
+
+      <div className="flex flex-col divide-y divide-hairline rounded-[4px] border border-hairline">
+        <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+          <span className="flex min-w-0 items-start gap-2.5">
+            <Bell className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">This device</span>
+              <span className="block text-xs text-muted-foreground">{browser.text}</span>
+            </span>
+          </span>
+          {browser.help ? (
+            <button type="button" onClick={() => showGuide(browser.help!)} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+              Show me how
+            </button>
+          ) : push ? (
+            <button type="button" onClick={turnOffPush} disabled={busy} className="btn-frame h-9 shrink-0 px-3 text-[13px] disabled:opacity-60">
+              Turn off
+            </button>
+          ) : (
+            <button type="button" onClick={() => showGuide("ask")} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+              Turn on
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+          <span className="flex min-w-0 items-start gap-2.5">
+            <Send className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Telegram</span>
+              <span className="block text-xs text-muted-foreground">
+                {telegram ? "Linked. Herald messages you there." : "Herald, the Hermes bot, messages you there."}
+              </span>
+            </span>
+          </span>
+          {telegram ? (
+            <button type="button" onClick={unlinkTelegram} disabled={busy} className="btn-frame h-9 shrink-0 px-3 text-[13px] disabled:opacity-60">
+              Unlink
+            </button>
+          ) : (
+            <button type="button" onClick={() => showGuide("telegram")} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+              Link
+            </button>
+          )}
+        </div>
+      </div>
+
       {enabled && (
         <button type="button" onClick={turnOff} disabled={busy} className="btn-frame h-11 px-4 text-sm disabled:opacity-60">
-          {busy ? "Turning off..." : "Turn off alerts on this device"}
+          {busy ? "Turning off..." : "Turn off all alerts"}
         </button>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -303,7 +599,14 @@ export function AlertsSettings() {
 }
 
 // The guide: a bottom sheet on phones and tablets, a dialog on desktop
-function AlertsGuide({ guide, onClose, onAllow }: { guide: Guide | null; onClose: () => void; onAllow: () => void }) {
+interface GuideActions {
+  telegramLink: TelegramLink | null
+  onClose: () => void
+  onAllow: () => void
+  onTelegram: () => void
+}
+
+function AlertsGuide({ guide, ...actions }: { guide: Guide | null } & GuideActions) {
   const phone = usePhone()
   // Keep the last step on screen while the guide slides away
   const [last, setLast] = useState<Guide | null>(null)
@@ -312,8 +615,8 @@ function AlertsGuide({ guide, onClose, onAllow }: { guide: Guide | null; onClose
   }, [guide])
   const shown = guide ?? last
   const open = !!guide
-  const onOpenChange = (next: boolean) => !next && onClose()
-  const body = shown && <GuideBody guide={shown} onClose={onClose} onAllow={onAllow} />
+  const onOpenChange = (next: boolean) => !next && actions.onClose()
+  const body = shown && <GuideBody guide={shown} {...actions} />
 
   if (phone) {
     return (
@@ -356,10 +659,12 @@ const TITLES: Record<GuideStep, string> = {
   failed: "Alerts didn't turn on",
   "home-screen": "Add Hermes to your Home Screen",
   unsupported: "Open Hermes in your browser",
+  telegram: "Alerts on Telegram",
+  "telegram-on": "Telegram is linked",
 }
 
-function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => void; onAllow: () => void }) {
-  const { step, route } = guide
+function GuideBody({ guide, telegramLink, onClose, onAllow, onTelegram }: { guide: Guide } & GuideActions) {
+  const { step, route, positions } = guide
   const [where, setWhere] = useState<Platform>("desktop")
   const [host, setHost] = useState("www.hermesagg.xyz")
   const [slow, setSlow] = useState(false)
@@ -377,7 +682,9 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
     return () => clearTimeout(timer)
   }, [step])
 
-  const subtitle = route ? `${route.name} · ${route.token}` : "On this device"
+  const subtitle = route ? `${route.name} · ${route.token}` : positions ? "Your positions" : "On this device"
+  // What the alerts are about, for the lines below
+  const about = route ? route.name : positions ? "a route you hold" : "a route you watch or hold"
 
   return (
     <>
@@ -389,15 +696,17 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
       <div className="flex flex-col gap-4 p-[18px] text-sm leading-relaxed">
         {step === "ask" && (
           <>
-            {route && <WhatAlertsCover route={route} />}
+            {(route || positions) && <WhatAlertsCover route={route} />}
             <div className="flex flex-col gap-2">
               <p>Next, your browser asks to send you notifications. Tap Allow.</p>
               <PromptPreview host={host} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Hermes keeps this device's alert address and the routes you watch. No wallet, no email.
+              Hermes keeps this device's alert address and the routes you watch{positions ? " and hold" : ""}. No wallet, no
+              email.
             </p>
             <Actions primary="Allow alerts" onPrimary={onAllow} secondary="Not now" onSecondary={onClose} />
+            <TelegramOption onTelegram={onTelegram} />
           </>
         )}
 
@@ -424,6 +733,7 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
             <p>Still no prompt? Allow notifications by hand:</p>
             <AllowSteps where={where} host={host} />
             <p className="text-xs text-muted-foreground">Hermes turns alerts on as soon as you allow them.</p>
+            <TelegramOption onTelegram={onTelegram} />
           </>
         )}
 
@@ -433,23 +743,25 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
             <AllowSteps where={where} host={host} />
             <p className="text-xs text-muted-foreground">Hermes turns alerts on as soon as you allow them.</p>
             <Actions primary="I've allowed them" onPrimary={onAllow} secondary="Close" onSecondary={onClose} />
+            <TelegramOption onTelegram={onTelegram} />
           </>
         )}
 
         {step === "working" && (
           <p className="flex items-center gap-2.5">
             <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-            Turning on alerts{route ? ` for ${route.name}` : ""}...
+            Turning on alerts{route ? ` for ${route.name}` : positions ? " for your positions" : ""}...
           </p>
         )}
 
-        {step === "on" && route && (
+        {step === "on" && (
           <>
             <p className="flex items-start gap-2.5">
               <BellRing className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
-                Hermes will tell this device when {route.name} changes. It just sent a first notification, which can take a few
-                seconds.
+                Hermes will tell this device when {about} changes.{" "}
+                {positions && "It follows your wallet: routes join and leave as your positions do. "}
+                A first notification is on its way, which can take a few seconds.
               </span>
             </p>
             <p className="text-xs text-muted-foreground">{NOTHING_ARRIVED[where]}</p>
@@ -468,6 +780,7 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
           <>
             <p>{guide.message ?? FALLBACK_ERROR}</p>
             <Actions primary="Try again" onPrimary={onAllow} secondary="Close" onSecondary={onClose} />
+            <TelegramOption onTelegram={onTelegram} />
           </>
         )}
 
@@ -479,29 +792,66 @@ function GuideBody({ guide, onClose, onAllow }: { guide: Guide; onClose: () => v
                 "In Safari, tap Share (the square with an arrow). On newer iOS it sits under the three dots.",
                 "Tap Add to Home Screen, then Add.",
                 "Open Hermes from your Home Screen.",
-                route ? `Tap "Alert me about ${route.name}" again and choose Allow.` : "Tap the bell under a route and choose Allow.",
+                route
+                  ? `Tap "Alert me about ${route.name}" again and choose Allow.`
+                  : positions
+                    ? `Open Portfolio, tap "Alert me about my positions" again and choose Allow.`
+                    : "Tap the bell under a route and choose Allow.",
               ]}
             />
             <Actions primary="Got it" onPrimary={onClose} />
+            <TelegramOption onTelegram={onTelegram} lead="Or skip the Home Screen:" />
           </>
         )}
 
-        {step === "unsupported" && <Unsupported host={host} onClose={onClose} />}
+        {step === "unsupported" && (
+          <>
+            <Unsupported host={host} onClose={onClose} />
+            <TelegramOption onTelegram={onTelegram} lead="Or get them here on Telegram:" />
+          </>
+        )}
+
+        {step === "telegram" && <TelegramStep link={telegramLink} message={guide.message} about={about} onRetry={onTelegram} />}
+
+        {step === "telegram-on" && (
+          <>
+            <p className="flex items-start gap-2.5">
+              <Send className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                Herald will message you on Telegram when {about} changes.
+                {positions && " He follows your wallet: routes join and leave as your positions do."} He sent the list to your
+                chat. Send him /stop there, or unlink in Settings, to turn it off.
+              </span>
+            </p>
+            <Actions primary="Done" onPrimary={onClose} />
+          </>
+        )}
       </div>
     </>
   )
 }
 
-function WhatAlertsCover({ route }: { route: YieldRoute }) {
-  const items = [
-    "Its rate falls 20% or more in a day",
-    `A top rated ${route.token} route pays a point or more above it`,
-    "Its Safety Score falls below 80",
-    ...(route.category === "lending" ? ["5% or less of the reserve can be withdrawn"] : []),
-  ]
+function WhatAlertsCover({ route }: { route: YieldRoute | null }) {
+  // Without a route: the positions, whatever they hold
+  const items = route
+    ? [
+        "Its rate falls 20% or more in a day",
+        `A top rated ${route.token} route pays a point or more above it`,
+        "Its Safety Score falls below 80",
+        ...(route.category === "liquid-staking" ? [`${route.receipt ?? "Its token"} trades 1% or more below its SOL value`] : []),
+        "15% or more of its deposits leave in a day",
+        ...(route.category === "lending" ? ["5% or less of the reserve can be withdrawn"] : []),
+      ]
+    : [
+        "A rate falls 20% or more in a day",
+        "A top rated route for the same token pays half a point more: Reroute is a tap away",
+        "A staking token trades 1% or more below its SOL value",
+        "15% or more of a route's deposits leave in a day",
+        "A reserve is nearly all borrowed, or a route leaves Top rated",
+      ]
   return (
     <div className="flex flex-col gap-2">
-      <p>Get a notification on this device when {route.name} changes:</p>
+      <p>{route ? `Get a notification on this device when ${route.name} changes:` : "Get a notification when a route you hold changes:"}</p>
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => (
           <li key={item} className="flex items-start gap-2.5">
@@ -512,6 +862,57 @@ function WhatAlertsCover({ route }: { route: YieldRoute }) {
       </ul>
       <p className="text-xs text-muted-foreground">At most one alert of each kind a day.</p>
     </div>
+  )
+}
+
+// Telegram as the other way: browsers inside apps and iPhones outside the Home Screen can't show notifications
+function TelegramOption({ onTelegram, lead = "Rather use Telegram?" }: { onTelegram: () => void; lead?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[4px] border border-hairline bg-plate px-3.5 py-2.5">
+      <span className="text-[13px] text-muted-foreground">{lead}</span>
+      <button type="button" onClick={onTelegram} className="btn-frame h-9 shrink-0 px-3 text-[13px]">
+        <Send className="size-3.5" aria-hidden="true" />
+        Get alerts on Telegram
+      </button>
+    </div>
+  )
+}
+
+// The link to Herald, then a wait until it's opened. Hermes checks every few seconds and when the page comes back.
+function TelegramStep({ link, message, about, onRetry }: { link: TelegramLink | null; message?: string; about: string; onRetry: () => void }) {
+  if (message) {
+    return (
+      <>
+        <p>{message}</p>
+        <Actions primary="Try again" onPrimary={onRetry} />
+      </>
+    )
+  }
+  return (
+    <>
+      <p>Herald, the Hermes bot, will message you on Telegram when {about} changes.</p>
+      <Steps items={["Tap Open Telegram.", "In the chat with Herald, tap Start.", "Come back here. Hermes carries on by itself."]} />
+      {link ? (
+        <a href={link.url} target="_blank" rel="noopener noreferrer" className="btn-teal h-12 w-full text-[15px]">
+          <Send className="size-4" aria-hidden="true" />
+          Open Telegram
+        </a>
+      ) : (
+        <span className="btn-teal h-12 w-full text-[15px] opacity-60" aria-busy="true">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Making your link
+        </span>
+      )}
+      {link && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
+          Waiting for Telegram
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Hermes keeps your Telegram chat and the routes you watch or hold. No wallet. Send /stop to Herald to end it.
+      </p>
+    </>
   )
 }
 
@@ -570,7 +971,7 @@ function Steps({ items }: { items: string[] }) {
     <ol className="flex flex-col gap-2">
       {items.map((item, index) => (
         <li key={item} className="flex items-start gap-2.5">
-          <span className="grid size-5 shrink-0 place-items-center rounded-full border border-frame font-roman text-[11px] font-bold">
+          <span className="grid size-5 shrink-0 place-items-center rounded-full border border-frame font-sans text-[11px] font-semibold tabular-nums">
             {index + 1}
           </span>
           <span>{item}</span>

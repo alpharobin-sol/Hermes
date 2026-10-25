@@ -118,7 +118,7 @@ interface OnboardingProps {
 
 export function Onboarding({ route, onConnect, onDeposit }: OnboardingProps) {
   const { connected, publicKey, wallets } = useWallet()
-  const { support, enabled, watched, toggle } = useAlerts()
+  const { support, enabled, watched, held, following, toggle } = useAlerts()
   // Read in the browser after the first render, so the server and the browser render the same page
   const [state, setState] = useState<OnboardingState | null>(null)
   const [open, setOpen] = useState(false)
@@ -137,9 +137,11 @@ export function Onboarding({ route, onConnect, onDeposit }: OnboardingProps) {
   useEffect(() => {
     if (connected) markStep("wallet")
   }, [connected])
+  // A watched route, or alerts that follow the wallet's positions, by notification or Telegram
+  const alerting = enabled && (watched.length > 0 || (following && held.length > 0))
   useEffect(() => {
-    if (enabled && watched.length > 0) markStep("alerts")
-  }, [enabled, watched.length])
+    if (alerting) markStep("alerts")
+  }, [alerting])
 
   // A wallet that already holds a position in a Hermes route has made its first deposit. Asked once per wallet.
   const address = publicKey?.toBase58() ?? null

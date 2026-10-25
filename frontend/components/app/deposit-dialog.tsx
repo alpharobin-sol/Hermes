@@ -13,7 +13,7 @@ import { formatPercent } from "@/lib/helpers/formatters"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
 import { HIGH_UTILIZATION, Medallion, exitTight, formatApy, typeLabel, withdrawablePercent } from "./rate-board"
 import { whatCanGoWrong } from "./safety"
-import { RouteAlertToggle } from "./alerts"
+import { RouteAlertToggle, useAlerts } from "./alerts"
 import { HorizonSummary } from "./live-quotes"
 import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
 import { markPortfolioChanged } from "@/lib/portfolio-changed"
@@ -67,6 +67,7 @@ export function DepositDialog({
   const { connection } = useConnection()
   const { publicKey, sendTransaction, signAllTransactions } = useWallet()
 
+  const { addHeld } = useAlerts()
   const [status, setStatus] = useState<DepositStatus>("quoting")
   const [quote, setQuote] = useState<DepositQuote | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -208,6 +209,8 @@ export function DepositDialog({
       setStatus("success")
       markPortfolioChanged()
       markStep("deposit")
+      // Alerts that follow the wallet take in the new route
+      addHeld(route.id)
       onDeposited?.()
     } catch (err) {
       if (controller.signal.aborted) return

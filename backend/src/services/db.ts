@@ -58,6 +58,19 @@ const SCHEMA = `
     updated_at timestamptz not null default now()
   );
 
+  -- The routes the device's wallet holds, sent by the browser from Portfolio. Never the wallet itself.
+  alter table push_subscriptions add column if not exists held text[] not null default '{}';
+
+  -- Alerts by Telegram: a link token made in Hermes, the chat that opened it with Herald, and the same two lists
+  create table if not exists telegram_alerts (
+    token text primary key,
+    chat_id bigint unique,
+    routes text[] not null default '{}',
+    held text[] not null default '{}',
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  );
+
   create table if not exists alert_log (
     endpoint text not null,
     route_id text not null,
