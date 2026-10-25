@@ -7,8 +7,8 @@ import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { isTopRated } from "@/lib/top-rated"
 import { exitTight, routeLabel, routeSlug, typeLabel } from "@/lib/route-copy"
 
-// Each route's share image, for X, Telegram and search: its live APY and Safety Score on the Aurora palette, with the
-// fresco in an arch like the site's. Drawn on the server and kept for a minute, like the page. A failed read throws,
+// Each route's share image, for X, Telegram and search: its live APY and Safety Score on the Aurora palette, with a
+// fresco of Hermes, caduceus raised, in an arch like the site's (the owner's pick). Drawn on the server and kept for a minute, like the page. A failed read throws,
 // so the last good image stays.
 export const revalidate = 60
 export const alt = "A Hermes route with its live APY and Safety Score"
@@ -41,7 +41,7 @@ const files = Promise.all([
   readFile(join(process.cwd(), "assets/fonts/HermesCormorant-MediumItalic.ttf")),
   readFile(join(process.cwd(), "assets/fonts/Cinzel-Bold.ttf")),
   readFile(join(process.cwd(), "assets/fonts/Inter-Medium.ttf")),
-  readFile(join(process.cwd(), "public/brand/aurora-banner.jpg")),
+  readFile(join(process.cwd(), "assets/images/hermes-caduceus.jpg")),
   readFile(join(process.cwd(), "public/brand/hermes-wordmark-light.png")),
 ])
 
@@ -72,7 +72,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const route = routes.find((candidate) => routeSlug(candidate) === slug)
   if (!route) notFound()
 
-  const [cormorant, cormorantItalic, cinzel, inter, banner, wordmark] = await files
+  const [cormorant, cormorantItalic, cinzel, inter, fresco, wordmark] = await files
   const label = routeLabel(route)
   // One line at any length: "JitoSOL" large, "Jupiter Lend USDT" smaller
   const titleSize = Math.min(124, Math.floor(1300 / Math.max(label.length, 1)))
@@ -173,7 +173,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             )}
           </div>
 
-          {/* The fresco in an arch, Hermes leading the Hours */}
+          {/* Hermes in flight in an arch: his head, raised hand and caduceus inside the curve */}
           <div
             style={{
               marginLeft: "auto",
@@ -188,10 +188,10 @@ export default async function Image({ params }: { params: Promise<{ slug: string
             <div style={{ flex: 1, display: "flex", position: "relative", overflow: "hidden", borderRadius: "174px 174px 2px 2px" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`data:image/jpeg;base64,${banner.toString("base64")}`}
-                width={1560}
-                height={520}
-                style={{ position: "absolute", left: -455, top: 0 }}
+                src={`data:image/jpeg;base64,${fresco.toString("base64")}`}
+                width={464}
+                height={560}
+                style={{ position: "absolute", left: -88, top: -10 }}
                 alt=""
               />
             </div>
