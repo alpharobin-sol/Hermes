@@ -10,6 +10,7 @@ const COLUMNS = [
     title: "Product",
     links: [
       { href: "/app", label: "Launch app" },
+      { href: "/routes", label: "Routes" },
       { href: "/portfolio", label: "Portfolio" },
       { href: "/docs", label: "Docs" },
     ],

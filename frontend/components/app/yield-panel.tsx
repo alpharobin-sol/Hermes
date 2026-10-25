@@ -137,6 +137,18 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   const visibleRoutes = view === "all" ? forToken : forToken.filter(isTopRated)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
 
+  // A route page's Launch app opens /app?route=jito on that route: its token, and All routes when it isn't top rated
+  const linkedRoute = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (linkedRoute.current === undefined) linkedRoute.current = new URLSearchParams(window.location.search).get("route")
+    const route = linkedRoute.current ? routes.find((candidate) => candidate.id === linkedRoute.current) : undefined
+    if (!route) return
+    linkedRoute.current = null
+    setSelectedSymbol(route.token)
+    if (!isTopRated(route)) setView("all")
+    setSelectedId(route.id)
+  }, [routes])
+
   const numericAmount = useMemo(() => {
     const parsed = Number.parseFloat(amount.replace(/,/g, ""))
     return isNaN(parsed) || parsed < 0 ? 0 : parsed
