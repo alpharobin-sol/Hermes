@@ -173,32 +173,27 @@ export function DepositDialog({
           continue
         }
 
+        // Sent through the app's connection, then followed on the chain like a wallet's send
         const sig = await connection.sendRawTransaction(signed[i].serialize())
         setSignature(sig)
         setStatus("confirming")
-
-        let result
-        try {
-          result = await connection.confirmTransaction(
-            {
-              signature: sig,
-              blockhash: transactions[i].message.recentBlockhash,
-              lastValidBlockHeight: built.lastValidBlockHeight,
-            },
-            "confirmed"
+        const outcome = await sendAndWatch({
+          connection,
+          sendTransaction: async () => sig,
+          transaction: signed[i],
+          user: publicKey,
+          lastValidBlockHeight: built.lastValidBlockHeight,
+          signal: controller.signal,
+        })
+        if (outcome.kind === "stopped") return
+        if (outcome.kind !== "landed") {
+          throw new Error(
+            isDeposit
+              ? "The deposit didn't land, so nothing left your wallet. Try again."
+              : "A pool update step didn't land. Your SOL was not deposited. Try again."
           )
-        } catch (confirmErr) {
-          console.warn("Could not confirm transaction", confirmErr)
-          if (!isDeposit) {
-            // Only a pool update was in flight, the deposit itself was never sent
-            throw new Error("A pool update step could not be confirmed. Your SOL was not deposited. Try again.")
-          }
-          // The deposit was sent but we could not check it. Never offer a retry here: it could deposit twice.
-          setStatus("unconfirmed")
-          onDeposited?.()
-          return
         }
-        if (result.value.err) {
+        if (outcome.failed) {
           throw new Error(
             isDeposit
               ? "Transaction failed on-chain. Your funds were not moved."
