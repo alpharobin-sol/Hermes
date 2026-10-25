@@ -7,6 +7,7 @@ import { cached, Cached } from './cache';
 import { connection, getRate, http, solPrice, tokenPrices } from './rates';
 import { createJupiterClient } from './jupiter';
 import { getYieldRoutes } from './yields';
+import { Project0Deposit, project0Account, PROJECT0_PROGRAM, readBank, readPosition } from './project0';
 
 /**
  * PORTFOLIO
@@ -26,6 +27,9 @@ import { getYieldRoutes } from './yields';
  * - Kamino vaults: the wallet's vault shares from Kamino's API, staked or not, worth the shares times what one share
  *   holds. Earned: that value minus what was paid in, from Kamino's record of the wallet's vault deposits and
  *   withdrawals. Shares that came another way leave earned out.
+ * - Project 0: the wallet's Project 0 accounts that Hermes opens (one per token, at a fixed address), read on chain.
+ *   Earned: the value minus what went in, from that account's history through SOLANA_HISTORY_RPC_URL. Deposits made in
+ *   Project 0's own app sit in other accounts and show there.
  *
  * A source that fails is named in `unavailable`, never counted as empty. Each wallet's answer is kept 60 seconds.
  */
@@ -72,6 +76,7 @@ const LST_ROUTES = ROUTES.filter((route) => route.category === 'liquid-staking' 
 const KAMINO_ROUTES = ROUTES.filter((route) => route.source.kind === 'kamino');
 const JUPITER_LEND_ROUTES = ROUTES.filter((route) => route.source.kind === 'jupiter-lend' && route.receipt);
 const VAULT_ROUTES = ROUTES.filter((route) => route.source.kind === 'kamino-vault');
+const PROJECT0_ROUTES = ROUTES.filter((route) => route.direct?.kind === 'project0');
 
 // ---------- Wallet history, for what liquid staking has earned ----------
 
@@ -510,6 +515,110 @@ async function kaminoVaults(owner: string): Promise<Found[]> {
   );
 }
 
+// What a transaction on a Project 0 account did: the wallet's change in the token, and whether it opened or closed the
+// account
+interface Project0Change {
+  at: number | null;
+  paid: number;
+  opened: boolean;
+  closed: boolean;
+}
+const project0Changes = new Map<string, Project0Change | null>();
+
+async function project0Change(signature: string, owner: string, account: string, token: TokenInfo) {
+  const key = `${signature}:${owner}:${token.mint}`;
+  if (project0Changes.has(key)) return project0Changes.get(key)!;
+  const tx = await rpc<any>('getTransaction', [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 1, commitment: 'confirmed' }]);
+  let change: Project0Change | null = null;
+  if (tx?.meta && !tx.meta.err) {
+    const keys: string[] = (tx.transaction?.message?.accountKeys ?? []).map((k: any) => (typeof k === 'string' ? k : k.pubkey));
+    const sum = (balances: any[] | undefined) =>
+      (balances ?? []).filter((b) => b.owner === owner && b.mint === token.mint).reduce((total, b) => total + Number(b.uiTokenAmount?.amount ?? 0), 0);
+    const index = keys.indexOf(account);
+    const before = Number(tx.meta.preBalances?.[index]);
+    const after = Number(tx.meta.postBalances?.[index]);
+    change = {
+      at: tx.blockTime ? tx.blockTime * 1000 : null,
+      paid: (sum(tx.meta.postTokenBalances) - sum(tx.meta.preTokenBalances)) / 10 ** token.decimals,
+      opened: index >= 0 && before === 0 && after > 0,
+      closed: index >= 0 && before > 0 && after === 0,
+    };
+  }
+  if (project0Changes.size >= MAX_CHANGES) project0Changes.delete(project0Changes.keys().next().value!);
+  project0Changes.set(key, change);
+  return change;
+}
+
+/**
+ * What a Project 0 position has earned: its value now minus what went in, from the history of the wallet's Hermes
+ * account. That account holds only this token, so what left the wallet in its transactions went in, and what came
+ * back came out. The count runs from the transaction that opened the account; closing it starts over. A history that
+ * doesn't start with the opening can't be added up.
+ */
+export async function project0Earned(owner: string, account: PublicKey, token: TokenInfo, value: number): Promise<Earned> {
+  if (!historyRpc) return { earned: null, note: null, since: null };
+  const signatures = await rpc<any[]>('getSignaturesForAddress', [account.toBase58(), { limit: MAX_HISTORY }]);
+  if (signatures.length >= MAX_HISTORY) return { earned: null, note: 'Earned unknown: too much history to add up.', since: null };
+  const ordered = signatures.filter((s) => !s.err).reverse();
+  const found = await Promise.all(ordered.map((s) => project0Change(s.signature, owner, account.toBase58(), token)));
+  let net = 0;
+  let since: number | null = null;
+  let open = false;
+  for (const change of found) {
+    if (!change) continue;
+    if (change.opened) {
+      open = true;
+      net = 0;
+      since = change.at;
+    }
+    net -= change.paid;
+    if (change.closed) open = false;
+  }
+  if (!open) return { earned: null, note: "Earned unknown: the account is older than the history Hermes can read.", since: null };
+  // More came out than went in, or nothing went in: deposits or withdrawals happened another way
+  if (!(net > 0)) return { earned: null, note: "Earned unknown: the account's history doesn't add up.", since: null };
+  return { earned: value - net, note: null, since };
+}
+
+async function project0(owner: PublicKey): Promise<Found[]> {
+  const accounts = PROJECT0_ROUTES.map((route) => project0Account(route.direct as Project0Deposit, owner));
+  const banks = PROJECT0_ROUTES.map((route) => new PublicKey((route.direct as Project0Deposit).bank));
+  const infos = await connection.getMultipleAccountsInfo([...banks, ...accounts]);
+  const held = PROJECT0_ROUTES.flatMap((route, i) => {
+    const info = infos[banks.length + i];
+    if (!info?.owner.equals(PROJECT0_PROGRAM)) return [];
+    const bankInfo = infos[i];
+    if (!bankInfo) throw new Error('no Project 0 bank');
+    const direct = route.direct as Project0Deposit;
+    const position = readPosition(accounts[i], info, direct, readBank(bankInfo.owner, bankInfo.data, direct.group), owner);
+    const amount = position.amount.div(10 ** TOKENS[route.token].decimals).toNumber();
+    return amount > 0 ? [{ route, position, amount }] : [];
+  });
+
+  return Promise.all(
+    held.map(async ({ route, position, amount }): Promise<Found> => {
+      let earned: Earned = { earned: null, note: null, since: null };
+      try {
+        earned = await project0Earned(owner.toBase58(), position.account, TOKENS[route.token], amount);
+      } catch (error) {
+        logger.info(`Portfolio history failed for ${route.id}: ${error instanceof Error ? error.message : error}`);
+        earned = { earned: null, note: RETRY_NOTE, since: null };
+      }
+      return {
+        route,
+        routeId: route.id,
+        holding: { amount, symbol: route.token },
+        value: amount,
+        earned: earned.earned,
+        earnedNote: earned.note,
+        since: earned.since ? new Date(earned.since).toISOString() : null,
+        source: historyRpc ? 'On-chain: your Project 0 account and its history' : 'On-chain: your Project 0 account',
+        note: position.borrows ? 'This Project 0 account also borrows. Project 0 shows the full position.' : null,
+      };
+    })
+  );
+}
+
 // ---------- The answer ----------
 
 async function readPortfolio(address: string): Promise<Portfolio> {
@@ -518,6 +627,7 @@ async function readPortfolio(address: string): Promise<Portfolio> {
     ['your token accounts', liquidStaking(owner)],
     ['Kamino', kamino(address)],
     ['Kamino vaults', kaminoVaults(address)],
+    ['Project 0', project0(owner)],
     ['Jupiter Lend', jupiterLend(address)],
   ];
   const [settled, routes, fetched] = await Promise.all([

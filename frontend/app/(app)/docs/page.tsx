@@ -109,9 +109,10 @@ export default function Docs() {
                 staking rewards. To get out, you swap back to SOL at the market price.
               </p>
               <p>
-                <strong>Lending.</strong> You lend SOL, USDC or USDT to borrowers through Kamino Lend or Jupiter Lend.
-                The yield is the interest borrowers pay, so it moves as they borrow more or less. You withdraw at the
-                protocol whenever the reserve has room.
+                <strong>Lending.</strong> You lend SOL, USDC or USDT to borrowers through Kamino Lend, Jupiter Lend or
+                Project 0 (formerly marginfi). The yield is the interest borrowers pay, so it moves as they borrow more or
+                less. You withdraw at the protocol whenever the reserve has room. A rate far above the others usually
+                means nearly everything is borrowed, so getting out may wait.
               </p>
               <p>
                 <strong>Lending vault.</strong> A Kamino vault lends your USDC across several Kamino reserves. Its curator
@@ -154,7 +155,9 @@ export default function Docs() {
               </List>
               <p>
                 Top rated routes score 80 or more. Open Why next to any Safety Score to see each part, what it measured
-                and where the number came from. The score does not cover smart contract bugs or a sudden depeg.
+                and where the number came from. The score does not cover smart contract bugs or a sudden depeg. A route
+                whose deposit history has no source yet shows Not scored until Hermes has two weeks of its own: Project
+                0 for now.
               </p>
             </Section>
 
@@ -214,12 +217,12 @@ export default function Docs() {
                   their pool, so you see the exit cost before you sign.
                 </li>
                 <li>
-                  Kamino Lend, Jupiter Lend and the Kamino vault pay your USDC, USDT or SOL back. Only part of a reserve
-                  can leave at once when most of it is lent out, and Hermes shows how much can leave right now.
+                  Kamino Lend, Jupiter Lend, Project 0 and the Kamino vault pay your USDC, USDT or SOL back. Only part of
+                  a reserve can leave at once when most of it is lent out, and Hermes shows how much can leave right now.
                 </li>
                 <li>
-                  Taking everything out of Kamino closes your Kamino account and returns the one-time rent you paid on
-                  your first deposit.
+                  Taking everything out of Kamino Lend or Project 0 closes the account and returns the one-time rent you
+                  paid on your first deposit.
                 </li>
               </List>
               <p>
@@ -230,6 +233,10 @@ export default function Docs() {
                 , Jupiter Lend at{" "}
                 <a href="https://jup.ag/lend/earn" target="_blank" rel="noopener noreferrer" className={LINK}>
                   jup.ag/lend/earn
+                </a>
+                , Project 0 at{" "}
+                <a href="https://app.0.xyz" target="_blank" rel="noopener noreferrer" className={LINK}>
+                  app.0.xyz
                 </a>
                 , and staking tokens on{" "}
                 <a href="https://jup.ag" target="_blank" rel="noopener noreferrer" className={LINK}>
@@ -278,8 +285,9 @@ export default function Docs() {
               </p>
               <p>
                 Earned is what a position is worth now minus what you paid in, network fees aside. Kamino reports its own
-                interest, and its record of your vault deposits and withdrawals. For staking tokens and Jupiter Lend,
-                Hermes reads your wallet&apos;s history. When tokens came
+                interest, and its record of your vault deposits and withdrawals. For staking tokens, Jupiter Lend and
+                Project 0, Hermes reads your wallet&apos;s history. Portfolio shows the Project 0 accounts Hermes opens;
+                deposits made in Project 0&apos;s own app show there. When tokens came
                 from another wallet or another token, Hermes says it can&apos;t tell what they cost instead of guessing.
               </p>
             </Section>
@@ -312,7 +320,8 @@ export default function Docs() {
               <p>
                 In beta, each deposit is capped at 10 SOL, or 1,000 USDC or USDT for lending. A first Kamino deposit also
                 pays a one-time account rent in SOL, shown before you sign: about 0.03 SOL for Kamino Lend, about 0.007
-                SOL for a Kamino vault.
+                SOL for a Kamino vault. A first Project 0 deposit pays about 0.0124 SOL, back when you take everything
+                out.
               </p>
             </Section>
 

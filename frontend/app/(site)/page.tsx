@@ -120,7 +120,7 @@ const AUDIENCES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: CircleDollarSign,
     title: "Stablecoin savers",
-    body: "Lend USDC or USDT on Kamino and Jupiter Lend, or through a curated Kamino vault. No impermanent loss, and you see how much can be withdrawn.",
+    body: "Lend USDC or USDT on Kamino, Jupiter Lend and Project 0, or through a curated Kamino vault. No impermanent loss, and you see how much can be withdrawn.",
   },
   {
     icon: Activity,
@@ -183,7 +183,7 @@ const FAQS = [
   {
     question: "Which routes can I use?",
     answer:
-      "Ten liquid staking tokens, including JitoSOL, mSOL and INF, Kamino Lend and Jupiter Lend for SOL, USDC and USDT, and Kamino's Steakhouse USDC vault. Every route on Hermes deposits inside Hermes. They are in beta, capped at 10 SOL per deposit, or 1,000 USDC or USDT for lending.",
+      "Ten liquid staking tokens, including JitoSOL, mSOL and INF, Kamino Lend and Jupiter Lend for SOL, USDC and USDT, Project 0 (formerly marginfi) for USDC and USDT, and Kamino's Steakhouse USDC vault. Every route on Hermes deposits inside Hermes. They are in beta, capped at 10 SOL per deposit, or 1,000 USDC or USDT for lending.",
   },
   {
     question: "What can go wrong?",

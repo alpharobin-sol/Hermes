@@ -221,7 +221,10 @@ function outflows(route: RouteConfig): Cached<Outflow> | undefined {
         ? () => kaminoOutflow(source.reserve)
         : source.kind === 'kamino-vault'
           ? () => kaminoVaultOutflow(source.vault)
-          : () => defillamaOutflow(route);
+          : source.kind === 'project0'
+            ? // DefiLlama tracks only what can be withdrawn from Project 0's banks, and its supply history is paid
+              () => Promise.reject(new Error("no deposit history until Hermes's own covers two weeks"))
+            : () => defillamaOutflow(route);
     const fetcher = async () => (await hermesOutflow(route)) ?? fallback();
     entry = cached(`deposit history for ${route.id}`, fetcher, {
       ttlMs: HOUR_MS,

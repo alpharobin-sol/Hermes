@@ -176,6 +176,10 @@
   ::placeholder {
     color: var(--placeholder);
   }
+  /* Cormorant's default figures are old-style, so its 0 reads as an o ("Project 0") */
+  .font-display {
+    font-variant-numeric: lining-nums;
+  }
 }
 
 @layer components {
