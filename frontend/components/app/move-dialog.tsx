@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { VersionedTransaction } from "@solana/web3.js"
 import { ExternalLink, Loader2 } from "lucide-react"
@@ -15,6 +15,7 @@ import { explorerTxUrl } from "@/lib/network"
 import { Notice, Row, base64ToBytes } from "./deposit-dialog"
 import { formatTokenAmount } from "./tokens"
 import type { Position } from "./portfolio"
+import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
 
 // Reroute: move a position into another route for the same token. Hermes proposes, the wallet signs. A staking token to a
 // staking token is one Jupiter swap. Anything with lending in it is two steps: the withdrawal, then the deposit of
@@ -43,7 +44,7 @@ function amountText(value: string | number, digits = 6): string {
 
 function errorText(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (/user rejected|rejected the request/i.test(message)) return "You rejected the transaction in your wallet."
+  if (isDeclined(err)) return "You declined in your wallet. Nothing was sent."
   return message || "Reroute failed"
 }
 
@@ -95,6 +96,16 @@ export function MoveDialog({
   const [quote, setQuote] = useState<MoveQuote | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
+  // The reroute step in flight, stopped when the dialog closes
+  const inFlight = useRef<AbortController | null>(null)
+  const follow = () => {
+    inFlight.current?.abort()
+    inFlight.current = new AbortController()
+    return inFlight.current.signal
+  }
+  useEffect(() => {
+    if (!open) inFlight.current?.abort()
+  }, [open])
   const [step1, setStep1] = useState<string | null>(null) // step 1's signature, once it is confirmed
   const [finish, setFinish] = useState<MoveFinish | null>(null)
 
@@ -165,29 +176,41 @@ export function MoveDialog({
     setAll(true)
   }
 
-  // Send one built transaction and wait for it. Returns false when it was sent but could not be checked.
-  const sendAndConfirm = async (encoded: string, lastValidBlockHeight: number, confirmingStatus: Status): Promise<string | null> => {
-    const transaction = VersionedTransaction.deserialize(base64ToBytes(encoded))
-    const sig = await sendTransaction(transaction, connection)
-    setSignature(sig)
-    setStatus(confirmingStatus)
-    let result
-    try {
-      result = await connection.confirmTransaction(
-        { signature: sig, blockhash: transaction.message.recentBlockhash, lastValidBlockHeight },
-        "confirmed"
-      )
-    } catch (confirmErr) {
-      console.warn("Could not confirm move transaction", confirmErr)
-      return null
+  // Send one built transaction through the wallet and follow it to the chain, from the wallet's answer or the chain,
+  // whichever comes first. Null when the dialog closed first.
+  const sendAndConfirm = async (
+    encoded: string,
+    lastValidBlockHeight: number,
+    confirmingStatus: Status,
+    signal: AbortSignal
+  ): Promise<string | null> => {
+    if (!publicKey) return null
+    const outcome = await sendAndWatch({
+      connection,
+      sendTransaction,
+      transaction: VersionedTransaction.deserialize(base64ToBytes(encoded)),
+      user: publicKey,
+      lastValidBlockHeight,
+      signal,
+      onSigned: (sig) => {
+        setSignature(sig)
+        setStatus(confirmingStatus)
+      },
+    })
+    if (outcome.kind === "stopped") return null
+    if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
+    if (outcome.kind === "expired") {
+      throw new Error(`Your wallet didn't send it, so nothing moved.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`)
     }
-    if (result.value.err) throw new Error("failed on-chain")
-    return sig
+    setSignature(outcome.signature)
+    if (outcome.failed) throw new Error("failed on-chain")
+    return outcome.signature
   }
 
   // Step 2: build the deposit of what step 1 paid in, then sign it, unless it carries a one-time rent to show first
   const runStep2 = async (step1Signature: string, signNow: boolean) => {
     if (!publicKey || !to) return
+    const signal = follow()
     try {
       let built = finish
       if (!built) {
@@ -200,6 +223,7 @@ export function MoveDialog({
           userPublicKey: publicKey.toBase58(),
           signature: step1Signature,
         })
+        if (signal.aborted) return
         setFinish(built)
         if (Number(built.quote.setupCostSol) > 0 && !signNow) {
           setStatus("step2-ready")
@@ -212,7 +236,18 @@ export function MoveDialog({
       // More than one transaction (a stake pool update first) is signed up front and sent in order
       const signed = transactions.length > 1 && signAllTransactions ? await signAllTransactions(transactions) : null
       for (let i = 0; i < transactions.length; i++) {
-        const sig = signed ? await connection.sendRawTransaction(signed[i].serialize()) : await sendTransaction(transactions[i], connection)
+        if (!signed) {
+          let sig: string | null
+          try {
+            sig = await sendAndConfirm(encoded[i], built.lastValidBlockHeight, "step2-confirming", signal)
+          } catch (err) {
+            if (err instanceof Error && err.message === "failed on-chain") throw new Error("Step 2 failed on-chain. Nothing was deposited.")
+            throw err
+          }
+          if (!sig) return
+          continue
+        }
+        const sig = await connection.sendRawTransaction(signed[i].serialize())
         setSignature(sig)
         setStatus("step2-confirming")
         let result
@@ -230,9 +265,11 @@ export function MoveDialog({
         }
         if (result.value.err) throw new Error("Step 2 failed on-chain. Nothing was deposited.")
       }
+      if (signal.aborted) return
       setStatus("success")
       onDone()
     } catch (err) {
+      if (signal.aborted) return
       // A failed build or a rejected signature starts step 2 over with a fresh transaction
       setFinish(null)
       setError(errorText(err))
@@ -242,26 +279,24 @@ export function MoveDialog({
 
   const handleMove = async () => {
     if (!publicKey || !to) return
+    const signal = follow()
     try {
       setStatus("signing")
       setError(null)
       const built = await MoveAPI.build({ from: position.routeId, to, amount: all ? undefined : amount, all, userPublicKey: publicKey.toBase58() })
+      if (signal.aborted) return
       setQuote(built.quote)
       let sig: string | null
       try {
-        sig = await sendAndConfirm(built.transaction, built.lastValidBlockHeight, "confirming")
+        sig = await sendAndConfirm(built.transaction, built.lastValidBlockHeight, "confirming", signal)
       } catch (err) {
         if (err instanceof Error && err.message === "failed on-chain") {
           throw new Error(built.steps === 1 ? "The swap failed on-chain. Nothing was rerouted." : "The withdrawal failed on-chain. Nothing left your position.")
         }
         throw err
       }
-      if (!sig) {
-        // Sent but not checked. Never offer a retry here: it could move twice.
-        setStatus("unconfirmed")
-        onDone()
-        return
-      }
+      // The dialog closed while it was in flight
+      if (!sig) return
       if (built.steps === 1) {
         setStatus("success")
         onDone()
@@ -271,12 +306,14 @@ export function MoveDialog({
       onDone()
       await runStep2(sig, false)
     } catch (err) {
+      if (signal.aborted) return
       setError(errorText(err))
       setStatus("error")
     }
   }
 
   const busy = ["signing", "confirming", "finishing", "step2-signing", "step2-confirming"].includes(status)
+  const slow = useSlowWallet(status === "signing" || status === "step2-signing")
   const cost = quote ? Number(quote.cost) : 0
   const costShare = quote && Number(quote.valueIn) > 0 ? cost / Number(quote.valueIn) : 0
   const extra = quote ? Number(quote.extraPerYear) : 0
@@ -291,7 +328,7 @@ export function MoveDialog({
       : "Reroute confirmed."
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[452px] gap-0 rounded-[4px] border-gilt bg-card p-[5px] shadow-[0_24px_64px_rgba(0,0,0,0.45)] sm:max-w-[452px] [&>[data-slot=dialog-close]]:right-5 [&>[data-slot=dialog-close]]:top-5">
         <div className="plaque-inner max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <DialogHeader className="flex-row items-start gap-3 border-b border-hairline p-[18px] pb-3.5 pr-12 text-left">
@@ -446,6 +483,12 @@ export function MoveDialog({
               <Notice tone="plain">
                 Step 2 deposits {amountText(finish.quote.inAmount)} {finish.quote.inputToken.symbol} into {target?.name}. A first
                 deposit pays {amountText(finish.quote.setupCostSol ?? 0)} SOL of one-time account rent.
+              </Notice>
+            )}
+            {(status === "signing" || status === "step2-signing") && slow && (
+              <Notice tone="plain">
+                Waiting for your wallet. If you approved it, it shows here as soon as it lands. You can close this:
+                Portfolio updates when it lands.
               </Notice>
             )}
             {status === "error" && error && <Notice tone="error">{error}</Notice>}

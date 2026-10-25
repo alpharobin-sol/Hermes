@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { VersionedTransaction } from "@solana/web3.js"
 import { AlertCircle, AlertTriangle, ArrowDown, Check, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
@@ -15,6 +15,7 @@ import { HIGH_UTILIZATION, Medallion, exitTight, formatApy, typeLabel, withdrawa
 import { whatCanGoWrong } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { HorizonSummary } from "./live-quotes"
+import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -49,7 +50,7 @@ function hostOf(url: string): string {
 
 function getErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (/user rejected|rejected the request/i.test(message)) return "You rejected the transaction in your wallet."
+  if (isDeclined(err)) return "You declined in your wallet. Nothing was sent."
   return message || "Deposit failed"
 }
 
@@ -69,6 +70,8 @@ export function DepositDialog({
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
+  // The deposit in flight, stopped when the dialog closes
+  const inFlight = useRef<AbortController | null>(null)
 
   const wallet = publicKey?.toBase58()
 
@@ -97,8 +100,18 @@ export function DepositDialog({
     return () => controller.abort()
   }, [open, route.id, amount, wallet])
 
+  // Closing the dialog stops following the deposit. One that lands shows in Portfolio.
+  useEffect(() => {
+    if (!open) inFlight.current?.abort()
+  }, [open])
+
+  const slow = useSlowWallet(status === "signing")
+
   const handleConfirm = async () => {
     if (!publicKey) return
+    inFlight.current?.abort()
+    const controller = new AbortController()
+    inFlight.current = controller
 
     try {
       setStatus("signing")
@@ -109,6 +122,7 @@ export function DepositDialog({
         amount,
         userPublicKey: publicKey.toBase58(),
       })
+      if (controller.signal.aborted) return
       setQuote(built.quote)
 
       const transactions = (built.transactions?.length ? built.transactions : [built.transaction]).map((tx) =>
@@ -127,9 +141,39 @@ export function DepositDialog({
         const isDeposit = i === transactions.length - 1
         if (transactions.length > 1) setProgress({ current: i + 1, total: transactions.length })
 
-        const sig = signed
-          ? await connection.sendRawTransaction(signed[i].serialize())
-          : await sendTransaction(transactions[i], connection)
+        if (!signed) {
+          // The wallet signs and sends it. Hermes follows the wallet's answer and the chain, whichever comes first.
+          const outcome = await sendAndWatch({
+            connection,
+            sendTransaction,
+            transaction: transactions[i],
+            user: publicKey,
+            lastValidBlockHeight: built.lastValidBlockHeight,
+            signal: controller.signal,
+            onSigned: (sig) => {
+              setSignature(sig)
+              setStatus("confirming")
+            },
+          })
+          if (outcome.kind === "stopped") return
+          if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
+          if (outcome.kind === "expired") {
+            throw new Error(
+              `Your wallet didn't send the deposit, so nothing left your wallet.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`
+            )
+          }
+          setSignature(outcome.signature)
+          if (outcome.failed) {
+            throw new Error(
+              isDeposit
+                ? "Transaction failed on-chain. Your funds were not moved."
+                : "A pool update step failed on-chain. Your SOL was not deposited."
+            )
+          }
+          continue
+        }
+
+        const sig = await connection.sendRawTransaction(signed[i].serialize())
         setSignature(sig)
         setStatus("confirming")
 
@@ -163,9 +207,11 @@ export function DepositDialog({
         }
       }
 
+      if (controller.signal.aborted) return
       setStatus("success")
       onDeposited?.()
     } catch (err) {
+      if (controller.signal.aborted) return
       setError(getErrorMessage(err))
       setStatus("error")
     }
@@ -184,7 +230,7 @@ export function DepositDialog({
   const compared = quote?.compared ?? []
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !isBusy && onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[452px] gap-0 rounded-[4px] border-gilt bg-card p-[5px] shadow-[0_24px_64px_rgba(0,0,0,0.45)] sm:max-w-[452px] [&>[data-slot=dialog-close]]:right-5 [&>[data-slot=dialog-close]]:top-5">
         <div className="plaque-inner max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <DialogHeader className="flex-row items-start gap-3 border-b border-hairline p-[18px] pb-3.5 pr-12 text-left">
@@ -347,6 +393,12 @@ export function DepositDialog({
             )}
 
             {/* Status */}
+            {status === "signing" && slow && (
+              <Notice tone="plain">
+                Waiting for your wallet. If you approved it, the deposit shows here as soon as it lands. You can close
+                this: a deposit that lands shows in your Portfolio.
+              </Notice>
+            )}
             {status === "error" && error && <Notice tone="error">{error}</Notice>}
 
             {status === "success" && (

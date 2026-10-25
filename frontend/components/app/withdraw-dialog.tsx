@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { VersionedTransaction } from "@solana/web3.js"
 import { ArrowDown, ExternalLink, Loader2 } from "lucide-react"
@@ -12,6 +12,7 @@ import { formatPercent } from "@/lib/helpers/formatters"
 import { explorerTxUrl } from "@/lib/network"
 import { Notice, Row, base64ToBytes } from "./deposit-dialog"
 import type { Position } from "./portfolio"
+import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
 
 // Withdraw from a position in the wallet, the way a deposit works in reverse: Hermes builds the transaction and the
 // wallet signs it. Staking tokens swap back to SOL on Jupiter. Kamino Lend and Jupiter Lend pay the token back.
@@ -26,7 +27,7 @@ function amountText(value: string | number, digits = 6): string {
 
 function errorText(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (/user rejected|rejected the request/i.test(message)) return "You rejected the transaction in your wallet."
+  if (isDeclined(err)) return "You declined in your wallet. Nothing was sent."
   return message || "Withdrawal failed"
 }
 
@@ -53,6 +54,12 @@ export function WithdrawDialog({
   const [quote, setQuote] = useState<WithdrawQuote | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [signature, setSignature] = useState<string | null>(null)
+  // The withdrawal in flight, stopped when the dialog closes
+  const inFlight = useRef<AbortController | null>(null)
+  const slow = useSlowWallet(status === "signing")
+  useEffect(() => {
+    if (!open) inFlight.current?.abort()
+  }, [open])
 
   // A fresh start every time the dialog opens
   useEffect(() => {
@@ -112,6 +119,9 @@ export function WithdrawDialog({
 
   const handleWithdraw = async () => {
     if (!publicKey) return
+    inFlight.current?.abort()
+    const controller = new AbortController()
+    inFlight.current = controller
     try {
       setStatus("signing")
       setError(null)
@@ -121,28 +131,32 @@ export function WithdrawDialog({
         all,
         userPublicKey: publicKey.toBase58(),
       })
+      if (controller.signal.aborted) return
       setQuote(built.quote)
-      const transaction = VersionedTransaction.deserialize(base64ToBytes(built.transaction))
-      const sig = await sendTransaction(transaction, connection)
-      setSignature(sig)
-      setStatus("confirming")
-      let result
-      try {
-        result = await connection.confirmTransaction(
-          { signature: sig, blockhash: transaction.message.recentBlockhash, lastValidBlockHeight: built.lastValidBlockHeight },
-          "confirmed"
-        )
-      } catch (confirmErr) {
-        console.warn("Could not confirm withdrawal", confirmErr)
-        // Sent but not checked. Never offer a retry here: it could withdraw twice.
-        setStatus("unconfirmed")
-        onDone()
-        return
+      // The wallet signs and sends it. Hermes follows the wallet's answer and the chain, whichever comes first.
+      const outcome = await sendAndWatch({
+        connection,
+        sendTransaction,
+        transaction: VersionedTransaction.deserialize(base64ToBytes(built.transaction)),
+        user: publicKey,
+        lastValidBlockHeight: built.lastValidBlockHeight,
+        signal: controller.signal,
+        onSigned: (sig) => {
+          setSignature(sig)
+          setStatus("confirming")
+        },
+      })
+      if (outcome.kind === "stopped") return
+      if (outcome.kind === "declined") throw new Error("You declined in your wallet. Nothing was sent.")
+      if (outcome.kind === "expired") {
+        throw new Error(`Your wallet didn't send the withdrawal, so nothing left your position.${outcome.reason ? ` ${outcome.reason}.` : ""} Try again.`)
       }
-      if (result.value.err) throw new Error("The withdrawal failed on-chain. Nothing left your position.")
+      setSignature(outcome.signature)
+      if (outcome.failed) throw new Error("The withdrawal failed on-chain. Nothing left your position.")
       setStatus("success")
       onDone()
     } catch (err) {
+      if (controller.signal.aborted) return
       setError(errorText(err))
       setStatus("error")
     }
@@ -153,7 +167,7 @@ export function WithdrawDialog({
   const limited = quote?.available !== null && quote?.available !== undefined && Number(quote.available) < held
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[452px] gap-0 rounded-[4px] border-gilt bg-card p-[5px] shadow-[0_24px_64px_rgba(0,0,0,0.45)] sm:max-w-[452px] [&>[data-slot=dialog-close]]:right-5 [&>[data-slot=dialog-close]]:top-5">
         <div className="plaque-inner max-h-[calc(100dvh-4rem)] overflow-y-auto">
           <DialogHeader className="flex-row items-start gap-3 border-b border-hairline p-[18px] pb-3.5 pr-12 text-left">
@@ -263,6 +277,12 @@ export function WithdrawDialog({
 
             {status !== "success" && (
               <Notice tone="warning">Beta: in-app withdrawals are new and move real funds. Start with a small amount.</Notice>
+            )}
+            {status === "signing" && slow && (
+              <Notice tone="plain">
+                Waiting for your wallet. If you approved it, the withdrawal shows here as soon as it lands. You can close
+                this: Portfolio updates when it lands.
+              </Notice>
             )}
             {status === "error" && error && <Notice tone="error">{error}</Notice>}
             {status === "success" && quote && (
