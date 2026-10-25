@@ -404,6 +404,10 @@ function RouteChoices({
                 <span className="shrink-0 text-[13px] text-muted-foreground" title={quote.error ?? undefined}>
                   No quote
                 </span>
+              ) : earned === null ? (
+                <span className="shrink-0 text-[13px] text-muted-foreground" title="Working out the exit cost">
+                  Pending
+                </span>
               ) : (
                 <span className={cn("shrink-0 text-[15px] font-semibold", isBest ? "text-ink" : "text-foreground")}>
                   {formatEarned(earned, r.token)}{" "}
