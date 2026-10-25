@@ -308,6 +308,10 @@ function RouteRow({
           <span className="shrink-0 text-[13px] text-muted-foreground" title={quote?.error ?? undefined}>
             No quote
           </span>
+        ) : earned === null ? (
+          <span className="shrink-0 text-[13px] text-muted-foreground" title="Working out the exit cost">
+            Pending
+          </span>
         ) : (
           <span className={cn("shrink-0 text-base font-semibold", best ? "text-ink" : "text-foreground")}>
             {formatEarned(earned, route.token)}{" "}

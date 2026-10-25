@@ -137,10 +137,11 @@ export function startRateRefresh(intervalMs: number = 60 * 1000): NodeJS.Timeout
   // Safety Score history goes after the rates: DefiLlama deposit history needs each route's pool id
   const refresh = () =>
     refreshRates()
-      // Snapshots after the score inputs, so each one carries the route's Safety Score
-      .then(() => refreshSafetyInputs())
-      // Exit quotes after the score's, so Jupiter calls stay spread out
-      .then(() => refreshExitCosts())
+      // The score's exit quotes and the horizon exit costs both hit Jupiter, through the one queue that already
+      // paces every call, so run them together: the exit costs interleave instead of waiting behind every score
+      // quote, and the horizon figure on the site is right sooner after a restart. Snapshots after, so each carries
+      // the route's Safety Score.
+      .then(() => Promise.all([refreshSafetyInputs(), refreshExitCosts()]))
       .then(() => recordSnapshots(collectSnapshots))
       .catch((error) => logger.error('Rate refresh failed:', error));
   refresh();
