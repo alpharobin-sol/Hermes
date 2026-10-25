@@ -13,7 +13,7 @@ import { formatTokenAmount, type Token } from "./tokens"
 import { SafetyBreakdown } from "./safety"
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
-import { SplitAction, SplitCard, SplitMessages, SplitSwitch, type SplitState } from "./split"
+import { SplitAction, SplitCard, SplitMessages, SplitToggle, type SplitState } from "./split"
 
 // Why the connected wallet can't cover the amount: more than it holds, or into the SOL kept for fees
 export type BalanceIssue = "insufficient" | "fee-reserve" | null
@@ -92,9 +92,12 @@ export function DepositPanel({
         )}
 
         <div className="flex flex-col gap-2.5">
-          <label htmlFor="deposit-amount" className="label-roman">
-            Amount
-          </label>
+          <div className="flex min-h-8 items-center justify-between gap-3">
+            <label htmlFor="deposit-amount" className="label-roman">
+              Amount
+            </label>
+            {split && <SplitToggle split={split} />}
+          </div>
           <div className="flex items-center gap-3 rounded-[4px] border border-input bg-background py-2.5 pl-4 pr-2.5 focus-within:border-ink">
             <input
               id="deposit-amount"
@@ -137,8 +140,6 @@ export function DepositPanel({
             <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
           )}
         </div>
-
-        {split && <SplitSwitch split={split} />}
 
         {splitting && <SplitCard split={split!} token={token.symbol} />}
 

@@ -206,7 +206,7 @@ const FAQS = [
   {
     question: "Can I spread a deposit across several routes?",
     answer:
-      "Yes. Type an amount and turn on Split across Top rated. Hermes splits it evenly across the two or three top rated routes with the highest Safety Scores for that token. You approve once in your wallet, each part is an ordinary deposit, and each shows in Portfolio. While in beta a whole split stays within one deposit's cap.",
+      "Yes. Turn on Split beside the amount. Hermes splits it evenly across the two or three top rated routes with the highest Safety Scores for that token. You approve once in your wallet, each part is an ordinary deposit, and each shows in Portfolio. While in beta a whole split stays within one deposit's cap.",
   },
   {
     question: "How do I withdraw?",

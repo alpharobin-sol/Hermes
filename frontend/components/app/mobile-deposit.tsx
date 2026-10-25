@@ -26,7 +26,7 @@ import {
 import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
 import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
-import { SplitAction, SplitCard, SplitMessages, SplitSwitch, type SplitState } from "./split"
+import { SplitAction, SplitCard, SplitMessages, type SplitState } from "./split"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -172,8 +172,6 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
         ) : (
           <AmountMessages token={token} spendable={spendable} balanceIssue={balanceIssue} solShort={solShort} route={route} overCap={overCap} />
         )}
-
-        {split && <SplitSwitch split={split} />}
 
         {splitting ? (
           <SplitCard split={split!} token={token.symbol} showHorizon />

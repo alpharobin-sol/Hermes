@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
 import { VersionedTransaction } from "@solana/web3.js"
-import { AlertCircle, Check, ExternalLink, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { AlertCircle, Check, ExternalLink, Info, Loader2, Split } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { IS_DEVNET, explorerTxUrl } from "@/lib/network"
@@ -101,34 +102,38 @@ export interface SplitState {
   reserve: number // SOL kept back for the parts' fees and accounts
 }
 
-// The switch under the amount: one route, or even parts across the top rated ones
-export function SplitSwitch({ split }: { split: SplitState }) {
+// The split's toggle: a small chip like a swap app's mode switch. Docs explain it, the card says it in a line.
+export function SplitToggle({ split, className }: { split: SplitState; className?: string }) {
   if (!split.available) return null
   return (
     <button
       type="button"
       role="switch"
       aria-checked={split.on}
+      aria-label="Split across Top rated"
+      title="Spread the deposit evenly across the top rated routes, in one approval"
       onClick={() => split.onChange(!split.on)}
       className={cn(
-        "flex w-full items-center justify-between gap-3 rounded-[2px] border px-3.5 py-2.5 text-left transition-colors",
-        split.on ? "border-frame bg-secondary" : "border-hairline bg-card hover:bg-secondary/60"
+        "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border pl-2.5 pr-1.5 text-xs font-medium transition-colors",
+        split.on ? "border-foreground bg-secondary text-foreground" : "border-frame text-muted-foreground hover:bg-secondary hover:text-foreground",
+        className
       )}
     >
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[13px] font-semibold">Split across Top rated</span>
-        <span className="text-[11px] leading-snug text-muted-foreground">
-          Even parts in the {Math.min(split.size, split.maxSize)} highest-scoring routes. One approval.
-        </span>
-      </span>
+      <Split className="size-3.5" aria-hidden="true" />
+      Split
       <span
         aria-hidden="true"
         className={cn(
-          "relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border transition-colors",
-          split.on ? "border-ink bg-primary" : "border-frame bg-background"
+          "relative ml-0.5 h-[18px] w-[30px] rounded-full border transition-colors",
+          split.on ? "border-foreground bg-foreground" : "border-frame bg-background"
         )}
       >
-        <span className={cn("absolute size-4 rounded-full bg-card shadow transition-all", split.on ? "left-[19px]" : "left-[3px] bg-frame")} />
+        <span
+          className={cn(
+            "absolute top-1/2 size-3 -translate-y-1/2 rounded-full transition-all",
+            split.on ? "left-[14px] bg-card" : "left-[2px] bg-frame"
+          )}
+        />
       </span>
     </button>
   )
@@ -167,6 +172,14 @@ export function SplitCard({ split, token, showHorizon = false }: { split: SplitS
         )}
       </div>
 
+      <p className="m-0 flex items-center justify-between gap-2 border-b border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
+        <span>Top rated routes only. One approval.</span>
+        <Link href="/docs#split" className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
+          <Info className="size-3" aria-hidden="true" />
+          How it works
+        </Link>
+      </p>
+
       {showHorizon && hasAmount && (
         <div className="flex items-center justify-between gap-2 border-b border-row-line bg-card px-3 py-2">
           <span className="text-[12px] text-muted-foreground">After costs, over</span>
@@ -181,7 +194,6 @@ export function SplitCard({ split, token, showHorizon = false }: { split: SplitS
           const earned = hasAmount ? estimatedReturn(route, Number(split.amounts[i]), quote, split.horizon) : null
           return (
             <li key={route.id} className="flex items-center gap-3 border-t border-row-line bg-card px-3 py-2.5 first:border-t-0">
-              <Medallion route={route} className="size-8 text-xs" />
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate font-display text-[18px] font-bold leading-[1.1]">{route.name}</span>
                 <span className="truncate text-[11px] text-muted-foreground">

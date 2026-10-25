@@ -17,7 +17,7 @@ import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
 import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 import { Onboarding } from "./onboarding"
-import { SplitDialog, splitAmounts, splitCandidates, splitCap, splitReserve, type SplitSize, type SplitState } from "./split"
+import { SplitDialog, SplitToggle, splitAmounts, splitCandidates, splitCap, splitReserve, type SplitSize, type SplitState } from "./split"
 
 const RATE_REFRESH_MS = 60 * 1000
 
@@ -267,16 +267,19 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       {/* Phones and tablets: a toolbar over the card, like a swap app's. Desktop shows the network in the header. */}
       <div className="-mb-2 flex basis-full items-center justify-between gap-3 lg:hidden">
         <NetworkPill />
-        <button
-          type="button"
-          onClick={() => (error ? setReloadKey((key) => key + 1) : refreshRates())}
-          disabled={loading || refreshing}
-          aria-label="Refresh rates"
-          title={updatedLabel(forToken) ? `Rates updated ${updatedLabel(forToken)}` : "Refresh rates"}
-          className="grid size-8 place-items-center rounded-full border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60"
-        >
-          <RefreshCw className={loading || refreshing ? "size-3.5 animate-spin" : "size-3.5"} aria-hidden="true" />
-        </button>
+        <div className="flex items-center gap-2">
+          <SplitToggle split={split} />
+          <button
+            type="button"
+            onClick={() => (error ? setReloadKey((key) => key + 1) : refreshRates())}
+            disabled={loading || refreshing}
+            aria-label="Refresh rates"
+            title={updatedLabel(forToken) ? `Rates updated ${updatedLabel(forToken)}` : "Refresh rates"}
+            className="grid size-8 place-items-center rounded-full border border-frame text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-60"
+          >
+            <RefreshCw className={loading || refreshing ? "size-3.5 animate-spin" : "size-3.5"} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <MobileDeposit
