@@ -218,15 +218,10 @@ export function WithdrawDialog({
               <div className="flex flex-col gap-1 rounded-[2px] border border-gilt bg-accent px-4 py-3.5">
                 <span className="label-roman text-[10px]">You get</span>
                 {quote ? (
-                  <>
-                    <span className="text-2xl font-semibold text-ink">
-                      {quote.method === "jupiter-swap" ? "≈ " : ""}
-                      {amountText(quote.outAmount)} {quote.outputToken.symbol}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {quote.method === "jupiter-swap" ? "Swapped back to SOL on Jupiter, into your wallet." : "Back in your wallet."}
-                    </span>
-                  </>
+                  <span className="text-2xl font-semibold text-ink">
+                    {quote.method === "jupiter-swap" ? "≈ " : ""}
+                    {amountText(quote.outAmount)} {quote.outputToken.symbol}
+                  </span>
                 ) : status === "quoting" ? (
                   <span className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" /> Fetching quote...
@@ -245,6 +240,12 @@ export function WithdrawDialog({
 
             {quote && (
               <dl className="m-0 flex flex-col gap-2 text-[13px]">
+                {/* Where the quote came from, the way Titan names the venue that won */}
+                <Row label="Quote">
+                  {quote.method === "jupiter-swap"
+                    ? `Jupiter${quote.routeLabels.length > 0 ? ` via ${quote.routeLabels.join(" → ")}` : ""}`
+                    : quote.position}
+                </Row>
                 {quote.method === "jupiter-swap" ? (
                   <>
                     {quote.value && <Row label="Worth in the pool">{amountText(quote.value)} SOL</Row>}
@@ -262,7 +263,6 @@ export function WithdrawDialog({
                   </>
                 ) : (
                   <>
-                    <Row label="From">{quote.position}</Row>
                     {/* Only when it holds the withdrawal back: most of the reserve is lent out */}
                     {quote.available !== null && limited && (
                       <Row label="Can leave right now" className="text-warning">
