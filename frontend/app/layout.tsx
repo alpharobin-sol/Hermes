@@ -31,7 +31,7 @@ const DESCRIPTION =
   "Compare live Solana staking and lending APYs, from JitoSOL and mSOL to Kamino and Jupiter Lend. Safety Score on every route. Deposit from your own wallet."
 const X_HANDLE = "@Hermes_agg"
 
-// The share image (opengraph-image.jpg, twitter-image.jpg) sits next to this file, and Next adds its tags.
+// The share image (opengraph-image.tsx, twitter-image.tsx: live top rated routes) sits next to this file, and Next adds its tags.
 // Search Console codes come from the environment, so the owner can paste them into Vercel without a code change.
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
