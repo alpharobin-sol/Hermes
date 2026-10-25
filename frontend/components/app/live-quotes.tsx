@@ -209,7 +209,10 @@ export function horizonSuffix(horizon: Horizon): string {
  * quote's entry cost taken off), grown at the APY, less the exit cost of selling back at today's price. Without a
  * quote, the APY and exit cost alone. Rates move, so it is today's picture, not a promise.
  */
-export function estimatedReturn(route: YieldRoute, amount: number, quote: RouteQuote | undefined, horizon: Horizon): number {
+export function estimatedReturn(route: YieldRoute, amount: number, quote: RouteQuote | undefined, horizon: Horizon): number | null {
+  // Liquid staking's exit cost comes from the API and can lag the quote by a refresh after a restart. Until it's
+  // known, taking 0 would read optimistic (it can even flip a short horizon positive), so the figure is pending.
+  if (route.category === "liquid-staking" && route.exitCost == null) return null
   const entered = quote?.value ? Number(quote.value) : amount
   const grown = entered * (1 + route.apy) ** horizonYears(horizon)
   // A missing exit cost (its quote still loading) counts as none, and the dialog says so
@@ -232,6 +235,7 @@ export function bestQuoteRoute(routes: YieldRoute[], amount: number, live: LiveQ
     const quote = live.byRoute[route.id]
     if (!quote?.quote) continue
     const value = estimatedReturn(route, amount, quote, horizon)
+    if (value === null) continue // exit cost not loaded yet, so this route can't be ranked over the horizon
     if (value > bestValue) {
       best = route
       bestValue = value
@@ -280,8 +284,14 @@ export function HorizonSummary({ route, amount, quote }: { route: YieldRoute; am
           return (
             <div key={h.value} className="flex flex-col gap-0.5">
               <dt className="text-[11px] text-muted-foreground">{h.long}</dt>
-              <dd className={cn("m-0 text-[14px] font-semibold", value < 0 && "text-warning")}>
-                {formatEarned(value, route.token)} <span className="text-[11px] font-medium">{route.token}</span>
+              <dd className={cn("m-0 text-[14px] font-semibold", value !== null && value < 0 && "text-warning")}>
+                {value === null ? (
+                  <span className="text-muted-foreground">Pending</span>
+                ) : (
+                  <>
+                    {formatEarned(value, route.token)} <span className="text-[11px] font-medium">{route.token}</span>
+                  </>
+                )}
               </dd>
             </div>
           )
