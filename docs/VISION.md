@@ -78,6 +78,7 @@ The capstone flags that new users want a savings account, not an index. Routing 
 - Hermes stays a router. Routed deposits are non-custodial: Hermes builds the transaction and the user signs it in their own wallet.
 - Hermes can hold funds for automation (DPO). It is opt-in: a user who wants Hermes to manage a position moves funds into a Hermes vault. That needs a Hermes program, an outside security review and deposit caps before real funds go in.
 - The vision deck says both "not a vault" and "deposits enter a Hermes vault". This decision settles it: router by default, vault only for opt-in automation.
+- The vault is Hermes's own (owner, 25 October 2026): a Hermes program, not a curated vault on another protocol or delegated rights on a smart account. Before the vault, the app got a Getting started checklist for new users.
 
 ## Founder-market fit (capstone)
 

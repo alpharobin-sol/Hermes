@@ -16,6 +16,7 @@ import { DepositDialog } from "./deposit-dialog"
 import { MobileDeposit } from "./mobile-deposit"
 import { BASE_TOKENS } from "./tokens"
 import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
+import { Onboarding } from "./onboarding"
 
 const RATE_REFRESH_MS = 60 * 1000
 
@@ -193,6 +194,13 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     }
   }
 
+  // Getting started's deposit step: the amount box, the card's on phones and tablets, the panel's on desktop
+  const focusAmount = () => {
+    const input = document.getElementById(window.matchMedia("(max-width: 1023px)").matches ? "mobile-amount" : "deposit-amount")
+    input?.scrollIntoView({ behavior: "smooth", block: "center" })
+    setTimeout(() => input?.focus({ preventScroll: true }), 300)
+  }
+
   const handleReview = () => {
     if (!publicKey) {
       setWalletModalVisible(true)
@@ -298,6 +306,8 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         onReview={handleReview}
         className="max-lg:hidden"
       />
+
+      <Onboarding route={selectedRoute} onConnect={() => setWalletModalVisible(true)} onDeposit={focusAmount} />
 
       {reviewOpen && selectedRoute && (
         <DepositDialog

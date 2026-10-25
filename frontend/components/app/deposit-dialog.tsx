@@ -17,6 +17,7 @@ import { RouteAlertToggle } from "./alerts"
 import { HorizonSummary } from "./live-quotes"
 import { isDeclined, sendAndWatch, useSlowWallet } from "@/lib/send-transaction"
 import { markPortfolioChanged } from "@/lib/portfolio-changed"
+import { markStep } from "@/lib/onboarding"
 
 type DepositStatus = "quoting" | "ready" | "signing" | "confirming" | "success" | "unconfirmed" | "error"
 
@@ -206,6 +207,7 @@ export function DepositDialog({
       if (controller.signal.aborted) return
       setStatus("success")
       markPortfolioChanged()
+      markStep("deposit")
       onDeposited?.()
     } catch (err) {
       if (controller.signal.aborted) return

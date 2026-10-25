@@ -2,8 +2,9 @@
 
 import { ThemeToggle } from "./ThemeToggle"
 import { AlertsSettings } from "./alerts"
+import { OnboardingSettings } from "./onboarding"
 
-// Settings: how Hermes looks and whether this device gets alerts
+// Settings: how Hermes looks, whether this device gets alerts, and the Getting started checklist
 export function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 py-6 md:px-8 md:py-10">
@@ -19,6 +20,9 @@ export function SettingsPage() {
           </div>
           <div className="border-t border-hairline md:px-1">
             <AlertsSettings />
+          </div>
+          <div className="border-t border-hairline">
+            <OnboardingSettings />
           </div>
         </div>
       </section>
