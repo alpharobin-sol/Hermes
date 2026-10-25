@@ -19,7 +19,7 @@ Wedge: trust and curation. Hermes rates every route with a Safety Score built fr
 - Site: `www.hermesagg.xyz` (Vercel, Root Directory = `frontend`). The landing page is `/`, the app is `/app` (the routes), with Portfolio, Settings and Docs beside it. Next route groups: `frontend/app/(site)` for the landing page (its own header), `frontend/app/(app)` for the app (wallet, menu, alerts).
 - API: `hermes-api-pyw9.onrender.com` (Render free plan, `render.yaml`, root `backend`). An UptimeRobot monitor (owner's account) pings `/health` every 5 minutes so it never sleeps. The free plan's 750 hours a month cover this one service awake all month.
 - Repo: `alpharobin-sol/Hermes`
-- Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+gYZPiesNgH85YzE8`, both linked in the footer
+- Community: X `x.com/Hermes_agg` and the Telegram group `t.me/+I2pSaIdIykgwMDQ0`, both linked in the footer
 - Network: mainnet beta, real funds. `SOLANA_NETWORK=mainnet-beta` on Render and `NEXT_PUBLIC_SOLANA_NETWORK=mainnet-beta` (or unset) on Vercel. Both must match, or the app turns deposits off. Set both to `devnet` to test with test SOL.
 - Beta deposit cap: 10 SOL per deposit on mainnet routes in beta (`BETA_DEPOSIT_CAP_SOL` on Render).
 - Wallet history RPC: `SOLANA_HISTORY_RPC_URL` on Render, a Helius RPC URL with its key (free plan, owner added it 24 Oct). The portfolio reads a wallet's history with it for what staking tokens and Jupiter Lend have earned. Without it the portfolio leaves those earnings out.

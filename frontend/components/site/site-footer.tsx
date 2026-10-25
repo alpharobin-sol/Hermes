@@ -27,7 +27,7 @@ const COLUMNS = [
     title: "Community",
     links: [
       { href: "https://x.com/Hermes_agg", label: "X", external: true },
-      { href: "https://t.me/+gYZPiesNgH85YzE8", label: "Telegram", external: true },
+      { href: "https://t.me/+I2pSaIdIykgwMDQ0", label: "Telegram", external: true },
     ],
   },
 ]

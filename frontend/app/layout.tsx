@@ -82,7 +82,7 @@ const STRUCTURED_DATA = {
       alternateName: ["Hermes Agg", "HermesAgg"],
       url: SITE_URL,
       logo: `${SITE_URL}/brand/icon-192.png`,
-      sameAs: ["https://x.com/Hermes_agg", "https://t.me/+gYZPiesNgH85YzE8"],
+      sameAs: ["https://x.com/Hermes_agg", "https://t.me/+I2pSaIdIykgwMDQ0"],
     },
     {
       "@type": "WebSite",
