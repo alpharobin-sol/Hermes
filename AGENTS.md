@@ -94,7 +94,7 @@ Trust and curation (the wedge)
 
 Routes
 
-- [ ] Owner deposits to move Jito, Marinade and Kamino Lend from beta to live (owner)
+- [ ] Owner deposits to move Jito, Marinade and Kamino Lend from beta to live (owner). Jito and Marinade each have the owner's deposit and exit (25 Oct, `INTEGRATIONS.md`); the owner keeps them in beta while Hermes is still improving. Kamino Lend waits on a deposit (its first deposit holds back 0.0325 SOL).
 - [ ] Rate checks against each protocol's app for the beta routes
 - [x] Hidden LSTs back with in-app deposits: Sanctum Infinity, Bybit, JPool, BlazeStake
 - [x] Jupiter Lend
