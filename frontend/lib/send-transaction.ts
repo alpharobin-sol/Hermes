@@ -122,8 +122,9 @@ function pause(ms: number, signal: AbortSignal | undefined, onWake: (wake: () =>
 }
 
 // Whether a landed transaction is this one: the same blockhash, or every one of its instructions. Read raw, so a
-// version 1 transaction (some wallets send them) reads like any other.
-async function isThisTransaction(connection: Connection, signature: string, transaction: VersionedTransaction): Promise<boolean> {
+// version 1 transaction (some wallets send them) reads like any other. null: not readable yet. A public RPC is
+// several nodes, and the one asked may not have the transaction another just listed.
+async function isThisTransaction(connection: Connection, signature: string, transaction: VersionedTransaction): Promise<boolean | null> {
   const response = await fetch(connection.rpcEndpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -135,7 +136,7 @@ async function isThisTransaction(connection: Connection, signature: string, tran
     }),
   })
   const message = (await response.json())?.result?.transaction?.message
-  if (!message) return false
+  if (!message) return null
   if (message.recentBlockhash === transaction.message.recentBlockhash) return true
   const ours = fingerprint(
     transaction.message.staticAccountKeys.map((key) => key.toBase58()),
@@ -199,12 +200,13 @@ export async function sendAndWatch({
         for (const entry of recent) {
           if (checked.has(entry.signature)) continue
           if (since !== null && entry.slot < since - 10) continue
-          if (await isThisTransaction(connection, entry.signature, transaction)) {
+          const match = await isThisTransaction(connection, entry.signature, transaction)
+          if (match) {
             onSigned?.(entry.signature)
             return { kind: "landed", signature: entry.signature, failed: entry.err !== null }
           }
-          // Only a completed check rules a transaction out. One that failed to read is read again next round.
-          checked.add(entry.signature)
+          // Only a completed read rules a transaction out. One that failed or wasn't there yet is read again next round.
+          if (match === false) checked.add(entry.signature)
         }
       }
       // Past the deadline: a last look for the wallet's signature, then nothing more can land. A height reading that
