@@ -87,22 +87,92 @@ const routeNames = (ids: string[]) =>
     return route ? `${route.name} (${route.token})` : id;
   });
 
-// Aurora in an email: plaster around a vellum card, umber text, the teal button
-function page(title: string, inner: string, footer: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#f6ead0;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#2b140e">
-<div style="max-width:520px;margin:0 auto;background:#fcf5e6;border:1px solid #cdb185;border-radius:4px;padding:24px">
-<div style="font-family:Georgia,serif;font-size:13px;letter-spacing:3px;color:#8e3b1f">HERMES</div>
-<h1 style="font-family:Georgia,serif;font-size:26px;line-height:1.15;margin:8px 0 16px">${escape(title)}</h1>
-${inner}
-</div>
-<p style="max-width:520px;margin:16px auto 0;font-size:12px;line-height:1.6;color:#6b4a36">${footer}</p>
+// ---------- The look ----------
+// Night in an email: umber around an umber card, parchment text, gold for ornament, the teal button. A dark email
+// looks meant in dark mode, so mail apps leave it as it is. The hero is a Roman marble of Hermes (1st or 2nd century
+// CE, The Metropolitan Museum of Art, open access) toned to the palette, in a gilt arch like the site's.
+
+const C = {
+  page: '#0f0806',
+  card: '#160b08',
+  line: '#45291e',
+  text: '#f7e6c4',
+  muted: '#c7a988',
+  faint: '#8e755e',
+  gold: '#f2c585',
+  teal: '#1ab5b7',
+  link: '#3fd0d2',
+};
+const SERIF = "Georgia,'Times New Roman',serif";
+const SANS = 'Arial,Helvetica,sans-serif';
+const HERO = `${SITE_URL}/brand/email-hermes.jpg`;
+
+// Marcus Aurelius, Meditations VI.3, in George Long's translation (1862)
+const QUOTE = 'Look within. Let neither the peculiar quality of anything nor its value escape thee.';
+
+const SAFETY_LINE = 'Hermes never asks for your seed phrase or private key.';
+const CREDIT = 'Marble statue of Hermes, Roman, 1st or 2nd century CE. The Metropolitan Museum of Art.';
+
+function roman(n: number): string {
+  const numerals: [number, string][] = [
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let out = '';
+  for (const [value, numeral] of numerals) {
+    while (n >= value) {
+      out += numeral;
+      n -= value;
+    }
+  }
+  return out;
+}
+
+const longDate = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+const button = (href: string, label: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto"><tr><td style="background:${C.teal};border-radius:4px"><a href="${escape(href)}" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:15px;font-weight:bold;color:#2b140e;text-decoration:none;border-radius:4px">${escape(label)}</a></td></tr></table>`;
+
+// A gilt rule with a diamond in the middle, like the site's dividers
+const divider = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="border-top:1px solid ${C.line};font-size:0;line-height:0" width="45%">&nbsp;</td>
+<td align="center" style="padding:0 10px;font-size:11px;line-height:11px;color:${C.gold}">&#9670;</td>
+<td style="border-top:1px solid ${C.line};font-size:0;line-height:0" width="45%">&nbsp;</td>
+</tr></table>`;
+
+/**
+ * The whole email: the mark, the arch, an eyebrow and a title, what it says, then the quote and the footer
+ */
+function page(options: { preheader: string; eyebrow: string; title: string; body: string; footer: string }): string {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark">
+<title>${escape(options.title)}</title></head>
+<body style="margin:0;padding:0;background:${C.page}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.page}">${escape(options.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.page}"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:${C.card};border:1px solid ${C.line};border-radius:4px">
+<tr><td align="center" style="padding:30px 24px 0;font-family:${SERIF};font-size:13px;letter-spacing:7px;color:${C.gold}">HERMES</td></tr>
+<tr><td align="center" style="padding:18px 24px 0"><img src="${HERO}" width="380" alt="A Roman marble of Hermes in a gilt arch" style="display:block;width:100%;max-width:380px;height:auto;border:0"></td></tr>
+<tr><td align="center" style="padding:22px 32px 0;font-family:${SANS};font-size:11px;letter-spacing:3px;color:${C.gold}">${escape(options.eyebrow.toUpperCase())}</td></tr>
+<tr><td align="center" style="padding:10px 32px 0;font-family:${SERIF};font-size:30px;line-height:1.15;font-weight:bold;color:${C.text}">${escape(options.title)}</td></tr>
+${options.body}
+<tr><td style="padding:30px 32px 0">${divider}</td></tr>
+<tr><td align="center" style="padding:22px 40px 0;font-family:${SERIF};font-size:16px;line-height:1.55;font-style:italic;color:${C.muted}">&ldquo;${escape(QUOTE)}&rdquo;</td></tr>
+<tr><td align="center" style="padding:10px 24px 34px;font-family:${SANS};font-size:10px;letter-spacing:2px;color:${C.gold}">MARCUS AURELIUS &middot; MEDITATIONS VI.3</td></tr>
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px"><tr><td align="center" style="padding:20px 24px 0;font-family:${SANS};font-size:12px;line-height:1.7;color:${C.faint}">
+${options.footer}<br>${SAFETY_LINE}<br><span style="font-size:11px">${CREDIT}</span>
+</td></tr></table>
+</td></tr></table>
 </body></html>`;
 }
 
-const button = (href: string, label: string) =>
-  `<a href="${escape(href)}" style="display:inline-block;background:#1ab5b7;color:#2b140e;font-weight:bold;text-decoration:none;padding:12px 20px;border-radius:4px">${escape(label)}</a>`;
-
-const SAFETY_LINE = 'Hermes never asks for your seed phrase or private key.';
+const paragraph = (html: string) =>
+  `<tr><td align="center" style="padding:14px 36px 0;font-family:${SANS};font-size:15px;line-height:1.65;color:${C.muted}">${html}</td></tr>`;
 
 async function sendConfirmation(address: string, token: string, routes: string[], held: string[]): Promise<boolean> {
   const link = `${SITE_URL}/settings?confirm=${token}`;
@@ -115,39 +185,62 @@ async function sendConfirmation(address: string, token: string, routes: string[]
     what,
     "If this wasn't you, ignore this email. Nothing more will come.",
     '',
+    `"${QUOTE}" Marcus Aurelius, Meditations VI.3`,
+    '',
     SAFETY_LINE,
   ].join('\n');
-  const html = page(
-    'Confirm your Hermes alerts',
-    `<p style="font-size:15px;line-height:1.6;margin:0 0 20px">${escape(what)} Tap below to get them at this address.</p>${button(link, 'Turn on email alerts')}`,
-    `If this wasn't you, ignore this email. Nothing more will come.<br>${SAFETY_LINE}`
-  );
+  const html = page({
+    preheader: `${what} Tap the button to turn them on.`,
+    eyebrow: 'One step left',
+    title: 'Confirm your Hermes alerts',
+    body: `${paragraph(`${escape(what)} Tap below to get them at this address.`)}
+<tr><td align="center" style="padding:24px 32px 0">${button(link, 'Turn on email alerts')}</td></tr>`,
+    footer: "If this wasn't you, ignore this email. Nothing more will come.",
+  });
   return send(address, 'Confirm your Hermes alerts', text, html);
 }
 
 /**
- * One email with everything that changed for this address in a check
+ * One email with everything that changed for this address in a check. Each change is numbered like a tablet.
  */
 export async function sendAlertEmail(address: string, token: string, notices: Notice[]): Promise<boolean> {
   if (notices.length === 0) return true;
   const unsubscribe = `${SITE_URL}/settings?unsubscribe=${token}`;
-  const subject = notices.length === 1 ? notices[0].title : `${notices.length} changes on your Hermes routes`;
+  const single = notices.length === 1;
+  const subject = single ? notices[0].title : `${notices.length} changes on your Hermes routes`;
+  // A change about a route you hold opens Portfolio, where Withdraw and Reroute are
+  const main = notices.find((notice) => notice.url.endsWith('/portfolio'))?.url ?? notices[0].url;
   const text = [
     ...notices.flatMap((notice) => [notice.title, notice.body, notice.url, '']),
+    `"${QUOTE}" Marcus Aurelius, Meditations VI.3`,
+    '',
     'You get these because you turned on Hermes alerts for this address. At most one of each kind per route a day.',
     `Stop them: ${unsubscribe}`,
     SAFETY_LINE,
   ].join('\n');
-  const html = page(
-    subject,
-    notices
-      .map(
-        (notice) =>
-          `<div style="border-top:1px solid #e3cfa8;padding:14px 0"><div style="font-weight:bold;font-size:15px">${escape(notice.title)}</div><div style="font-size:14px;line-height:1.6;color:#6b4a36;margin:4px 0 10px">${escape(notice.body)}</div><a href="${escape(notice.url)}" style="color:#086668;font-size:14px">Open in Hermes</a></div>`
-      )
-      .join(''),
-    `You get these because you turned on Hermes alerts for this address. At most one of each kind per route a day. <a href="${escape(unsubscribe)}" style="color:#6b4a36">Stop these emails</a>.<br>${SAFETY_LINE}`
-  );
+
+  const changes = single
+    ? paragraph(escape(notices[0].body))
+    : `<tr><td style="padding:18px 32px 0">${notices
+        .map(
+          (notice, index) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid ${C.line}"><tr>
+<td width="46" valign="top" style="padding:18px 0 18px;font-family:${SERIF};font-size:16px;letter-spacing:1px;color:${C.gold}">${roman(index + 1)}</td>
+<td valign="top" style="padding:16px 0 18px">
+<div style="font-family:${SERIF};font-size:19px;line-height:1.3;font-weight:bold;color:${C.text}">${escape(notice.title)}</div>
+<div style="padding-top:6px;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.muted}">${escape(notice.body)}</div>
+<div style="padding-top:8px"><a href="${escape(notice.url)}" style="font-family:${SANS};font-size:14px;font-weight:bold;color:${C.link};text-decoration:none">Open in Hermes &rarr;</a></div>
+</td></tr></table>`
+        )
+        .join('')}</td></tr>`;
+
+  const html = page({
+    preheader: single ? notices[0].body : notices.map((notice) => notice.title).join(' · '),
+    eyebrow: longDate(),
+    title: subject,
+    body: `${changes}
+<tr><td align="center" style="padding:26px 32px 0">${button(main, main.endsWith('/portfolio') ? 'Open Portfolio' : 'Open Hermes')}</td></tr>`,
+    footer: `You get these because you turned on Hermes alerts for this address. At most one of each kind per route a day. <a href="${escape(unsubscribe)}" style="color:${C.muted}">Stop these emails</a>.`,
+  });
   // Mail apps show an Unsubscribe button from these. One tap posts to the API and stops the emails.
   const headers: Record<string, string> = API_URL
     ? { 'List-Unsubscribe': `<${API_URL}/api/alerts/email/one-click?token=${token}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
