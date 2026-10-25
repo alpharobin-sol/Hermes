@@ -81,6 +81,9 @@ const SUPERGROUP_NOTE = [
   'Open the group\'s settings and set Chat history for new members to Visible. Telegram upgrades the group and gives it a new id, which I\'ll post here. Set TELEGRAM_GROUP_ID to it on Render.',
 ].join('\n');
 
+const RIGHTS_NOTE =
+  'Admins: I can\'t hold new members back until they tap the welcome button. Make me an admin with Ban users and Delete messages.';
+
 const RULES_TEXT = [
   'Hermes group rules:',
   '',
@@ -96,7 +99,7 @@ const HELP_TEXT = [
   'I am Herald, the Hermes group\'s moderator.',
   '',
   'Ask me about Hermes: mention me, reply to me or use /ask followed by your question.',
-  '/rules shows the group rules.',
+  '/rules shows the group rules. Admins: /status checks my setup.',
   '',
   'Docs: hermesagg.xyz/docs',
 ].join('\n');
@@ -122,7 +125,8 @@ export function createHeraldBot(options: HeraldOptions): Bot {
   const admins = new Map<number, { ids: Set<number>; names: Set<string>; at: number }>();
 
   let migratedTo: number | null = null; // the group's new id, once it became a supergroup
-  let toldAboutSupergroup = false;
+  const toldAdmins = new Set<string>(); // setup notes already posted, once each
+  const checkedJoins = new Map<string, number>(); // a join arrives twice: as a member update and as a chat notice
   const inGroup = (chatId: number) => options.groupId !== null && (chatId === options.groupId || chatId === migratedTo);
 
   async function adminsOf(ctx: Context, chatId: number) {
@@ -169,19 +173,18 @@ export function createHeraldBot(options: HeraldOptions): Bot {
 
   // ---------- Joining ----------
 
-  bot.on('chat_member', async (ctx) => {
-    const update = ctx.chatMember;
-    const chatId = update.chat.id;
-    if (!inGroup(chatId)) return;
-    const was = update.old_chat_member.status;
-    const now = update.new_chat_member.status;
-    // A member who left while muted comes back restricted and stays that way
-    const joined = (was === 'left' || was === 'kicked') && now === 'member';
-    if (!joined) return;
-    const user = update.new_chat_member.user;
+  // The welcome check for one new member. Telegram reports a join twice, as a member update (sent only to admin
+  // bots) and as a notice in the chat, and either can arrive alone, so both lead here and the second is skipped.
+  async function checkNewcomer(ctx: Context, chatId: number, user: User, addedBy: User | undefined) {
+    const key = `${chatId}:${user.id}`;
+    if (Date.now() - (checkedJoins.get(key) ?? 0) < 2 * 60_000) return;
+    checkedJoins.set(key, Date.now());
+    if (checkedJoins.size > 10_000) checkedJoins.delete(checkedJoins.keys().next().value!);
+
     // A bot an admin added is trusted. Every person gets the check, whoever added them.
     if (user.is_bot) {
-      if (update.from.id === user.id || !(await isAdmin(ctx, chatId, update.from))) await ban(ctx, chatId, user, 'a bot added by a member');
+      const byAdmin = addedBy && addedBy.id !== user.id && (await isAdmin(ctx, chatId, addedBy));
+      if (!byAdmin) await ban(ctx, chatId, user, 'a bot added by a member');
       return;
     }
     if (await impostor(ctx, chatId, user)) return ban(ctx, chatId, user, 'a name made to look like Hermes staff');
@@ -189,12 +192,15 @@ export function createHeraldBot(options: HeraldOptions): Bot {
     try {
       await ctx.api.restrictChatMember(chatId, user.id, SILENT);
     } catch (error) {
-      // Telegram holds members back only in supergroups. Welcome them anyway, and tell the admins once how to fix it.
-      logger.warn(`Herald could not hold back ${user.id} in ${chatId}: ${error instanceof Error ? error.message : error}`);
+      // A basic group can't hold members back, nor can Herald without admin rights. Welcome them anyway, and tell
+      // the admins once what to change.
+      const why = error instanceof Error ? error.message : String(error);
+      logger.warn(`Herald could not hold back ${user.id} in ${chatId}: ${why}`);
       await quietly(ctx.api.sendMessage(chatId, welcomeText(user), { link_preview_options: { is_disabled: true } }));
-      if (!toldAboutSupergroup) {
-        toldAboutSupergroup = true;
-        await quietly(ctx.api.sendMessage(chatId, SUPERGROUP_NOTE));
+      const note = /supergroup/i.test(why) ? SUPERGROUP_NOTE : /rights|admin/i.test(why) ? RIGHTS_NOTE : null;
+      if (note && !toldAdmins.has(note)) {
+        toldAdmins.add(note);
+        await quietly(ctx.api.sendMessage(chatId, note));
       }
       return;
     }
@@ -204,7 +210,6 @@ export function createHeraldBot(options: HeraldOptions): Bot {
       `Welcome, ${name(user)}. Tap the button below within 5 minutes to start chatting.`,
       { reply_markup: keyboard }
     );
-    const key = `${chatId}:${user.id}`;
     clearTimeout(pending.get(key));
     pending.set(
       key,
@@ -217,6 +222,17 @@ export function createHeraldBot(options: HeraldOptions): Bot {
         await quietly(ctx.api.deleteMessage(chatId, sent.message_id));
       }, VERIFY_MS)
     );
+  }
+
+  bot.on('chat_member', async (ctx) => {
+    const update = ctx.chatMember;
+    if (!inGroup(update.chat.id)) return;
+    const was = update.old_chat_member.status;
+    const now = update.new_chat_member.status;
+    // A member who left while muted comes back restricted and stays that way
+    if ((was === 'left' || was === 'kicked') && now === 'member') {
+      await checkNewcomer(ctx, update.chat.id, update.new_chat_member.user, update.from);
+    }
   });
 
   // The button carries the member's id, so it still works after a restart has forgotten the pending check
@@ -290,7 +306,14 @@ export function createHeraldBot(options: HeraldOptions): Bot {
     const chatId = message.chat.id;
     // Other chats only reach /groupid, which an admin uses to set Herald up
     if (!inGroup(chatId)) return next();
-    // Join and leave notices clutter the chat
+    // A join notice: check each new member who isn't already held back (a member who left while muted), then
+    // remove the notice, as with leave notices, which clutter the chat
+    if (message.new_chat_members) {
+      for (const member of message.new_chat_members) {
+        const status = member.is_bot ? null : await ctx.api.getChatMember(chatId, member.id).catch(() => null);
+        if (status?.status !== 'restricted') await checkNewcomer(ctx, chatId, member, message.from);
+      }
+    }
     if (message.new_chat_members || message.left_chat_member) return quietly(ctx.api.deleteMessage(chatId, message.message_id));
     // The group's linked channel relays its posts, and anonymous admins post as the group
     if (message.is_automatic_forward || message.sender_chat?.id === chatId) return next();
@@ -329,6 +352,39 @@ export function createHeraldBot(options: HeraldOptions): Bot {
       return warn(ctx, chatId, `I removed a message from ${name(user)}: ${finding.reason}. Muted for a day. Next time is a ban.`);
     }
     return warn(ctx, chatId, `I removed a message from ${name(user)}: ${finding.reason}. Next time is a day's mute.`);
+  });
+
+  // An admin checks Herald's setup here: each line says what is wrong and what to change
+  bot.command('status', async (ctx) => {
+    if (ctx.chat.type === 'private' || !ctx.from || !(await isAdmin(ctx, ctx.chat.id, ctx.from))) return;
+    const here = ctx.chat.id;
+    const lines = ['Herald status'];
+    lines.push(
+      ctx.chat.type === 'supergroup'
+        ? 'Group: supergroup, ok'
+        : 'Group: basic group. The welcome check needs a supergroup: set Chat history for new members to Visible.'
+    );
+    lines.push(
+      options.groupId === null
+        ? `TELEGRAM_GROUP_ID: not set. Set it to ${here} on Render.`
+        : inGroup(here)
+          ? 'TELEGRAM_GROUP_ID: this group, ok'
+          : `TELEGRAM_GROUP_ID: ${options.groupId}, not this group. Set it to ${here} on Render.`
+    );
+    const me = await ctx.api.getChatMember(here, ctx.me.id).catch(() => null);
+    if (me?.status === 'administrator') {
+      const missing = [!me.can_delete_messages && 'Delete messages', !me.can_restrict_members && 'Ban users'].filter(Boolean);
+      lines.push(missing.length ? `Admin rights: missing ${missing.join(' and ')}. Turn them on.` : 'Admin rights: ok');
+    } else {
+      lines.push('Admin: no. Make me an admin with Delete messages and Ban users.');
+    }
+    const hook = await ctx.api.getWebhookInfo().catch(() => null);
+    if (hook) {
+      lines.push(hook.allowed_updates?.includes('chat_member') ? 'Join updates: on' : 'Join updates: off. Restart the API on Render.');
+      if (hook.last_error_message) lines.push(`Last delivery error: ${hook.last_error_message}`);
+    }
+    lines.push(answersEnabled() ? 'Answers: on' : 'Answers: off until ANTHROPIC_API_KEY is set');
+    await ctx.reply(lines.join('\n'));
   });
 
   // An admin finds the group's id here, for TELEGRAM_GROUP_ID
