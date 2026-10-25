@@ -37,8 +37,6 @@ const TOKEN_ICONS: Record<string, string> = {
   USDT: "/brand-logos/tetherLogoMark.svg",
 }
 
-const SHARE_IMAGE = { url: "/opengraph-image.jpg", width: 1200, height: 630, alt: "Hermes: your guide to Solana yield" }
-
 async function allRoutes(): Promise<YieldRoute[]> {
   return YieldAPI.getRoutes(undefined, { revalidate: 60, signal: AbortSignal.timeout(10_000) })
 }
@@ -164,9 +162,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title,
     description,
     alternates: { canonical: path },
-    // Setting openGraph here replaces the site's, so the share image comes along by name
-    openGraph: { type: "website", url: path, siteName: "Hermes", title, description, locale: "en_US", images: [SHARE_IMAGE] },
-    twitter: { card: "summary_large_image", site: "@Hermes_agg", title, description, images: [SHARE_IMAGE] },
+    // The share image is the route's own, drawn by opengraph-image.tsx and twitter-image.tsx next to this page
+    openGraph: { type: "website", url: path, siteName: "Hermes", title, description, locale: "en_US" },
+    twitter: { card: "summary_large_image", site: "@Hermes_agg", title, description },
   }
 }
 

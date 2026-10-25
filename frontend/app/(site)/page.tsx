@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
 import { isTopRated, TOP_RATED_MIN_SCORE } from "@/lib/top-rated"
+import { routePath } from "@/lib/route-copy"
 import { NetworkPill } from "@/components/app/layout/network-pill"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { HeroBoard, type BoardColumn } from "@/components/site/hero-board"
@@ -277,7 +278,14 @@ function boardColumns(routes: YieldRoute[]): BoardColumn[] {
       .filter((route) => route.token === token.symbol && isTopRated(route))
       .sort(bySafety)
       .slice(0, 4)
-      .map((route) => ({ id: route.id, name: route.name, type: typeOf(route), apy: route.apy, score: route.safety?.score ?? 0 })),
+      .map((route) => ({
+        id: route.id,
+        href: routePath(route),
+        name: route.name,
+        type: typeOf(route),
+        apy: route.apy,
+        score: route.safety?.score ?? 0,
+      })),
   })).filter((column) => column.routes.length > 0)
 }
 
@@ -343,7 +351,8 @@ function Hero({ routes }: { routes: YieldRoute[] | null }) {
   )
 }
 
-// Every route, live, running across the page like a ticker. The list runs twice so the loop has no seam.
+// Every route, live, running across the page like a ticker, each opening its own page. The list runs twice so the
+// loop has no seam; the second run is hidden from screen readers and the keyboard.
 function RateTape({ routes }: { routes: YieldRoute[] }) {
   const sorted = [...routes].sort(bySafety)
   const best = Math.max(...routes.map((route) => route.apy))
@@ -360,15 +369,17 @@ function RateTape({ routes }: { routes: YieldRoute[] }) {
             style={{ "--marquee-duration": `${sorted.length * 4}s` } as React.CSSProperties}
           >
             {[...sorted, ...sorted].map((route, index) => (
-              <li
-                key={`${route.id}-${index}`}
-                aria-hidden={index >= sorted.length || undefined}
-                className="flex items-center gap-2.5 whitespace-nowrap py-3.5 pl-6 pr-0"
-              >
-                <span className="font-display text-[17px] font-bold">{route.name}</span>
-                <span className="text-[11px] font-medium text-muted-foreground">{route.token}</span>
-                <span className={cn("font-roman text-[15px] font-bold", route.apy === best && "text-ink")}>{percent(route.apy)}</span>
-                <span className="text-[11px] text-muted-foreground">{route.safety ? `Safety ${route.safety.score}` : "Not scored"}</span>
+              <li key={`${route.id}-${index}`} aria-hidden={index >= sorted.length || undefined} className="flex items-center whitespace-nowrap">
+                <Link
+                  href={routePath(route)}
+                  tabIndex={index >= sorted.length ? -1 : undefined}
+                  className="group flex items-center gap-2.5 py-3.5 pl-6"
+                >
+                  <span className="font-display text-[17px] font-bold underline-offset-4 group-hover:underline">{route.name}</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">{route.token}</span>
+                  <span className={cn("font-roman text-[15px] font-bold", route.apy === best && "text-ink")}>{percent(route.apy)}</span>
+                  <span className="text-[11px] text-muted-foreground">{route.safety ? `Safety ${route.safety.score}` : "Not scored"}</span>
+                </Link>
                 <span className="diamond ml-3.5" aria-hidden="true" />
               </li>
             ))}
