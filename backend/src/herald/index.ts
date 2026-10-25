@@ -77,7 +77,8 @@ const TOPIC =
 
 const name = (user: User) => [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'there';
 
-function welcomeText(user: User): string {
+// answering: whether Herald answers questions (an ANTHROPIC_API_KEY is set). Without it he points to the Docs.
+function welcomeText(user: User, answering: boolean): string {
   return [
     `Welcome, ${name(user)}.`,
     '',
@@ -86,7 +87,7 @@ function welcomeText(user: User): string {
     'App: hermesagg.xyz/app',
     'Docs: hermesagg.xyz/docs',
     '',
-    'Ask me anything about Hermes: mention me or reply to me.',
+    answering ? 'Ask me anything about Hermes: mention me or reply to me.' : 'Questions? The Docs answer most of them, and the admins the rest.',
     '',
     'Admins never DM first. Never share your seed phrase or private key with anyone.',
   ].join('\n');
@@ -112,14 +113,16 @@ const RULES_TEXT = [
   'Removed messages count as strikes: a warning, then a day\'s mute, then a ban.',
 ].join('\n');
 
-const HELP_TEXT = [
-  'I am Herald, the Hermes group\'s moderator.',
-  '',
-  'Ask me about Hermes: mention me, reply to me or use /ask followed by your question.',
-  '/rules shows the group rules. Admins: /status checks my setup.',
-  '',
-  'Docs: hermesagg.xyz/docs',
-].join('\n');
+function helpText(answering: boolean): string {
+  return [
+    'I am Herald, the Hermes group\'s moderator. I welcome new members and keep scams out.',
+    '',
+    answering ? 'Ask me about Hermes: mention me, reply to me or use /ask followed by your question.' : 'For questions about Hermes, start with the Docs.',
+    '/rules shows the group rules. Admins: /status checks my setup.',
+    '',
+    'Docs: hermesagg.xyz/docs',
+  ].join('\n');
+}
 
 export interface HeraldOptions {
   token: string;
@@ -135,6 +138,7 @@ export interface HeraldOptions {
 export function createHeraldBot(options: HeraldOptions): Bot {
   const bot = new Bot(options.token, options.botInfo ? { botInfo: options.botInfo } : undefined);
   const ask = options.ask ?? answer;
+  const answering = () => !!options.ask || answersEnabled();
   const autoAnswer = options.autoAnswer ?? AUTO_ANSWER;
   const strikes = new Strikes();
   const verifiedAt = new Map<number, number>(); // when each newcomer passed the welcome check
@@ -213,7 +217,7 @@ export function createHeraldBot(options: HeraldOptions): Bot {
       // the admins once what to change.
       const why = error instanceof Error ? error.message : String(error);
       logger.warn(`Herald could not hold back ${user.id} in ${chatId}: ${why}`);
-      await quietly(ctx.api.sendMessage(chatId, welcomeText(user), { link_preview_options: { is_disabled: true } }));
+      await quietly(ctx.api.sendMessage(chatId, welcomeText(user, answering()), { link_preview_options: { is_disabled: true } }));
       const note = /supergroup/i.test(why) ? SUPERGROUP_NOTE : /rights|admin/i.test(why) ? RIGHTS_NOTE : null;
       if (note && !toldAdmins.has(note)) {
         toldAdmins.add(note);
@@ -282,7 +286,7 @@ export function createHeraldBot(options: HeraldOptions): Bot {
     await ctx.answerCallbackQuery({ text: 'Welcome to Hermes.' });
     const messageId = ctx.callbackQuery.message?.message_id;
     if (messageId) {
-      await quietly(ctx.api.editMessageText(chatId, messageId, welcomeText(ctx.from), { link_preview_options: { is_disabled: true } }));
+      await quietly(ctx.api.editMessageText(chatId, messageId, welcomeText(ctx.from, answering()), { link_preview_options: { is_disabled: true } }));
       setTimeout(() => quietly(ctx.api.deleteMessage(chatId, messageId)), WELCOME_LIFE_MS);
     }
     logger.info(`Herald let in ${memberId} (${name(ctx.from)})`);
@@ -310,7 +314,7 @@ export function createHeraldBot(options: HeraldOptions): Bot {
   // ---------- Private chats ----------
 
   bot.chatType('private').on('message', async (ctx) => {
-    await ctx.reply(`${HELP_TEXT}\n\nI answer questions in the Hermes group: ${GROUP_INVITE}`, {
+    await ctx.reply(`${helpText(answering())}\n\nThe Hermes group: ${GROUP_INVITE}`, {
       link_preview_options: { is_disabled: true },
     });
   });
@@ -412,7 +416,7 @@ export function createHeraldBot(options: HeraldOptions): Bot {
 
   bot.command('rules', (ctx) => (inGroup(ctx.chat.id) ? ctx.reply(RULES_TEXT) : undefined));
   bot.command(['help', 'start'], (ctx) =>
-    inGroup(ctx.chat.id) ? ctx.reply(HELP_TEXT, { link_preview_options: { is_disabled: true } }) : undefined
+    inGroup(ctx.chat.id) ? ctx.reply(helpText(answering()), { link_preview_options: { is_disabled: true } }) : undefined
   );
 
   bot.command('ask', async (ctx) => {
