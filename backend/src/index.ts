@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import { solanaNetwork } from './config/runtime';
 import { startRateRefresh } from './services/yields';
 import { checkAlerts } from './services/alerts';
+import { startHerald } from './herald';
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,6 +18,8 @@ function main() {
   const app = createApp();
   const server = app.listen(PORT, () => {
     logger.info(`Server running on port ${PORT} (deposits on ${solanaNetwork()})`);
+    // Herald, the Telegram group's bot, when TELEGRAM_BOT_TOKEN is set
+    void startHerald();
   });
 
   const refreshTimer = startRateRefresh();
