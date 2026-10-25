@@ -4,8 +4,8 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { StakePoolLayout } from '@solana/spl-stake-pool';
 import { logger } from '../utils/logger';
 import { cached } from './cache';
-import { KAMINO_MAIN_MARKET, PROJECT0_GROUP, RateSource, ROUTES, TOKENS } from '../registry/routes';
-import { tokenValueNear } from './history';
+import { KAMINO_MAIN_MARKET, PROJECT0_GROUP, RateSource, ROUTES, SANCTUM_EPOCHS, TOKENS } from '../registry/routes';
+import { EpochValue, recentEpochValues, recordEpochValues, tokenValueNear } from './history';
 import { jupiterBase, jupiterHeaders } from './jupiter';
 import { readBank } from './project0';
 
@@ -29,6 +29,7 @@ export interface Rate {
   deposits?: number; // in the route's token (SOL for LSTs), for Hermes's own history
   tokenValue?: number; // LSTs: SOL per token. Vaults: tokens per share. The value APY compounds on.
   source?: string; // where the APY came from, when not the source's usual label
+  apyWindow?: string; // how far back an APY measured from past values looks: "the last epoch", "the last 10 epochs", "14 days"
   updatedAt: number; // ms timestamp of the fetch
   defillamaPool?: string; // DefiLlama pool id, for its history
 }
@@ -99,24 +100,49 @@ export const tokenPrices = cached(
 
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
 
-// Keyed by stake pool address. APY compounds the pool's own record of this epoch's SOL per token against
-// last epoch's. Epoch length is measured from recent slots, not assumed. TVL is the SOL the pool holds.
+// How long an epoch takes, measured from recent slots rather than assumed
+const epochTiming = cached(
+  'epoch timing',
+  async () => {
+    const [epochInfo, samples] = await Promise.all([connection.getEpochInfo(), connection.getRecentPerformanceSamples(60)]);
+    const slots = samples.reduce((sum, sample) => sum + sample.numSlots, 0);
+    const seconds = samples.reduce((sum, sample) => sum + sample.samplePeriodSecs, 0);
+    if (slots <= 0 || seconds <= 0) throw new Error('no slot timing');
+    const epochSeconds = (epochInfo.slotsInEpoch * seconds) / slots;
+    return { epochSeconds, epochsPerYear: YEAR_SECONDS / epochSeconds };
+  },
+  { ttlMs: MINUTE_MS, maxStaleMs: 60 * MINUTE_MS }
+);
+
+const windowLabel = (epochs: number) => (epochs === 1 ? 'the last epoch' : `the last ${epochs} epochs`);
+
+// Stake pools whose protocol's app shows APY over several epochs, and how many
+const POOL_EPOCHS = new Map(
+  ROUTES.flatMap((route) => (route.source.kind === 'stake-pool' && route.source.epochs ? [[route.source.pool, route.source.epochs]] : []))
+);
+// Hermes's record of each pool's SOL per token by epoch, read every 10 minutes: values change once an epoch
+const poolEpochHistory = cached('stake pool epochs', () => recentEpochValues(Math.max(SANCTUM_EPOCHS, ...POOL_EPOCHS.values())), {
+  ttlMs: 10 * MINUTE_MS,
+  maxStaleMs: 6 * 60 * MINUTE_MS,
+});
+const recordedEpochs = new Set<string>();
+
+// Keyed by stake pool address. APY compounds the pool's own record of SOL per token at its latest update against an
+// earlier epoch's: the last epoch's (kept on the pool account), or for pools whose app shows several epochs, the
+// oldest within that many that Hermes has recorded. TVL is the SOL the pool holds.
 const stakePoolRates = rateSource('stake pools on chain', async () => {
   const pools = [...new Set(ROUTES.flatMap((route) => (route.source.kind === 'stake-pool' ? [route.source.pool] : [])))];
-  const [accounts, epochInfo, samples, price] = await Promise.all([
+  const [accounts, timing, price, history] = await Promise.all([
     connection.getMultipleAccountsInfo(pools.map((pool) => new PublicKey(pool))),
-    connection.getEpochInfo(),
-    connection.getRecentPerformanceSamples(60),
+    epochTiming.get(),
     solPrice.get(),
+    POOL_EPOCHS.size > 0 ? poolEpochHistory.get() : Promise.resolve(null),
   ]);
   if (!price) throw new Error('no SOL price');
-
-  const slots = samples.reduce((sum, sample) => sum + sample.numSlots, 0);
-  const seconds = samples.reduce((sum, sample) => sum + sample.samplePeriodSecs, 0);
-  if (slots <= 0 || seconds <= 0) throw new Error('no slot timing');
-  const epochsPerYear = YEAR_SECONDS / ((epochInfo.slotsInEpoch * seconds) / slots);
+  if (!timing) throw new Error('no epoch timing');
 
   const rates: RateMap = new Map();
+  const toRecord: EpochValue[] = [];
   const now = Date.now();
   accounts.forEach((account, i) => {
     if (!account) return;
@@ -125,24 +151,70 @@ const stakePoolRates = rateSource('stake pools on chain', async () => {
     const current = lamports / Number(pool.poolTokenSupply.toString());
     const previous = Number(pool.lastEpochTotalLamports.toString()) / Number(pool.lastEpochPoolTokenSupply.toString());
     if (!(current > 0) || !(previous > 0) || !Number.isFinite(current) || !Number.isFinite(previous)) return;
+    // The pool's last update set `current` for this epoch and kept the one before it as `previous`
+    const epoch = Number(pool.lastUpdateEpoch.toString());
+    for (const row of [
+      { pool: pools[i], epoch, value: current },
+      { pool: pools[i], epoch: epoch - 1, value: previous },
+    ]) {
+      if (!recordedEpochs.has(`${row.pool}:${row.epoch}`)) toRecord.push(row);
+    }
+
+    let from = { epoch: epoch - 1, value: previous };
+    const window = POOL_EPOCHS.get(pools[i]) ?? 1;
+    const recorded = history?.get(pools[i]);
+    for (let past = epoch - window; past < epoch - 1 && recorded; past++) {
+      const value = recorded.get(past);
+      if (value && value > 0) {
+        from = { epoch: past, value };
+        break;
+      }
+    }
+    const epochs = epoch - from.epoch;
     rates.set(pools[i], {
-      apy: Math.pow(current / previous, epochsPerYear) - 1,
+      apy: Math.pow(current / from.value, timing.epochsPerYear / epochs) - 1,
+      apyWindow: windowLabel(epochs),
       tvl: (lamports / 1e9) * price,
       deposits: lamports / 1e9,
       tokenValue: current,
       updatedAt: now,
     });
   });
+
+  // Kept in the background: a failed write is tried again on the next read
+  if (toRecord.length > 0) {
+    void recordEpochValues(toRecord).then((ok) => {
+      if (ok) for (const row of toRecord) recordedEpochs.add(`${row.pool}:${row.epoch}`);
+    });
+  }
   return rates;
 });
 
-// Keyed "marinade": mSOL's 7-day APY and the SOL staked through mSOL, from Marinade's API
+// Marinade's liquid staking program, whose rolling APY Marinade's app shows for mSOL
+const MARINADE_LIQUID_PROGRAM = 'MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD';
+const FOURTEEN_DAYS_S = 14 * 24 * 60 * 60;
+
+// Keyed "marinade": mSOL's APY and the SOL staked through mSOL. Marinade's app shows mSOL's APY over 14 days ("APY (14D
+// avg)"): the latest point of its rolling APY, taken about once a day. Hermes reads that same point, so the two match.
+// Marinade's API gives mSOL's SOL value now, and its own 14-day APY if the rolling one can't be read.
 const marinadeRates = rateSource(
   'Marinade',
   async () => {
     const base = process.env.MARINADE_API_URL || 'https://api.marinade.finance';
-    const [apy, tlv] = await Promise.all([http.get(`${base}/msol/apy/7d`), http.get(`${base}/tlv`)]);
-    const value = Number(apy.data?.value);
+    const apyBase = process.env.MARINADE_APY_URL || 'https://apy.marinade.finance';
+    const to = Math.floor(Date.now() / 1000);
+    const [apy, tlv, rolling] = await Promise.all([
+      http.get(`${base}/msol/apy/14d`),
+      http.get(`${base}/tlv`),
+      http
+        .get(`${apyBase}/v1/rolling-apy/liquid-pool-token/${MARINADE_LIQUID_PROGRAM}`, {
+          params: { window: FOURTEEN_DAYS_S, from: to - 3 * 24 * 60 * 60, to },
+        })
+        .catch(() => null),
+    ]);
+    const values: unknown[] = Array.isArray(rolling?.data?.values) ? rolling!.data.values : [];
+    const latest = Number(values[values.length - 1]);
+    const value = Number.isFinite(latest) && latest > 0 && latest < 1 ? latest : Number(apy.data?.value);
     const tvl = Number(tlv.data?.staked_usd);
     if (!Number.isFinite(value) || !(tvl > 0)) throw new Error('unexpected Marinade response');
     const deposits = Number(tlv.data?.staked_sol);
@@ -152,6 +224,7 @@ const marinadeRates = rateSource(
         'marinade',
         {
           apy: value,
+          apyWindow: '14 days',
           tvl,
           deposits: deposits > 0 ? deposits : undefined,
           tokenValue: tokenValue > 0 ? tokenValue : undefined,
@@ -170,15 +243,22 @@ const INFINITY_MINT_OFFSET = 144;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 const INFINITY_ROUTE = ROUTES.find((route) => route.source.kind === 'infinity');
 
-// INF's SOL value about a week ago (at least a day ago) from Hermes's history. Checked every 30 minutes.
+// INF's SOL value 10 epochs ago, the window Sanctum's app shows, from Hermes's history: the oldest reading while history
+// is shorter, at least a day old. Checked every 30 minutes.
 const infinityPastValue = cached(
   'INF value history',
-  () => (INFINITY_ROUTE ? tokenValueNear(INFINITY_ROUTE.id, new Date(Date.now() - 7 * DAY_MS), new Date(Date.now() - DAY_MS)) : Promise.resolve(null)),
+  async () => {
+    const timing = await epochTiming.get();
+    if (!INFINITY_ROUTE || !timing) return null;
+    const target = new Date(Date.now() - SANCTUM_EPOCHS * timing.epochSeconds * 1000);
+    return tokenValueNear(INFINITY_ROUTE.id, target, new Date(Date.now() - DAY_MS));
+  },
   { ttlMs: 30 * MINUTE_MS, maxStaleMs: 6 * 60 * MINUTE_MS }
 );
 
 // Keyed "infinity". TVL is the SOL value Sanctum Infinity's pool records on chain. APY compounds INF's SOL value
-// against Hermes's own reading from about a week ago. Until that history is a day old, DefiLlama's APY stands in.
+// against Hermes's own reading from 10 epochs ago (Sanctum's window), or its oldest while history is shorter. Until that
+// history is a day old, DefiLlama's APY stands in.
 const infinityRates = rateSource('Sanctum Infinity on chain', async () => {
   const [state, price] = await Promise.all([connection.getAccountInfo(INFINITY_STATE), solPrice.get()]);
   if (!state || state.data.length < INFINITY_MINT_OFFSET + 32) throw new Error('no Infinity pool state');
@@ -191,17 +271,20 @@ const infinityRates = rateSource('Sanctum Infinity on chain', async () => {
   if (!(solValue > 0) || !(supply > 0)) throw new Error('empty Infinity pool');
   const tokenValue = solValue / supply;
 
-  const past = await infinityPastValue.get();
+  const [past, timing] = await Promise.all([infinityPastValue.get(), epochTiming.get()]);
   let apy: number | undefined;
   let source: string | undefined;
+  let apyWindow: string | undefined;
   if (past && past.value > 0 && Date.now() - past.at >= DAY_MS) {
     apy = Math.pow(tokenValue / past.value, (365.25 * DAY_MS) / (Date.now() - past.at)) - 1;
+    const epochs = timing ? Math.round((Date.now() - past.at) / 1000 / timing.epochSeconds) : 0;
+    apyWindow = epochs >= 1 ? windowLabel(epochs) : `${Math.round((Date.now() - past.at) / DAY_MS)} days`;
   } else {
     apy = (await defillamaRates.get())?.get('sanctum-infinity:INF')?.apy;
     source = 'DefiLlama';
   }
   if (apy === undefined || !Number.isFinite(apy)) return new Map();
-  return new Map([['infinity', { apy, tvl: solValue * price, deposits: solValue, tokenValue, source, updatedAt: Date.now() }]]);
+  return new Map([['infinity', { apy, apyWindow, tvl: solValue * price, deposits: solValue, tokenValue, source, updatedAt: Date.now() }]]);
 });
 
 // Keyed by `${project}:${symbol}`. The pools list is ~10 MB, only Solana pools are kept. Only INF's APY uses it, until Hermes has a day of history.
@@ -377,7 +460,9 @@ const jupiterLendRates = rateSource('Jupiter Lend', async () => {
   const now = Date.now();
 
   for (const token of tokens) {
-    const rateBps = Number(token.totalRate); // supply rate plus rewards, in basis points
+    // Supply rate plus rewards, as an APR in basis points. Jupiter's app compounds it into the APY it shows (5.26% shows
+    // as 5.4%), and so does Hermes.
+    const rateBps = Number(token.totalRate);
     const decimals = Number(token.asset?.decimals);
     const price = Number(token.asset?.price);
     if (!Number.isFinite(rateBps) || !Number.isFinite(decimals) || !Number.isFinite(price)) continue;
@@ -387,7 +472,7 @@ const jupiterLendRates = rateSource('Jupiter Lend', async () => {
     const withdrawableNow = Number(token.liquiditySupplyData?.withdrawable);
     const withdrawable = supplied > 0 && Number.isFinite(withdrawableNow) ? Math.min(1, withdrawableNow / supplied) : undefined;
     const deposits = Number(token.totalAssets) / 10 ** decimals;
-    rates.set(token.assetAddress, { apy: rateBps / 10_000, tvl, withdrawable, deposits, updatedAt: now });
+    rates.set(token.assetAddress, { apy: Math.expm1(rateBps / 10_000), tvl, withdrawable, deposits, updatedAt: now });
   }
   return rates;
 });

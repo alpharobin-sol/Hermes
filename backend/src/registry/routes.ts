@@ -69,7 +69,9 @@ const PROJECT0_BANKS: Partial<Record<InputToken, { bank: string; accountIndex: n
 
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
-  | { kind: 'stake-pool'; pool: string } // SPL stake pool account on chain (SPL program or Sanctum's forks)
+  // SPL stake pool account on chain (SPL program or Sanctum's forks). APY over the last `epochs` epochs, the window the
+  // protocol's own app shows (Sanctum's apps: 10); over the last epoch without it.
+  | { kind: 'stake-pool'; pool: string; epochs?: number }
   | { kind: 'infinity' } // Sanctum Infinity's pool account on chain (INF)
   | { kind: 'marinade' } // Marinade's API
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana, only where no live source exists
@@ -108,6 +110,9 @@ export interface RouteConfig {
 }
 
 const lst = (symbol: string, mint: string): TokenInfo => ({ symbol, mint, decimals: 9 });
+
+// Sanctum's apps, and the apps of LSTs Sanctum runs (Jupiter, Drift, Helius, Bybit), show APY over the last 10 epochs
+export const SANCTUM_EPOCHS = 10;
 
 export const ROUTES: RouteConfig[] = [
   // Liquid staking: SOL in, LST out
@@ -164,7 +169,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('jupSOL', 'jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v'),
     website: 'https://jup.ag',
-    source: { kind: 'stake-pool', pool: '8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr' },
+    source: { kind: 'stake-pool', pool: '8VpRhuxa7sUUepdY3kQiTmX9rS5vx4WgaXiAnXq4KCtr', epochs: SANCTUM_EPOCHS },
     trackedSince: '2024-08-16',
     defillamaPool: '52bd72a7-9e81-4112-abb4-71673e8de9bf',
     deposit: { 'mainnet-beta': 'beta' },
@@ -178,7 +183,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('dSOL', 'Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ'),
     website: 'https://www.drift.trade',
-    source: { kind: 'stake-pool', pool: '9mhGNSPArRMHpLDMSmxAvuoizBqtBGqYdT8WGuqgxNdn' },
+    source: { kind: 'stake-pool', pool: '9mhGNSPArRMHpLDMSmxAvuoizBqtBGqYdT8WGuqgxNdn', epochs: SANCTUM_EPOCHS },
     trackedSince: '2024-08-26',
     defillamaPool: '296651fc-25f6-4434-b8ec-17c2af9808da',
     deposit: { 'mainnet-beta': 'beta' },
@@ -192,7 +197,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('hSOL', 'he1iusmfkpAdwvxLNGV8Y1iSbj4rUy6yMhEA3fotn9A'),
     website: 'https://www.helius.dev',
-    source: { kind: 'stake-pool', pool: '3wK2g8ZdzAH8FJ7PKr2RcvGh7V9VYson5hrVsJM5Lmws' },
+    source: { kind: 'stake-pool', pool: '3wK2g8ZdzAH8FJ7PKr2RcvGh7V9VYson5hrVsJM5Lmws', epochs: SANCTUM_EPOCHS },
     trackedSince: '2024-08-16',
     defillamaPool: 'd7e101d6-8e6c-4348-9c5f-62398872a301',
     deposit: { 'mainnet-beta': 'beta' },
@@ -220,7 +225,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'SOL',
     receipt: lst('bbSOL', 'Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B'),
     website: 'https://www.bybit.com',
-    source: { kind: 'stake-pool', pool: '2aMLkB5p5gVvCwKkdSo5eZAL1WwhZbxezQr1wxiynRhq' },
+    source: { kind: 'stake-pool', pool: '2aMLkB5p5gVvCwKkdSo5eZAL1WwhZbxezQr1wxiynRhq', epochs: SANCTUM_EPOCHS },
     trackedSince: '2024-09-25',
     defillamaPool: 'f76cc844-73a2-4cc7-8de7-f9fb874c626d',
     deposit: { 'mainnet-beta': 'beta' },

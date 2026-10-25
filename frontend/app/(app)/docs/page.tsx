@@ -132,6 +132,15 @@ export default function Docs() {
                 more. The deposit dialog shows every path it checked.
               </p>
               <p>
+                Each APY matches what the protocol&apos;s own app shows, over the same window: the last epoch for Jito,
+                Binance, JPool and BlazeStake, the last 10 epochs for Sanctum Infinity, Jupiter, Drift, Helius and Bybit
+                (Sanctum&apos;s window), 14 days for Marinade, and today&apos;s rate for lending. Tap Why under a route to
+                see its window. Three differences: Binance&apos;s app shows an APR, which reads lower for the same rate,
+                while Hermes shows every rate as an APY. BlazeStake&apos;s app shows an estimate, while Hermes shows what
+                bSOL earned. Kamino&apos;s app lists extra rewards beside the supply APY, while Hermes shows the supply
+                APY.
+              </p>
+              <p>
                 Every route has its own page.{" "}
                 <Link href="/routes" className={LINK}>
                   Routes

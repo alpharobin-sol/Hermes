@@ -70,6 +70,7 @@ export interface YieldRoute {
   safety?: SafetyScore | null; // null while any part of the score is missing
   website: string;
   source: string; // where apy and tvl come from
+  apyWindow?: string | null; // how far back the APY looks when measured from past values: "the last 10 epochs", "14 days"
   updatedAt: string;
   utilization?: number | null; // lending only: share of the supply that is borrowed, 1 = all of it
   withdrawable?: number | null; // lending only: share of the supply that can be withdrawn right now

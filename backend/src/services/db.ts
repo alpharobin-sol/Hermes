@@ -92,6 +92,13 @@ const SCHEMA = `
     sent_at timestamptz not null default now()
   );
   create index if not exists alert_log_recent on alert_log (endpoint, route_id, kind, sent_at desc);
+
+  create table if not exists stake_pool_epochs (
+    pool text not null,
+    epoch integer not null,
+    token_value double precision not null,
+    primary key (pool, epoch)
+  );
 `;
 
 let ready: Promise<boolean> | null = null;
