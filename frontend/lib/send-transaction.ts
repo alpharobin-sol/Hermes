@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react"
-import type { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js"
+import { ComputeBudgetProgram, type Connection, type PublicKey, type VersionedTransaction } from "@solana/web3.js"
 
 // Send a transaction through the wallet and follow it to the chain, without depending on the wallet's answer.
 //
-// On phones the wallet can send a transaction and its answer never reach the page: Chrome on Android talks to
-// Phantom through Mobile Wallet Adapter, and the connection back drops while the page sits behind the wallet. So
-// Hermes asks the wallet and also watches the chain: the wallet's newest transactions, matched by this
-// transaction's blockhash. Whichever answers first settles it. A transaction that hasn't landed once its blockhash
-// expires never can, so that is the end of the wait.
+// On phones the wallet can send a transaction and its answer never reach the page: Chrome on Android talks to the
+// wallet (Solflare, Phantom or any other) through Mobile Wallet Adapter or the wallet's own link, and the connection
+// back can drop while the page sits behind the wallet. So Hermes asks the wallet and also watches the chain: the
+// wallet's newest transactions, matched to this one by its blockhash or, since a wallet may refresh the blockhash and
+// add its own checks, by carrying every one of its instructions. Whichever answers first settles it. A transaction
+// that hasn't landed once its blockhash expires never can, so that is the end of the wait.
 
 export type SendOutcome =
   | { kind: "landed"; signature: string; failed: boolean } // on chain; failed: the program refused it, nothing moved
@@ -26,6 +27,8 @@ interface SendOptions {
 }
 
 const POLL_MS = 2_500
+// Blocks a blockhash stays valid. A wallet that refreshes the blockhash when it signs gets this many more.
+const BLOCKHASH_LIFE = 150
 // After this long without the wallet's answer, a dialog says what it is waiting for
 const SLOW_WALLET_MS = 20_000
 
@@ -41,11 +44,49 @@ export function useSlowWallet(waiting: boolean): boolean {
   return slow
 }
 
-// The wallet said no, as opposed to losing its connection to the page
+// Codes wallets use when the user says no: 4001 (browser wallets), -3 (Mobile Wallet Adapter: not signed), and Mobile
+// Wallet Adapter's cancelled association (the wallet was closed before it opened the request)
+const DECLINED_CODES = new Set<unknown>([4001, -3, "ERROR_ASSOCIATION_CANCELLED"])
+
+// The wallet said no, as opposed to losing its connection to the page. Wallet adapters wrap the wallet's own error,
+// sometimes twice, so the whole chain is read.
 export function isDeclined(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err ?? "")
-  const code = (err as { code?: unknown; error?: { code?: unknown } } | null)?.error?.code ?? (err as { code?: unknown } | null)?.code
-  return code === 4001 || /user rejected|rejected the request|declined|not signed|denied/i.test(message)
+  let current = err as { code?: unknown; message?: unknown; error?: unknown; cause?: unknown } | null | undefined
+  for (let depth = 0; current && depth < 4; depth++) {
+    if (DECLINED_CODES.has(current.code)) return true
+    const message = typeof current === "string" ? current : typeof current.message === "string" ? current.message : ""
+    if (/reject|declin|denied|not signed|cancell?ed by (the )?user|user cancell?ed/i.test(message)) return true
+    current = (current.error ?? current.cause) as typeof current
+  }
+  return false
+}
+
+const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+// Base58, the way the RPC writes instruction data
+function base58(bytes: Uint8Array): string {
+  const digits: number[] = []
+  for (const byte of bytes) {
+    let carry = byte
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] * 256
+      digits[j] = carry % 58
+      carry = Math.floor(carry / 58)
+    }
+    while (carry > 0) {
+      digits.push(carry % 58)
+      carry = Math.floor(carry / 58)
+    }
+  }
+  let zeros = 0
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++
+  return "1".repeat(zeros) + digits.reverse().map((digit) => BASE58[digit]).join("")
+}
+
+// Each instruction as its program and data, leaving out compute budget, which a wallet may change
+function fingerprint(programs: string[], instructions: { programIdIndex: number; data: string }[]): string[] {
+  const budget = ComputeBudgetProgram.programId.toBase58()
+  return instructions.map((ix) => `${programs[ix.programIdIndex]}:${ix.data}`).filter((entry) => !entry.startsWith(`${budget}:`))
 }
 
 // Wait, but wake as soon as the page is back in view (the user returning from the wallet), the wallet answers, or
@@ -68,8 +109,9 @@ function pause(ms: number, signal: AbortSignal | undefined, onWake: (wake: () =>
   })
 }
 
-// A transaction's blockhash, read raw so a version 1 transaction (some wallets send them) reads like any other
-async function blockhashOf(connection: Connection, signature: string): Promise<string | null> {
+// Whether a landed transaction is this one: the same blockhash, or every one of its instructions. Read raw, so a
+// version 1 transaction (some wallets send them) reads like any other.
+async function isThisTransaction(connection: Connection, signature: string, transaction: VersionedTransaction): Promise<boolean> {
   const response = await fetch(connection.rpcEndpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -80,8 +122,15 @@ async function blockhashOf(connection: Connection, signature: string): Promise<s
       params: [signature, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: "confirmed" }],
     }),
   })
-  const data = await response.json()
-  return data?.result?.transaction?.message?.recentBlockhash ?? null
+  const message = (await response.json())?.result?.transaction?.message
+  if (!message) return false
+  if (message.recentBlockhash === transaction.message.recentBlockhash) return true
+  const ours = fingerprint(
+    transaction.message.staticAccountKeys.map((key) => key.toBase58()),
+    transaction.message.compiledInstructions.map((ix) => ({ programIdIndex: ix.programIdIndex, data: base58(ix.data) }))
+  )
+  const landed = new Set(fingerprint(message.accountKeys ?? [], message.instructions ?? []))
+  return ours.length > 0 && ours.every((entry) => landed.has(entry))
 }
 
 export async function sendAndWatch({
@@ -93,9 +142,7 @@ export async function sendAndWatch({
   signal,
   onSigned,
 }: SendOptions): Promise<SendOutcome> {
-  const blockhash = transaction.message.recentBlockhash
   // The wallet opens first: a phone opens it only right after the tap
-  const startedAt = Date.now()
   let walletSignature: string | null = null
   let walletError: unknown = null
   // An answer that arrives mid-round skips the next pause. One that arrives during a pause ends it.
@@ -115,6 +162,10 @@ export async function sendAndWatch({
     }
   )
 
+  // The chain's slot as the wallet opens. The transaction can't land before it, whatever the phone's clock says.
+  const startSlot = connection.getSlot("confirmed").catch(() => null)
+  // Hermes's blockhash, and one more lifetime in case the wallet refreshed it
+  const deadline = lastValidBlockHeight + BLOCKHASH_LIFE
   const checked = new Set<string>()
   const statusOf = async (signature: string) =>
     (await connection.getSignatureStatuses([signature], { searchTransactionHistory: true })).value[0]
@@ -129,20 +180,22 @@ export async function sendAndWatch({
           return { kind: "landed", signature: walletSignature, failed: status.err !== null }
         }
       } else {
-        // No answer: look for it among the wallet's transactions since the tap (a minute's room for clocks)
+        // No answer: look for it among the wallet's transactions since the wallet opened
+        const since = await startSlot
         const recent = await connection.getSignaturesForAddress(user, { limit: 10 }, "confirmed")
         for (const entry of recent) {
           if (checked.has(entry.signature)) continue
-          checked.add(entry.signature)
-          if (entry.blockTime && entry.blockTime * 1000 < startedAt - 60_000) continue
-          if ((await blockhashOf(connection, entry.signature)) === blockhash) {
+          if (since !== null && entry.slot < since - 10) continue
+          if (await isThisTransaction(connection, entry.signature, transaction)) {
             onSigned?.(entry.signature)
             return { kind: "landed", signature: entry.signature, failed: entry.err !== null }
           }
+          // Only a completed check rules a transaction out. One that failed to read is read again next round.
+          checked.add(entry.signature)
         }
       }
-      // Past the blockhash's life: a last look for the wallet's signature, then nothing more can land
-      if ((await connection.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+      // Past the deadline: a last look for the wallet's signature, then nothing more can land
+      if ((await connection.getBlockHeight("confirmed")) > deadline) {
         if (walletSignature) {
           const status = await statusOf(walletSignature)
           if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {

@@ -82,6 +82,7 @@ A move is a withdrawal and a deposit Hermes already builds, so each half goes th
 - dSOL to Kamino Lend SOL: step 1 swaps dSOL to SOL (0.0000625 SOL cost, about 0.1% of 0.0591 SOL, made back in about 172 days at today's APYs).
 - Step 2 from real withdrawals by other wallets in the last half hour: Jupiter Lend USDC withdrawals of 33.757367 and 100 USDC were read from their confirmed transactions (one a version 1 transaction) and built into Kamino Lend USDC deposits with each wallet's one-time rent (0.0176 and 0.0298 SOL). Transactions that pay the signer nothing (bots moving funds elsewhere) are refused with a plain reason.
 - Steakhouse USDC to Jupiter Lend USDC (50 USDC) and to Kamino Lend USDC (the whole 237.72 USDC): step 1 is the vault withdrawal, built and simulated. Step 1's landed amount read from a real vault withdrawal: 19.998998 USDC.
+- Owner's reroute from hermesagg.xyz (25 Oct, Solflare on Android Chrome): the whole 0.0068876 JitoSOL (0.0090093 SOL in its pool) to 0.006374506 mSOL (0.0090141 SOL in its pool, 0.05% more), one Jupiter swap, quote ≈ 0.006375 mSOL. [tx](https://solscan.io/tx/5YKHR8fZW3f1omEqCNQLoBn8GTVczDW6oBXHM3vTfSmhQsbmu28zixQ3Vu1gwp1NcXTyC6CSZJXSdxqxekXu2ZhA). The dialog wrongly said nothing moved: fixed in the follow-up to PR #60.
 - Refused: a move to another token, the same route, or more than the target's beta cap (Jupiter Lend USDC to Kamino Lend USDC above 1,000 USDC).
 
 Still to do: an owner move per kind, signed, before moves leave beta.
