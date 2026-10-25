@@ -318,18 +318,20 @@ export default function Docs() {
                 <li>the Safety Score falls below 80</li>
               </List>
               <p>
-                The first bell asks how Hermes should reach you: notifications on this device, or email. Android works
-                in Chrome. On iPhone, add Hermes to your Home Screen first (iOS 16.4 or later), or use email. For email,
-                Hermes sends a link to confirm the address, and alerts start once it is opened. Each check&apos;s
-                changes come in one email, and every email has a link to stop them. Add or remove either way in{" "}
+                The first bell asks how Hermes should reach you: notifications on this device, email, or Telegram.
+                Android works in Chrome. On iPhone, add Hermes to your Home Screen first (iOS 16.4 or later), or use
+                email or Telegram. For email, Hermes sends a link to confirm the address, and alerts start once it is
+                opened; every email has a link to stop them. For Telegram, tap Open Telegram, then Start in the chat
+                with Herald, the Hermes bot; send him /alerts to see what he watches and /stop to end it. Each
+                check&apos;s changes come in one email or message. Add or remove any of the three in{" "}
                 <Link href="/settings" className={LINK}>
                   Settings
                 </Link>
                 .
               </p>
               <p>
-                Hermes keeps this device&apos;s notification address or your email address, and the routes you watch
-                or hold. Never your wallet: the browser sends only which routes it holds.
+                Hermes keeps this device&apos;s notification address, your email address or your Telegram chat, and the
+                routes you watch or hold. Never your wallet: the browser sends only which routes it holds.
               </p>
             </Section>
 
@@ -364,8 +366,12 @@ export default function Docs() {
                 .
               </p>
               <p>
-                In the Telegram group, Herald, Hermes&apos;s bot, welcomes new members and removes scams. Admins never DM
-                first, and no one from Hermes will ever ask for your seed phrase or private key.
+                In the Telegram group, Herald, Hermes&apos;s bot, welcomes new members and removes scams. He also sends{" "}
+                <a href="#alerts" className={LINK}>
+                  alerts
+                </a>{" "}
+                to anyone who links Telegram in Settings, and messages only them. Admins never DM first, and no one from
+                Hermes will ever ask for your seed phrase or private key.
               </p>
             </Section>
           </div>

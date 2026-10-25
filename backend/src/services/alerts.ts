@@ -5,12 +5,14 @@ import { dbReady, pool } from './db';
 import { readingNear } from './history';
 import { getYieldRoutes, YieldRoute } from './yields';
 import { emailAlertsOn, emailTargets, sendAlertEmail } from './email';
+import { sendTelegramAlert, telegramAlertsOn, telegramTargets, unlinkTelegramChat } from './telegram-alerts';
 
 /**
  * ALERTS
- * Notifications about the routes a device watches and the routes its wallet holds, by web push to the phone or
- * computer, or by email (services/email.ts). Hermes keeps the device's push subscription or the confirmed email
- * address, the route ids it watches and the route ids its wallet holds. Never the wallet: the browser reads the
+ * Notifications about the routes a device watches and the routes its wallet holds, three ways: web push to the phone
+ * or computer, email (services/email.ts), or Telegram through Herald (services/telegram-alerts.ts). Hermes keeps the
+ * device's push subscription, confirmed email address or Telegram chat, the route ids it watches and the route ids
+ * its wallet holds. Never the wallet: the browser reads the
  * positions and sends only their route ids. Every 10 minutes Hermes checks those routes against its own history and
  * sends at most one alert per device (or address), route and kind a day:
  * - apy-drop: the APY fell 20% or more and at least half a point in a day
@@ -22,7 +24,8 @@ import { emailAlertsOn, emailTargets, sendAlertEmail } from './email';
  * - outflow: 15% or more of the route's deposits, counted in its token, left in a day
  * An alert about a held route says so and opens Portfolio, where Withdraw and Reroute are.
  * The VAPID keys that sign push notifications come from VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY when set, otherwise
- * they are created once and kept in the database. Email needs RESEND_API_KEY. Needs DATABASE_URL.
+ * they are created once and kept in the database. Email needs RESEND_API_KEY, Telegram TELEGRAM_BOT_TOKEN. Needs
+ * DATABASE_URL.
  */
 
 export type AlertKind = 'apy-drop' | 'better-route' | 'exit-tight' | 'left-top-rated' | 'depeg' | 'outflow';
@@ -275,9 +278,10 @@ export function noticesFor(route: YieldRoute, signals: Signals, held: boolean): 
 // ---------- The check ----------
 
 interface Target {
-  key: string; // the alert log's device: the push endpoint, or mail: and the address
+  key: string; // the alert log's device: the push endpoint, mail: and the address, or tg: and the chat
   push?: PushSubscriptionInput;
   email?: { address: string; token: string };
+  chatId?: number;
   routes: string[];
   held: string[];
 }
@@ -292,7 +296,7 @@ let checking = false;
 export async function checkAlerts(): Promise<void> {
   if (!pool || checking || Date.now() - lastCheckAt < CHECK_EVERY_MS || !(await dbReady())) return;
   const pushOn = !!(await vapidKeys());
-  if (!pushOn && !emailAlertsOn()) return;
+  if (!pushOn && !emailAlertsOn() && !telegramAlertsOn()) return;
   checking = true;
   lastCheckAt = Date.now();
   try {
@@ -306,6 +310,9 @@ export async function checkAlerts(): Promise<void> {
     // An address on two devices shares one log, so it hears about each change once
     for (const target of await emailTargets()) {
       targets.push({ key: `mail:${target.address}`, email: { address: target.address, token: target.token }, routes: target.routes, held: target.held });
+    }
+    for (const target of await telegramTargets()) {
+      targets.push({ key: `tg:${target.chatId}`, chatId: target.chatId, routes: target.routes, held: target.held });
     }
     if (targets.length > 0) await deliver(targets);
     await pool.query(`delete from alert_log where sent_at < now() - interval '30 days'`);
@@ -346,9 +353,17 @@ async function deliver(targets: Target[]): Promise<void> {
     }
     if (fresh.length === 0) continue;
 
-    // Email: everything in one message
-    if (target.email) {
-      if (await sendAlertEmail(target.email.address, target.email.token, fresh.map((item) => item.notice))) {
+    // Email and Telegram: everything in one message
+    if (target.email || target.chatId !== undefined) {
+      const notices = fresh.map((item) => item.notice);
+      const outcome = target.email
+        ? (await sendAlertEmail(target.email.address, target.email.token, notices))
+          ? 'sent'
+          : 'failed'
+        : await sendTelegramAlert(target.chatId!, notices);
+      // The user blocked Herald or deleted the chat
+      if (outcome === 'gone') await unlinkTelegramChat(target.chatId!);
+      if (outcome === 'sent') {
         sent += fresh.length;
         for (const item of fresh) await log(target.key, item.routeId, item.kind);
       }

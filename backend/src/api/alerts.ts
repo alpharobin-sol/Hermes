@@ -4,6 +4,14 @@ import { logger } from '../utils/logger';
 import { alertsPublicKey, subscribe, unsubscribe } from '../services/alerts';
 import { confirmEmail, emailAlertsOn, emailStatus, saveEmailLists, startEmail, unsubscribeEmail } from '../services/email';
 import { dbReady } from '../services/db';
+import {
+  saveTelegram,
+  saveTelegramLists,
+  telegramAlertsOn,
+  telegramLink,
+  telegramLinked,
+  unlinkTelegram,
+} from '../services/telegram-alerts';
 
 const router = Router();
 
@@ -34,10 +42,11 @@ const listsSchema = {
   routes: z.array(z.string().max(64)).max(40),
   held: z.array(z.string().max(64)).max(40).default([]),
 };
-// The email alerts token: 24 random bytes, base64url
+// The email and Telegram tokens: 24 random bytes, base64url
 const tokenSchema = z.string().regex(/^[A-Za-z0-9_-]{32}$/);
 
 const EMAIL_OFF = 'Email alerts are off right now.';
+const TELEGRAM_OFF = 'Telegram alerts are off right now.';
 const START_ERRORS = {
   off: [503, EMAIL_OFF],
   'address-limit': [429, 'Hermes just sent a link to this address. Check your inbox and spam folder, or try again in a few minutes.'],
@@ -93,11 +102,80 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
 
 /**
  * GET /api/alerts/channels
- * The ways alerts can arrive right now: this browser's notifications and email
+ * The ways alerts can arrive right now: this browser's notifications, email and Telegram
  */
 router.get('/channels', async (_req: Request, res: Response) => {
   const [push, database] = await Promise.all([alertsPublicKey(), dbReady()]);
-  return res.json({ success: true, push: !!push, email: emailAlertsOn() && database });
+  return res.json({ success: true, push: !!push, email: emailAlertsOn() && database, telegram: telegramAlertsOn() && database });
+});
+
+/**
+ * POST /api/alerts/telegram { token?, routes, held }
+ * Save what this device wants on Telegram. Without a token it starts a link, which the user opens in Telegram:
+ * Herald ties the chat to it. Returns the token, whether a chat has it yet, and the link.
+ */
+router.post('/telegram', async (req: Request, res: Response) => {
+  const parsed = z.object({ token: tokenSchema.nullish(), ...listsSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request' });
+  try {
+    const saved = await saveTelegram(parsed.data.token ?? null, parsed.data.routes, parsed.data.held);
+    if (!saved) return res.status(503).json({ success: false, error: TELEGRAM_OFF });
+    return res.json({ success: true, ...saved, url: telegramLink(saved.token) });
+  } catch (error) {
+    logger.error('Telegram alerts save failed:', error);
+    return res.status(500).json({ success: false, error: 'Could not update Telegram alerts. Try again shortly.' });
+  }
+});
+
+/**
+ * POST /api/alerts/telegram/save { token, routes, held }
+ * New lists for this device's chat. 404 when Hermes no longer has the link.
+ */
+router.post('/telegram/save', async (req: Request, res: Response) => {
+  const parsed = z.object({ token: tokenSchema, ...listsSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request' });
+  try {
+    const saved = await saveTelegramLists(parsed.data.token, parsed.data.routes, parsed.data.held);
+    if (!saved) return res.status(404).json({ success: false, error: 'Telegram alerts are off for this device. Link Telegram again in Settings.' });
+    return res.json({ success: true, ...saved });
+  } catch (error) {
+    logger.error('Telegram alerts save failed:', error);
+    return res.status(500).json({ success: false, error: 'Could not update Telegram alerts. Try again shortly.' });
+  }
+});
+
+/**
+ * POST /api/alerts/telegram/unlink { token }
+ * Stop Telegram alerts for this device. Herald tells the chat.
+ */
+router.post('/telegram/unlink', async (req: Request, res: Response) => {
+  const parsed = z.object({ token: tokenSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request' });
+  try {
+    await unlinkTelegram(parsed.data.token);
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error('Telegram alerts unlink failed:', error);
+    return res.status(500).json({ success: false, error: 'Could not turn Telegram alerts off. Try again shortly.' });
+  }
+});
+
+/**
+ * GET /api/alerts/telegram/:token
+ * Whether the link has been opened in Telegram yet. The browser asks while it waits. 404 when Hermes no longer has
+ * it (the user sent /stop, or it was never opened).
+ */
+router.get('/telegram/:token', async (req: Request, res: Response) => {
+  const parsed = tokenSchema.safeParse(req.params.token);
+  if (!parsed.success) return res.status(400).json({ success: false, error: 'Invalid request' });
+  try {
+    const linked = await telegramLinked(parsed.data);
+    if (linked === null) return res.status(404).json({ success: false, error: 'Not found' });
+    return res.json({ success: true, linked });
+  } catch (error) {
+    logger.error('Telegram alerts status failed:', error);
+    return res.status(500).json({ success: false, error: 'Could not check Telegram. Try again shortly.' });
+  }
 });
 
 /**

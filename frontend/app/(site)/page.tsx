@@ -160,7 +160,7 @@ const ROADMAP = [
   {
     status: "Live",
     title: "Signals and Reroute",
-    body: "Alerts for the routes you watch and the positions you hold, on your phone or by email, and Reroute: Hermes proposes a better top rated route and you sign.",
+    body: "Alerts for the routes you watch and the positions you hold, on your phone, by email or on Telegram, and Reroute: Hermes proposes a better top rated route and you sign.",
   },
   {
     status: "Later",
@@ -215,7 +215,7 @@ const FAQS = [
   {
     question: "Can Hermes alert me?",
     answer:
-      "Yes. Tap the bell under a route, or turn on alerts for your positions in Portfolio. Hermes tells your phone or computer, or emails you, when a rate falls, a better top rated route opens, a staking token trades below its value, deposits leave, a reserve is nearly all borrowed, or a score drops below 80. On iPhone, add Hermes to your Home Screen first, or use email. Hermes stores your notification address or email address and the routes you watch or hold, never your wallet.",
+      "Yes. Tap the bell under a route, or turn on alerts for your positions in Portfolio. Hermes tells your phone or computer, your email or your Telegram when a rate falls, a better top rated route opens, a staking token trades below its value, deposits leave, a reserve is nearly all borrowed, or a score drops below 80. On iPhone, add Hermes to your Home Screen first, or use email or Telegram. Hermes stores your notification address, email address or Telegram chat and the routes you watch or hold, never your wallet.",
   },
   {
     question: "Does Hermes charge a fee?",
@@ -721,14 +721,14 @@ function Alerts() {
         <h2 className="mt-4 font-display text-[34px] font-semibold leading-[1.06] md:text-[50px]">Alerts, not another dashboard</h2>
         <p className="mt-3.5 max-w-[520px] text-[15px] leading-relaxed text-muted-foreground md:text-[17px]">
           You should not have to watch rates all day. Tap the bell under a route, or turn on alerts for your positions, and
-          Hermes checks every 10 minutes. Your phone or your inbox hears about it when something changes.
+          Hermes checks every 10 minutes. Your phone, your inbox or your Telegram hears about it when something changes.
         </p>
         <ul className="m-0 mt-6 flex list-none flex-col gap-2.5 p-0 text-[15px]">
           {[
-            "Notifications on your phone or computer, or email. You pick when you tap the bell.",
-            "Android in Chrome. iPhone from the Home Screen, iOS 16.4 or later, or email.",
+            "Notifications on your phone or computer, email, or Telegram through Herald. You pick when you tap the bell.",
+            "Android in Chrome. iPhone from the Home Screen, iOS 16.4 or later, or email or Telegram.",
             "Alerts for your positions follow your wallet: a route joins when you deposit and leaves when you withdraw.",
-            "Hermes keeps your notification address or email and the routes you watch or hold. Never your wallet.",
+            "Hermes keeps your notification address, email or Telegram chat and the routes you watch or hold. Never your wallet.",
           ].map((line) => (
             <li key={line} className="flex items-start gap-3">
               <span className="diamond mt-2 shrink-0" aria-hidden="true" />

@@ -60,4 +60,5 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       # Optional: HERALD_MODEL (default claude-opus-5-5), HERALD_DAILY_ANSWERS (default 300),
-      # HERALD_AUTO_ANSWER=false to answer only when mentioned, replied to or asked with /ask
+      # HERALD_AUTO_ANSWER=false to answer only when mentioned, replied to or asked with /ask.
+      # Herald also sends alerts to anyone who links Telegram in Settings: TELEGRAM_BOT_USERNAME if the bot is renamed.
