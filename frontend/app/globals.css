@@ -277,6 +277,19 @@
     }
   }
 
+  /* A light running across the step in progress on the Getting started checklist */
+  @keyframes sheen {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(200%);
+    }
+  }
+  .animate-sheen {
+    animation: sheen 2.4s ease-in-out infinite;
+  }
+
   @keyframes scan {
     0% {
       left: -10%;

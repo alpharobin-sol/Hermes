@@ -96,6 +96,12 @@ export default function Docs() {
               </ol>
               <p>Hermes is in beta on mainnet. Deposits use real funds, so start small.</p>
               <p>
+                The first time you open the app, Getting started walks you through four steps: connect your wallet,
+                learn the Safety Score with a short tour of the page, make a small deposit and turn on alerts. Each step
+                shows about how long it takes on your device and ticks itself once you have done it. Close it for now or
+                hide it for good. Settings brings it back.
+              </p>
+              <p>
                 <Link href="/app" className={LINK}>
                   Open the routes
                 </Link>

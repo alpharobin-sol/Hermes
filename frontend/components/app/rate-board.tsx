@@ -210,7 +210,7 @@ export function RateBoard({
             )}
           </p>
         ) : (
-          <div role="radiogroup" aria-label={`${token} routes`}>
+          <div role="radiogroup" aria-label={`${token} routes`} data-tour="routes">
             {listed.map((route) => (
               <RouteRow
                 key={route.id}
