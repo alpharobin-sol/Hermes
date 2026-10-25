@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { logger } from '../utils/logger';
 import depositService, { DepositError } from '../services/deposit';
 import { quoteRoutes } from '../services/route-quotes';
+import { buildSplit, SPLIT_MAX_PARTS } from '../services/split';
 import { InputToken, TOKENS } from '../registry/routes';
 
 const router = Router();
@@ -37,6 +38,12 @@ const quotesSchema = z.object({
 
 const buildSchema = quoteSchema.extend({
   userPublicKey: publicKeySchema,
+});
+
+const splitSchema = z.object({
+  token: z.string().refine((value) => value in TOKENS, 'Unsupported token'),
+  userPublicKey: publicKeySchema,
+  parts: z.array(z.object({ routeId: z.string().min(1), amount: amountSchema })).min(1).max(SPLIT_MAX_PARTS),
 });
 
 export function handleError(res: Response, error: unknown, action: string) {
@@ -109,6 +116,25 @@ router.post('/build', async (req: Request, res: Response) => {
     });
   } catch (error) {
     return handleError(res, error, 'build deposit transaction');
+  }
+});
+
+/**
+ * POST /api/deposit/split
+ * Build a Top rated split: one unsigned deposit per part, two or three top rated routes for one token, for the wallet
+ * to sign in one approval and send in order. The whole split stays within one deposit's beta cap.
+ */
+router.post('/split', async (req: Request, res: Response) => {
+  try {
+    const request = splitSchema.parse(req.body);
+    const data = await buildSplit(
+      request.token as InputToken,
+      request.parts.map((part) => ({ routeId: part.routeId, amount: String(part.amount) })),
+      request.userPublicKey
+    );
+    return res.json({ success: true, data });
+  } catch (error) {
+    return handleError(res, error, 'build split deposit');
   }
 });
 

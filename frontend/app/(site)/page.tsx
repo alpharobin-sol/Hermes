@@ -156,7 +156,7 @@ const ROADMAP = [
   {
     status: "Live",
     title: "The Router",
-    body: "Live quotes for any amount, the deposit built for the route you pick, and withdrawals from Portfolio.",
+    body: "Live quotes for any amount, the deposit built for the route you pick or split across top rated ones, and withdrawals from Portfolio.",
   },
   {
     status: "Live",
@@ -202,6 +202,11 @@ const FAQS = [
     question: "What does Top rated mean?",
     answer:
       "The view Hermes opens with: only routes that score 80 or more, and no lending reserve that is nearly all borrowed. It means fewer surprises, not no risk. Tap All routes to compare everything.",
+  },
+  {
+    question: "Can I spread a deposit across several routes?",
+    answer:
+      "Yes. Turn on Split beside the amount. Hermes splits it evenly across the two or three top rated routes with the highest Safety Scores for that token. You approve once in your wallet, each part is an ordinary deposit, and each shows in Portfolio. While in beta a whole split stays within one deposit's cap.",
   },
   {
     question: "How do I withdraw?",

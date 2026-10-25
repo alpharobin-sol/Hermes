@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: "routes", title: "Routes" },
   { id: "safety-score", title: "Safety Score" },
   { id: "quotes", title: "Live quotes" },
+  { id: "split", title: "Top rated split" },
   { id: "risks", title: "What can go wrong" },
   { id: "withdrawing", title: "Withdrawing" },
   { id: "rerouting", title: "Rerouting" },
@@ -201,6 +202,25 @@ export default function Docs() {
               </List>
               <p>Best quote marks the route that leaves you the most over the length you picked. The deposit dialog shows all three.</p>
               <p>APY is today&apos;s rate. It changes, and it is not a promise of returns.</p>
+            </Section>
+
+            <Section id="split">
+              <p>
+                Turn on <strong>Split</strong>, the toggle beside the amount (over the deposit card on phones). Hermes spreads the amount
+                evenly across the two or three top rated routes with the highest Safety Scores for that token, in the order
+                the app shows them. Each part is an ordinary deposit: Hermes builds and simulates every one, your wallet
+                signs them all in one approval, and they are sent one after another.
+              </p>
+              <List>
+                <li>Each part shows in Portfolio like any deposit, with Withdraw, Reroute and alerts for your positions.</li>
+                <li>A split needs two top rated routes for the token, so the toggle only shows where there are two.</li>
+                <li>While in beta, a whole split stays within one deposit&apos;s cap, and each part pays its own network fee.</li>
+                <li>
+                  If a part doesn&apos;t land, its share stays in your wallet. Try it again from the same dialog, or deposit it
+                  into one route.
+                </li>
+                <li>Spreading a deposit means one route&apos;s bad day reaches part of it, not all. It doesn&apos;t remove any route&apos;s risk.</li>
+              </List>
             </Section>
 
             <Section id="risks">

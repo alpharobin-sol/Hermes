@@ -50,6 +50,11 @@ export function riskTier(tvl: number, locked?: number, score?: number): RiskTier
   return tier;
 }
 
+// Top rated: a Safety Score of 80 or more and risk level low, so no lending reserve nearly all borrowed or held back.
+// The app opens on these routes, alerts point to them, and a split goes only into them.
+export const TOP_RATED_MIN_SCORE = 80;
+export const isTopRated = (route: YieldRoute) => !!route.safety && route.safety.score >= TOP_RATED_MIN_SCORE && route.risk === 'low';
+
 // How long a request waits for Safety Score history that is still loading, e.g. just after a restart
 const SAFETY_WAIT_MS = 12_000;
 
