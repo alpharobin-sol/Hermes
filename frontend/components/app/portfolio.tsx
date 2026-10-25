@@ -11,6 +11,7 @@ import { takePortfolioChanged } from "@/lib/portfolio-changed"
 import { formatTokenAmount } from "./tokens"
 import { WithdrawDialog } from "./withdraw-dialog"
 import { MoveDialog, moveTargets } from "./move-dialog"
+import { PositionAlertToggle, useAlerts } from "./alerts"
 
 // What the connected wallet holds in each route Hermes lists and what it has earned. The API reads it live from the
 // chain, Kamino and Jupiter Lend, and keeps each wallet's answer a minute.
@@ -127,6 +128,12 @@ export function PortfolioSection({
   const [moveOpen, setMoveOpen] = useState(false)
   const positions = portfolio?.positions ?? []
   const missingEarned = positions.some((p) => p.earned === null && !p.earnedNote)
+
+  // Alerts that follow the wallet learn its routes here. Only a full read can take a route off.
+  const { syncHeld } = useAlerts()
+  useEffect(() => {
+    if (portfolio) syncHeld(portfolio.positions.map((p) => p.routeId), portfolio.unavailable.length === 0)
+  }, [portfolio, syncHeld])
 
   // Live routes, for moves and their proposals. Loaded once there is something to move.
   const [routes, setRoutes] = useState<YieldRoute[]>([])
@@ -285,6 +292,8 @@ export function PortfolioSection({
           })}
         </ul>
       )}
+
+      {positions.length > 0 && <PositionAlertToggle routes={positions.map((p) => p.routeId)} />}
 
       {positions.length > 0 && (
         <p className="text-[11px] leading-relaxed text-muted-foreground">

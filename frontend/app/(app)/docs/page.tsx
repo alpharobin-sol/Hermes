@@ -203,8 +203,9 @@ export default function Docs() {
                 <li>Rates move. Today&apos;s APY can fall.</li>
               </List>
               <p>
-                Turn on <a href="#alerts" className={LINK}>alerts</a> for a route to hear when its rate drops, its
-                score falls or its reserve fills up. The deposit dialog repeats what can go wrong for each route before
+                Turn on <a href="#alerts" className={LINK}>alerts</a> for a route, or for your positions, to hear when
+                its rate drops, its token trades below its value, deposits leave, its score falls or its reserve fills
+                up. The deposit dialog repeats what can go wrong for each route before
                 you sign.
               </p>
             </Section>
@@ -300,22 +301,37 @@ export default function Docs() {
 
             <Section id="alerts">
               <p>
-                Tap the bell under a route to get alerts for it on this device. No app or account needed. Hermes checks
-                every 10 minutes and sends at most one alert per route and kind a day, when:
+                Tap the bell under a route to get alerts for it. Or, in Portfolio, tap Alert me about my positions:
+                Hermes then follows your wallet, so a route joins when you deposit and leaves when you withdraw. No
+                account needed. Hermes checks every 10 minutes and sends at most one alert per route and kind a day,
+                when:
               </p>
               <List>
                 <li>the APY falls by a fifth or more, and at least half a point, in a day</li>
-                <li>a top rated route for the same token pays a point or more above it</li>
+                <li>
+                  a top rated route for the same token pays a point or more above a route you watch, or half a point
+                  above one you hold (the gap at which Portfolio proposes a Reroute)
+                </li>
+                <li>a staking token sells on Jupiter for 1% or more below its SOL value in its pool</li>
+                <li>15% or more of a route&apos;s deposits leave in a day</li>
                 <li>5% or less of a lending reserve can be withdrawn</li>
                 <li>the Safety Score falls below 80</li>
               </List>
               <p>
-                Android works in Chrome. On iPhone, add Hermes to your Home Screen first (iOS 16.4 or later). Turn
-                alerts off in{" "}
+                The first bell asks how Hermes should reach you: notifications on this device, email, or Telegram.
+                Android works in Chrome. On iPhone, add Hermes to your Home Screen first (iOS 16.4 or later), or use
+                email or Telegram. For email, Hermes sends a link to confirm the address, and alerts start once it is
+                opened; every email has a link to stop them. For Telegram, tap Open Telegram, then Start in the chat
+                with Herald, the Hermes bot; send him /alerts to see what he watches and /stop to end it. Each
+                check&apos;s changes come in one email or message. Add or remove any of the three in{" "}
                 <Link href="/settings" className={LINK}>
                   Settings
                 </Link>
                 .
+              </p>
+              <p>
+                Hermes keeps this device&apos;s notification address, your email address or your Telegram chat, and the
+                routes you watch or hold. Never your wallet: the browser sends only which routes it holds.
               </p>
             </Section>
 
@@ -350,8 +366,12 @@ export default function Docs() {
                 .
               </p>
               <p>
-                In the Telegram group, Herald, Hermes&apos;s bot, welcomes new members and removes scams. Admins never DM
-                first, and no one from Hermes will ever ask for your seed phrase or private key.
+                In the Telegram group, Herald, Hermes&apos;s bot, welcomes new members and removes scams. He also sends{" "}
+                <a href="#alerts" className={LINK}>
+                  alerts
+                </a>{" "}
+                to anyone who links Telegram in Settings, and messages only them. Admins never DM first, and no one from
+                Hermes will ever ask for your seed phrase or private key.
               </p>
             </Section>
           </div>
