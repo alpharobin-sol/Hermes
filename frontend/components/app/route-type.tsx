@@ -4,7 +4,7 @@ import { Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { YieldRoute } from "@/lib/api/yield-api"
-import { CATEGORY_LABELS } from "./rate-board"
+import { typeLabel } from "./rate-board"
 
 // Plain labels for new users: what a route type is, where its yield comes from and how you get out.
 // Hidden until the user taps the type, so the card stays clean. What can go wrong has its own line below.
@@ -18,6 +18,13 @@ function hostOf(url: string): string {
 }
 
 function explain(route: YieldRoute): { what: string; yieldFrom: string; out: string } {
+  if (route.curator) {
+    return {
+      what: `A Kamino vault lends your ${route.token} across several Kamino reserves. ${route.curator} picks the reserves and how much goes to each. You hold vault shares, which grow as interest comes in.`,
+      yieldFrom: "The interest borrowers pay in those reserves, less the vault's fee. It moves as they borrow more or less.",
+      out: `Withdraw from your Portfolio or at ${hostOf(route.website)} whenever the reserves have room.`,
+    }
+  }
   if (route.category === "lending") {
     return {
       what: `You lend your ${route.token} to borrowers through ${route.name}. ${
@@ -42,10 +49,10 @@ export function RouteTypeButton({ route, open, onToggle }: { route: YieldRoute; 
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      aria-label={`${CATEGORY_LABELS[route.category]}: what it means`}
+      aria-label={`${typeLabel(route)}: what it means`}
       className="inline-flex items-center gap-1 underline decoration-dotted underline-offset-2 hover:text-foreground"
     >
-      {CATEGORY_LABELS[route.category]}
+      {typeLabel(route)}
       <Info className="size-3" aria-hidden="true" />
     </button>
   )

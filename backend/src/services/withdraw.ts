@@ -25,7 +25,8 @@ import { assertUserOnlySigner } from './deposit';
 import { assertKaminoOnly, loadLookupTables } from './kamino-deposit';
 import { JUPITER_LEND_PROGRAM, tokenAmount } from './jupiter-lend-deposit';
 import { depositBudgetInstructions } from './compute-budget';
-import { kaminoDeposit } from './portfolio';
+import { kaminoDeposit, kaminoVaultShares } from './portfolio';
+import { KaminoVault, kaminoVaultTransaction } from './kamino-vault';
 
 /**
  * HERMES WITHDRAWALS
@@ -39,6 +40,8 @@ import { kaminoDeposit } from './portfolio';
  *   between the user's own accounts), then simulated: SOL must not leave the wallet beyond fees.
  * - Jupiter Lend: Jupiter's withdraw instruction, or for the whole position its redeem instruction (every jl token,
  *   no dust). Jupiter Lend's program only and the user the only signer, like the deposit.
+ * - Kamino vaults: Kamino's transaction API unstakes the shares and redeems them for the token. Checked like the
+ *   vault's deposit: this vault, this farm, the shares asked for, and the user's own token accounts only.
  *
  * Lending withdrawals are limited by what the reserve can pay out right now, so the quote says how much that is.
  * Every withdrawal is simulated before the user signs it, and what lands is read from the simulation.
@@ -65,7 +68,7 @@ export interface WithdrawQuote {
   value: string | null; // staking tokens: what they are worth in their pool, in SOL, so the exit cost shows
   held: string; // the whole position, in inputToken
   available: string | null; // lending: what the reserve can pay out right now, in the route's token
-  position: string | null; // lending: "Kamino Lend" or "Jupiter Lend"
+  position: string | null; // lending: "Kamino Lend", "Jupiter Lend" or the vault's name
   rentBackSol: string | null; // a full Kamino exit closes the Kamino account and returns its rent, in SOL
 }
 
@@ -333,6 +336,55 @@ async function buildKamino(route: RouteConfig, request: WithdrawRequest, user: P
   };
 }
 
+// The wallet's shares in the vault and what one share is worth, in the route's token
+async function vaultPosition(route: RouteConfig, user: PublicKey) {
+  const vault = route.direct as KaminoVault;
+  const [shares, rate] = await Promise.all([kaminoVaultShares(user.toBase58()), getRate(route.source)]);
+  if (!rate?.tokenValue) throw new DepositError(`${route.name}'s share value is unavailable right now. Try again shortly.`, 503);
+  // Kamino reports staked shares with more decimals than the shares token has
+  const held = new Decimal(shares.get(vault.vault) ?? 0).toDecimalPlaces(vault.shares.decimals, Decimal.ROUND_DOWN);
+  return { vault, shares: held, perShare: new Decimal(rate.tokenValue) };
+}
+
+async function quoteVault(route: RouteConfig, request: WithdrawRequest, user: PublicKey) {
+  const token = TOKENS[route.token];
+  const [position, available] = await Promise.all([vaultPosition(route, user), availableNow(route)]);
+  const held = position.shares.mul(position.perShare).toDecimalPlaces(token.decimals, Decimal.ROUND_DOWN);
+  const amount = request.all ? held : new Decimal(request.amount!).toDecimalPlaces(token.decimals, Decimal.ROUND_DOWN);
+  checkAmount(route, amount, held, available, route.name);
+  return { quote: lendingQuote(route, amount.toFixed(), held.toFixed(), available, route.name), position };
+}
+
+async function buildVault(route: RouteConfig, request: WithdrawRequest, user: PublicKey): Promise<WithdrawTransaction> {
+  const { quote, position } = await quoteVault(route, request, user);
+  const token = TOKENS[route.token];
+  // Kamino redeems shares. The whole position is every share, part of it the shares the amount is worth.
+  const shares = request.all
+    ? position.shares
+    : Decimal.min(position.shares, new Decimal(quote.inAmount).div(position.perShare).toDecimalPlaces(position.vault.shares.decimals, Decimal.ROUND_DOWN));
+  const { transaction, lastValidBlockHeight } = await kaminoVaultTransaction(
+    connection,
+    position.vault,
+    token,
+    user,
+    'withdrawal',
+    shares.toFixed(),
+    raw(shares.toFixed(), position.vault.shares.decimals),
+    shares.eq(position.shares)
+  );
+  const { received } = await simulateWithdrawal(transaction, user, token, (logs) =>
+    /insufficient lamports|no record of a prior credit/i.test(logs.join(' '))
+      ? 'Not enough SOL for the network fee.'
+      : `${route.name} can't pay this out right now: its reserves are lent out. Try a smaller amount or try later.`
+  );
+  logger.info(`Built Kamino vault withdrawal: ${shares.toFixed()} shares of ${route.id} for ${received.toFixed()} ${token.symbol}`);
+  return {
+    quote: { ...quote, outAmount: received.toFixed(), minOutAmount: received.toFixed() },
+    transaction: Buffer.from(transaction.serialize()).toString('base64'),
+    lastValidBlockHeight,
+  };
+}
+
 async function jupiterLendPosition(route: RouteConfig, user: PublicKey) {
   const { data } = await lendApi.get('/earn/positions', { params: { users: user.toBase58() } });
   const position = (Array.isArray(data) ? data : []).find((p: any) => p.token?.address === route.receipt!.mint);
@@ -430,6 +482,7 @@ export async function quoteWithdrawal(request: WithdrawRequest): Promise<Withdra
   const { route, user } = resolve(request);
   if (route.category === 'liquid-staking') return (await quoteStaked(route, request, user)).quote;
   if (route.source.kind === 'kamino') return quoteKamino(route, request, user);
+  if (route.source.kind === 'kamino-vault') return (await quoteVault(route, request, user)).quote;
   if (route.source.kind === 'jupiter-lend') return (await quoteJupiterLend(route, request, user)).quote;
   throw new DepositError(`Hermes can't withdraw from ${route.name} yet.`, 422);
 }
@@ -438,6 +491,7 @@ export async function buildWithdrawal(request: WithdrawRequest): Promise<Withdra
   const { route, user } = resolve(request);
   if (route.category === 'liquid-staking') return buildStaked(route, request, user);
   if (route.source.kind === 'kamino') return buildKamino(route, request, user);
+  if (route.source.kind === 'kamino-vault') return buildVault(route, request, user);
   if (route.source.kind === 'jupiter-lend') return buildJupiterLend(route, request, user);
   throw new DepositError(`Hermes can't withdraw from ${route.name} yet.`, 422);
 }

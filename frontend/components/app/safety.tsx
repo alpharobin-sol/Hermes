@@ -82,6 +82,10 @@ export function whatCanGoWrong(route: YieldRoute): string {
 }
 
 function baseRisk(route: YieldRoute): string {
+  if (route.curator) {
+    const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
+    return `Your ${route.token} is lent through Kamino reserves that ${route.curator} picks. A withdrawal waits when those reserves are mostly borrowed.${now} A bug or bad debt in Kamino, or a poor pick by the curator, could lose funds.`
+  }
   if (route.category === "lending") {
     const now = typeof route.withdrawable === "number" ? ` Right now ${Math.round(route.withdrawable * 100)}% of it can leave.` : ""
     return `Your ${route.token} is lent to borrowers. A withdrawal waits when most of the reserve is borrowed.${now} A bug or bad debt in ${route.name} could lose funds.`

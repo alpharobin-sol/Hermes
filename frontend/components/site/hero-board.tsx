@@ -11,7 +11,7 @@ import { LiveDot } from "./live-dot"
 export interface BoardRoute {
   id: string
   name: string
-  type: string // "Liquid staking" or "Lending"
+  type: string // "Liquid staking", "Lending" or "Lending vault"
   apy: number // decimal
   score: number
 }

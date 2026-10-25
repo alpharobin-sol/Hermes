@@ -14,6 +14,7 @@ import { jupiterBase, jupiterHeaders } from './jupiter';
  * - INF: Sanctum Infinity's pool account on chain. Its APY comes from Hermes's own history of INF's SOL value,
  *   and from DefiLlama only until that history is a day old (Sanctum's APY API returns 0).
  * - mSOL: Marinade's API. Kamino Lend: Kamino's API. Jupiter Lend: Jupiter's API.
+ * - Kamino vaults: Kamino's API for where the vault lends, and each reserve's free liquidity on chain.
  * Fast sources refresh every minute. When a source is down, routes that depend on it drop out.
  * Hermes never fills the gap with an estimate.
  */
@@ -24,7 +25,7 @@ export interface Rate {
   utilization?: number; // lending only: share of the supply that is borrowed, 1 = all of it
   withdrawable?: number; // lending only: share of the supply that can be withdrawn right now
   deposits?: number; // in the route's token (SOL for LSTs), for Hermes's own history
-  tokenValue?: number; // LSTs: SOL per token, the value APY compounds on
+  tokenValue?: number; // LSTs: SOL per token. Vaults: tokens per share. The value APY compounds on.
   source?: string; // where the APY came from, when not the source's usual label
   updatedAt: number; // ms timestamp of the fetch
   defillamaPool?: string; // DefiLlama pool id, for its history
@@ -243,6 +244,96 @@ const kaminoRates = rateSource('Kamino', async () => {
   return rates;
 });
 
+const KAMINO_LEND_PROGRAM_ID = new PublicKey('KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD');
+// Kamino Lend reserve account: the liquidity mint at byte 128, the liquidity it can pay out right now (u64) at byte 224
+const RESERVE_MINT_OFFSET = 128;
+const RESERVE_AVAILABLE_OFFSET = 224;
+
+interface VaultReserve {
+  reserve: string;
+  market: string;
+  supplied: number; // tokens the vault has lent to the reserve
+  suppliedUsd: number;
+}
+
+// Supply APY of each reserve in a Kamino Lend market
+async function marketSupplyApys(kaminoApi: string, market: string): Promise<Map<string, number>> {
+  const { data } = await http.get(`${kaminoApi}/kamino-market/${market}/reserves/metrics`, { params: { env: 'mainnet-beta' } });
+  return new Map((Array.isArray(data) ? data : []).map((reserve: any): [string, number] => [String(reserve.reserve), Number(reserve.supplyApy)]));
+}
+
+async function kaminoVaultRate(vault: string): Promise<Rate> {
+  const kaminoApi = process.env.KAMINO_API_URL || 'https://api.kamino.finance';
+  const [{ data: allocation }, { data: info }] = await Promise.all([
+    http.get(`${kaminoApi}/kvaults/vaults/${vault}/allocations`),
+    http.get(`${kaminoApi}/kvaults/vaults/${vault}`),
+  ]);
+  const state = info?.state;
+  const decimals = Number(state?.tokenMintDecimals);
+  const shareDecimals = Number(state?.sharesMintDecimals);
+  const performanceFee = Number(state?.performanceFeeBps) / 10_000;
+  const managementFee = Number(state?.managementFeeBps) / 10_000;
+  const idle = Number(allocation?.unallocated?.tokenAmount);
+  const idleUsd = Number(allocation?.unallocated?.usd);
+  const reserves: VaultReserve[] = (Array.isArray(allocation?.allocations) ? allocation.allocations : [])
+    .map((a: any) => ({
+      reserve: String(a.reserve),
+      market: String(a.market),
+      supplied: Number(a.suppliedTokenAmount),
+      suppliedUsd: Number(a.suppliedUsd),
+    }))
+    .filter((r: VaultReserve) => r.supplied > 0);
+  const numbers = [decimals, shareDecimals, performanceFee, managementFee, idle, idleUsd, ...reserves.map((r) => r.suppliedUsd)];
+  if (!state?.tokenMint || reserves.length === 0 || numbers.some((n) => !Number.isFinite(n))) throw new Error(`unexpected Kamino vault response for ${vault}`);
+
+  // Each reserve's rate from its market, the way Kamino Lend's routes read theirs. The allocations answer carries
+  // rates too, but at times repeats one reserve's rate for all of them.
+  const markets = await Promise.all([...new Set(reserves.map((r) => r.market))].map((market) => marketSupplyApys(kaminoApi, market)));
+  const supplyApy = (reserve: string): number => {
+    const apy = markets.map((market) => market.get(reserve)).find((value) => value !== undefined);
+    if (apy === undefined || !Number.isFinite(apy)) throw new Error(`no rate for vault reserve ${reserve}`);
+    return apy;
+  };
+
+  // What each reserve can pay out right now, on chain. Free RPCs cap a multiple-account read at 10.
+  const keys = reserves.map((r) => new PublicKey(r.reserve));
+  const accounts = [];
+  for (let i = 0; i < keys.length; i += 10) accounts.push(...(await connection.getMultipleAccountsInfo(keys.slice(i, i + 10))));
+  let withdrawable = idle;
+  accounts.forEach((account, i) => {
+    if (!account?.owner.equals(KAMINO_LEND_PROGRAM_ID) || account.data.length < RESERVE_AVAILABLE_OFFSET + 8) throw new Error('vault reserve not found');
+    const mint = new PublicKey(account.data.subarray(RESERVE_MINT_OFFSET, RESERVE_MINT_OFFSET + 32));
+    if (mint.toBase58() !== state.tokenMint) throw new Error('unexpected reserve layout');
+    const available = Number(account.data.readBigUInt64LE(RESERVE_AVAILABLE_OFFSET)) / 10 ** decimals;
+    withdrawable += Math.min(reserves[i].supplied, available);
+  });
+
+  const deposits = idle + reserves.reduce((sum, r) => sum + r.supplied, 0);
+  // Each reserve's supply APY by its share of the vault, unlent tokens earning nothing, as continuous rates, after the
+  // vault's fees: how Kamino computes its vault APY. Kamino's own figure lags by up to an hour, so Hermes works it out.
+  const rate = reserves.reduce((sum, r) => sum + (r.supplied / deposits) * Math.log1p(supplyApy(r.reserve)), 0);
+  // What one share is worth: the vault's tokens less fees it owes, over the shares issued
+  const pendingFees = Number(state.pendingFees) / 10 ** decimals;
+  const shares = Number(state.sharesIssued) / 10 ** shareDecimals;
+  const tokenValue = shares > 0 && Number.isFinite(pendingFees) ? (deposits - pendingFees) / shares : undefined;
+  return {
+    apy: Math.expm1(rate * (1 - performanceFee) - managementFee),
+    tvl: idleUsd + reserves.reduce((sum, r) => sum + r.suppliedUsd, 0),
+    withdrawable: deposits > 0 ? Math.min(1, withdrawable / deposits) : undefined,
+    deposits,
+    tokenValue: tokenValue && tokenValue > 0 ? tokenValue : undefined,
+    updatedAt: Date.now(),
+  };
+}
+
+// Keyed by vault address. TVL and deposits are what the vault has lent out plus what it holds unlent. Withdrawable
+// is what it holds unlent, plus from each reserve the smaller of what the vault lent there and what the reserve can
+// pay out right now.
+const kaminoVaultRates = rateSource('Kamino vaults', async () => {
+  const vaults = [...new Set(ROUTES.flatMap((route) => (route.source.kind === 'kamino-vault' ? [route.source.vault] : [])))];
+  return new Map(await Promise.all(vaults.map(async (vault) => [vault, await kaminoVaultRate(vault)] as const)));
+});
+
 // Keyed by token mint
 const jupiterLendRates = rateSource('Jupiter Lend', async () => {
   const response = await http.get(`${process.env.JUPITER_LEND_API_URL || jupiterBase('lend/v1')}/earn/tokens`, {
@@ -274,6 +365,7 @@ export const SOURCE_LABELS: Record<RateSource['kind'], string> = {
   marinade: 'Marinade',
   defillama: 'DefiLlama',
   kamino: 'Kamino',
+  'kamino-vault': 'Kamino',
   'jupiter-lend': 'Jupiter Lend',
 };
 
@@ -292,6 +384,8 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
       return (await defillamaRates.get())?.get(`${source.project}:${source.symbol}`);
     case 'kamino':
       return (await kaminoRates.get())?.get(source.reserve);
+    case 'kamino-vault':
+      return (await kaminoVaultRates.get())?.get(source.vault);
     case 'jupiter-lend':
       return (await jupiterLendRates.get())?.get(source.mint);
   }
@@ -301,5 +395,5 @@ export async function getRate(source: RateSource): Promise<Rate | undefined> {
  * Fetch every source whose cache is due, so requests hit a warm cache
  */
 export async function refreshRates(): Promise<void> {
-  await Promise.all([stakePoolRates, infinityRates, marinadeRates, kaminoRates, jupiterLendRates].map((source) => source.get()));
+  await Promise.all([stakePoolRates, infinityRates, marinadeRates, kaminoRates, kaminoVaultRates, jupiterLendRates].map((source) => source.get()));
 }

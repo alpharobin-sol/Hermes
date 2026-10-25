@@ -50,6 +50,15 @@ const JUPITER_LEND: Record<InputToken, { receipt: TokenInfo; defillamaPool: stri
   },
 };
 
+// Kamino lending vaults: one deposit spread across several Kamino Lend reserves by a curator. The deposit mints vault
+// shares and stakes them in the vault's farm, so nothing reaches the wallet. The farm and shares mint are fixed here:
+// a Kamino transaction that touches another farm or mint is refused.
+const STEAKHOUSE_USDC = {
+  vault: 'HDsayqAsDWy3QvANGqh2yNraqcD8Fnjgh73Mhb3WRS5E',
+  farm: '9FVjHqduhDPMVqvu3cXiEBjU6nvxvGdCCLRwd9WpVRZj',
+  shares: { symbol: 'kVUSDC', mint: '7D8C5pDFxug58L9zkwK7bCiDg4kD4AygzbcZUmf5usHS', decimals: 6 },
+};
+
 // Where a route's APY and TVL come from. Each kind has one fetcher in services/rates.ts.
 export type RateSource =
   | { kind: 'stake-pool'; pool: string } // SPL stake pool account on chain (SPL program or Sanctum's forks)
@@ -57,6 +66,7 @@ export type RateSource =
   | { kind: 'marinade' } // Marinade's API
   | { kind: 'defillama'; project: string; symbol: string } // yields.llama.fi pool on Solana, only where no live source exists
   | { kind: 'kamino'; reserve: string } // Kamino Lend main market reserve
+  | { kind: 'kamino-vault'; vault: string } // Kamino lending vault
   | { kind: 'jupiter-lend'; mint: string }; // Jupiter Lend earn token
 
 // A deposit straight into the protocol. LST deposits are quoted against Jupiter on mainnet.
@@ -64,6 +74,7 @@ export type DirectDeposit =
   | { kind: 'spl-stake-pool'; pool: string } // SPL stake pool that mints the receipt
   | { kind: 'marinade' } // Marinade liquid staking program, mainnet only
   | { kind: 'kamino-lend'; market: string; reserve: string } // supply to a Kamino Lend reserve, mainnet only
+  | { kind: 'kamino-vault'; vault: string; farm: string; shares: TokenInfo } // deposit into a Kamino vault, mainnet only
   | { kind: 'jupiter-lend' }; // supply to Jupiter Lend Earn for its jl token, mainnet only
 
 export interface RouteConfig {
@@ -78,6 +89,8 @@ export interface RouteConfig {
   source: RateSource;
   // First day DefiLlama recorded the protocol's deposits. Fixed, so the Safety Score's track record needs no live fetch.
   trackedSince: string;
+  trackedFrom?: string; // where trackedSince comes from, when not DefiLlama's first record
+  curator?: string; // a vault's curator, who picks the reserves it lends to
   defillamaPool?: string; // DefiLlama pool for deposit history (Safety Score outflows), until Hermes keeps its own
   // Names in DefiLlama's hacks list for the protocol and the team that runs it. Their incidents lower the Safety Score.
   incidents: string[];
@@ -264,6 +277,24 @@ export const ROUTES: RouteConfig[] = [
       deposit: { 'mainnet-beta': 'beta' },
     },
   ]),
+
+  // Lending vaults: Kamino spreads the deposit across Kamino Lend reserves the curator picks
+  {
+    id: 'steakhouse-usdc',
+    protocol: 'kamino',
+    incidents: ['Kamino', 'Steakhouse'],
+    name: 'Steakhouse USDC',
+    category: 'lending',
+    token: 'USDC',
+    curator: 'Steakhouse Financial',
+    direct: { kind: 'kamino-vault', ...STEAKHOUSE_USDC },
+    website: 'https://app.kamino.finance',
+    source: { kind: 'kamino-vault', vault: STEAKHOUSE_USDC.vault },
+    // DefiLlama lists the vault only since Oct 2026. Kamino's history starts the day the vault opened.
+    trackedSince: '2025-04-02',
+    trackedFrom: "Kamino's vault history",
+    deposit: { 'mainnet-beta': 'beta' },
+  },
 ];
 
 export function getRoute(id: string): RouteConfig | undefined {
