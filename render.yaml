@@ -43,3 +43,15 @@ services:
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
+      # Herald, the Telegram group's bot (backend/src/herald). Off without a token.
+      # The token from @BotFather for @HermesAggHeraldBot
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # The Hermes group's id. Send /groupid in the group as an admin and Herald replies with it.
+      - key: TELEGRAM_GROUP_ID
+        sync: false
+      # Herald's answers come from Claude. Without a key he still welcomes and moderates, and points questions to Docs.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional: HERALD_MODEL (default claude-opus-5-5), HERALD_DAILY_ANSWERS (default 300),
+      # HERALD_AUTO_ANSWER=false to answer only when mentioned, replied to or asked with /ask

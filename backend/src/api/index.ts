@@ -12,6 +12,7 @@ import withdrawRouter from './withdraw';
 import moveRouter from './move';
 import { apiLimiter, expensiveGlobalLimiter, expensivePerClientLimiter, EXPENSIVE_PATHS } from './rate-limit';
 import { historyEnabled, lastSnapshot } from '../services/history';
+import { heraldWebhook } from '../herald';
 
 export function createApp(): Express {
   const app = express();
@@ -57,6 +58,11 @@ export function createApp(): Express {
     });
   });
   
+  // Herald, the Telegram group's bot: Telegram posts updates here, checked by a secret header. It sits outside /api,
+  // so the API's rate limits never hold Telegram back.
+  const herald = heraldWebhook();
+  if (herald) app.post(herald.path, herald.handler);
+
   // Rate limits: every /api endpoint per client, and a tighter per-client plus a global cap on the ones that
   // read the chain or call Jupiter. /health is above this line, so UptimeRobot's pings are never limited.
   app.use('/api', apiLimiter);
