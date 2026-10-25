@@ -10,6 +10,7 @@ import { LiveDot } from "./live-dot"
 
 export interface BoardRoute {
   id: string
+  href: string // the route's own page
   name: string
   type: string // "Liquid staking", "Lending" or "Lending vault"
   apy: number // decimal
@@ -58,19 +59,23 @@ export function HeroBoard({ columns, total }: { columns: BoardColumn[]; total: n
 
       <ul role="tabpanel" aria-label={`Top rated ${column.symbol} routes`} className="m-0 mt-3 list-none p-0">
         {column.routes.map((route) => (
-          <li key={route.id} className="flex items-center gap-3 border-t border-row-line py-3 first:border-t-0">
-            <span aria-hidden="true" className="medallion size-9 text-sm">
-              {route.name.charAt(0)}
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate font-display text-[20px] font-bold leading-[1.1]">{route.name}</span>
-              <span className="text-[11px] text-muted-foreground">
-                Safety {route.score} · {route.type}
+          <li key={route.id} className="border-t border-row-line first:border-t-0">
+            <Link href={route.href} className="group flex items-center gap-3 py-3">
+              <span aria-hidden="true" className="medallion size-9 text-sm">
+                {route.name.charAt(0)}
               </span>
-            </span>
-            <span className={cn("whitespace-nowrap font-roman text-[19px] font-bold", route.apy === best && "text-ink")}>
-              {(route.apy * 100).toFixed(2)}% <span className="font-sans text-[11px] font-medium">APY</span>
-            </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate font-display text-[20px] font-bold leading-[1.1] underline-offset-4 group-hover:underline">
+                  {route.name}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  Safety {route.score} · {route.type}
+                </span>
+              </span>
+              <span className={cn("whitespace-nowrap font-roman text-[19px] font-bold", route.apy === best && "text-ink")}>
+                {(route.apy * 100).toFixed(2)}% <span className="font-sans text-[11px] font-medium">APY</span>
+              </span>
+            </Link>
           </li>
         ))}
       </ul>
