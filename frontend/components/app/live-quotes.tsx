@@ -212,6 +212,7 @@ export function horizonSuffix(horizon: Horizon): string {
 export function estimatedReturn(route: YieldRoute, amount: number, quote: RouteQuote | undefined, horizon: Horizon): number {
   const entered = quote?.value ? Number(quote.value) : amount
   const grown = entered * (1 + route.apy) ** horizonYears(horizon)
+  // A missing exit cost (its quote still loading) counts as none, and the dialog says so
   return grown * (1 - (route.exitCost ?? 0)) - amount
 }
 
@@ -287,9 +288,11 @@ export function HorizonSummary({ route, amount, quote }: { route: YieldRoute; am
         })}
       </dl>
       <p className="m-0 text-[11px] leading-relaxed text-muted-foreground">
-        {route.category === "liquid-staking"
-          ? `Entry cost and the cost of selling ${route.receipt ?? "the token"} back to SOL at today's price taken off. Rates move.`
-          : "Lending enters and leaves at face value. Rates move."}
+        {route.category !== "liquid-staking"
+          ? "Lending enters and leaves at face value. Rates move."
+          : typeof route.exitCost === "number"
+            ? `Entry cost and the cost of selling ${route.receipt ?? "the token"} back to SOL at today's price taken off. Rates move.`
+            : `Entry cost taken off. The cost of selling ${route.receipt ?? "the token"} back to SOL isn't available right now, so it isn't. Rates move.`}
       </p>
     </div>
   )
