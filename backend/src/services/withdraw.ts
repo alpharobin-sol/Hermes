@@ -418,11 +418,15 @@ async function buildProject0(route: RouteConfig, request: WithdrawRequest, user:
   const transaction = new VersionedTransaction(
     new TransactionMessage({ payerKey: user, recentBlockhash: blockhash, instructions: [...budget, ...instructions] }).compileToV0Message()
   );
-  const { received, solChange } = await simulateWithdrawal(transaction, user, token, (logs) =>
-    /insufficient lamports|no record of a prior credit/i.test(logs.join(' '))
-      ? 'Not enough SOL for the network fee.'
-      : `Project 0's ${token.symbol} bank can't pay this out right now: it is lent out. Try a smaller amount or try later.`
-  );
+  const { received, solChange } = await simulateWithdrawal(transaction, user, token, (logs) => {
+    const text = logs.join(' ');
+    if (/insufficient lamports|no record of a prior credit/i.test(text)) return 'Not enough SOL for the network fee.';
+    // The bank's vault can't cover the transfer: the rest of the deposits are lent out
+    if (/insufficient funds|liquidity/i.test(text)) {
+      return `Project 0's ${token.symbol} bank can't pay this out right now: it is lent out. Try a smaller amount or try later.`;
+    }
+    return 'Project 0 rejected this withdrawal in simulation. Try again shortly, or manage it at app.0.xyz.';
+  });
   const rentBack = all && !position.others ? Decimal.max(0, solChange) : new Decimal(0);
   logger.info(`Built Project 0 withdrawal: ${received.toFixed()} ${token.symbol}${rentBack.gt(0) ? `, ${rentBack.toFixed()} SOL rent back` : ''}`);
   return {
