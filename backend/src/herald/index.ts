@@ -27,9 +27,10 @@ import { GROUP_INVITE, impersonates, inspect, Strikes } from './spam';
  */
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-// The group's id, forgiving quotes and spaces pasted with it. NaN when it isn't a number.
+// The group's id, forgiving quotes and spaces pasted with it, and a missing minus: a group's id is always negative.
+// NaN when it isn't a number.
 const GROUP_ID_RAW = (process.env.TELEGRAM_GROUP_ID ?? '').replace(/["'\s]/g, '');
-const GROUP_ID = GROUP_ID_RAW ? Number(GROUP_ID_RAW) : null;
+const GROUP_ID = GROUP_ID_RAW ? -Math.abs(Number(GROUP_ID_RAW)) : null;
 
 // What /status shows when the group id doesn't arrive: the names (never the values) of settings that look like it,
 // so a typo or a setting on the wrong service shows up
