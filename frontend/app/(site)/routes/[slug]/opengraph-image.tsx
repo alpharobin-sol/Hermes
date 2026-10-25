@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { ImageResponse } from "next/og"
 import { notFound } from "next/navigation"
 
-import { YieldAPI, type YieldRoute } from "@/lib/api/yield-api"
+import { YieldAPI } from "@/lib/api/yield-api"
 import { asJpeg } from "@/lib/og-jpeg"
 import { isTopRated } from "@/lib/top-rated"
 import { exitTight, routeLabel, routeSlug, typeLabel } from "@/lib/route-copy"
@@ -47,16 +47,6 @@ const files = Promise.all([
 ])
 
 const scoreColor = (score: number) => (score >= 80 ? C.olive : score >= 60 ? C.ochre : C.vermilion)
-
-const readAt = (route: YieldRoute) =>
-  new Date(route.updatedAt).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }) + " UTC"
 
 function Diamond({ color = C.gilt, size = 10 }: { color?: string; size?: number }) {
   return <div style={{ width: size, height: size, background: color, transform: "rotate(45deg)" }} />
@@ -166,11 +156,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
               {exitTight(route) ? (
                 <div style={{ marginTop: 26, display: "flex", alignItems: "center", fontFamily: "Inter", fontSize: 18, color: C.ochre }}>
                   <Diamond color={C.ochre} size={8} />
-                  <div style={{ marginLeft: 10 }}>{`Nearly all borrowed: withdrawals may wait  ·  Read ${readAt(route)}`}</div>
+                  <div style={{ marginLeft: 10 }}>Nearly all borrowed: withdrawals may wait</div>
                 </div>
               ) : (
                 <div style={{ marginTop: 26, display: "flex", fontFamily: "Inter", fontSize: 19, color: C.sienna }}>
-                  {`hermesagg.xyz/routes/${slug}  ·  Live, read ${readAt(route)}`}
+                  {`hermesagg.xyz/routes/${slug}`}
                 </div>
               )}
             </div>
