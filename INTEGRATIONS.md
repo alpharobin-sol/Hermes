@@ -42,7 +42,7 @@ Deposits run in Hermes with real funds. The site labels the route Beta.
 
 | Route | Stage | Rate check vs app | Mainnet simulation | Owner deposit | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Jito (JitoSOL) | beta, devnet beta | 22 Oct: Hermes 4.85% / $1,077M, Jito API 4.848% / 10.42M SOL ($1,077M) | Stake pool 0.01 / 1 / 100 SOL pass, Jupiter 0.01 / 1 / 10 SOL pass, 22 Oct | 25 Oct, owner's wallet from hermesagg.xyz: 0.009 SOL (Max with the new 0.0053 SOL hold-back, from 0.0144 SOL) for 0.0068876 JitoSOL through Jupiter, worth 0.0090093 SOL in the pool (0.1% above what went in). Phantom added its Lighthouse checks; the transaction landed. Portfolio showed the position with Safety 99 within a minute. [tx](https://solscan.io/tx/5SzjA4PAw6ZwFsmDQMSwJrCWv9T1PwsP93SQgwcApoVdqrbRwv8y1yxjPWj1SWXxdsPe5j3JEyVrc1uiH5x482Am). Exit pending. | Quotes the stake pool against Jupiter and builds the better one. Jupiter has led by about 0.1% so far. A stale pool (between epochs) falls back to Jupiter. Exit: unstake at jito.network/staking or swap JitoSOL to SOL on Jupiter. |
+| Jito (JitoSOL) | beta, devnet beta | 22 Oct: Hermes 4.85% / $1,077M, Jito API 4.848% / 10.42M SOL ($1,077M) | Stake pool 0.01 / 1 / 100 SOL pass, Jupiter 0.01 / 1 / 10 SOL pass, 22 Oct | 25 Oct, owner's wallet from hermesagg.xyz: 0.009 SOL (Max with the new 0.0053 SOL hold-back, from 0.0144 SOL) for 0.0068876 JitoSOL through Jupiter, worth 0.0090093 SOL in the pool (0.1% above what went in). Phantom added its Lighthouse checks; the transaction landed. Portfolio showed the position with Safety 99 within a minute. [tx](https://solscan.io/tx/5SzjA4PAw6ZwFsmDQMSwJrCWv9T1PwsP93SQgwcApoVdqrbRwv8y1yxjPWj1SWXxdsPe5j3JEyVrc1uiH5x482Am). Exit through Hermes: rerouted to mSOL, then withdrawn to SOL (Moves and In-app withdrawals below). | Quotes the stake pool against Jupiter and builds the better one. Jupiter has led by about 0.1% so far. A stale pool (between epochs) falls back to Jupiter. Exit: unstake at jito.network/staking or swap JitoSOL to SOL on Jupiter. |
 | Marinade (mSOL) | beta | 22 Oct: Hermes 5.351% / $233.0M, Marinade API 7-day 5.351% / liquid stake $231.1M | Marinade direct 0.01 / 1 / 4 / 10 SOL pass (new and existing mSOL accounts), Jupiter 0.01 / 1 / 10 SOL pass, 22 Oct | pending | Quotes Marinade's own deposit against Jupiter and builds the better one. Jupiter has led by about 0.15% so far. Exit: swap mSOL to SOL on Jupiter, or unstake at marinade.finance (instant via its pool, or delayed). |
 | Binance (BNSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap, price impact 0.2 to 0.3% |
 | Jupiter (jupSOL) | beta | pending | 0.01 / 1 / 100 SOL pass, 22 Oct | pending | Jupiter swap |
@@ -62,13 +62,14 @@ The first six beta routes predate this gate. Their rate checks against each prot
 
 ## In-app withdrawals (beta, 24 Oct)
 
-Built and simulated on mainnet with real positions, never signed:
+Built and simulated on mainnet with real positions, and signed once by the owner (mSOL, below):
 
 - Liquid staking (JitoSOL): 0.01 and the whole balance swap back to SOL on Jupiter. 0.037 JitoSOL returned 0.04837 SOL against a pool value of 0.04842 (0.1% exit cost, 0.09% price impact).
 - Kamino Lend SOL: 0.01, 0.5 and the whole deposit pass. The whole deposit asks for 0.1% more than Kamino's hourly exchange rate shows; Kamino caps it at the deposit, so nothing is left, and closes the account, returning 0.0176 SOL of rent. With loans in the same account, a full exit is refused with the most that can leave (about 13.88 of 29.11 SOL in the test account).
 - Kamino Lend USDC: 1 passes.
 - Jupiter Lend USDC: 1 and the whole position (redeems every jlUSDC) pass.
 - Jupiter Lend SOL: 0.5 and the whole position pass, SOL arrives unwrapped.
+- Owner's withdrawal from hermesagg.xyz (25 Oct, Solflare on Android Chrome): Max, the whole 0.006374506 mSOL back to 0.0089995 SOL through Jupiter, against 0.009014 SOL in its pool (0.16% exit cost) and a 0.008955 SOL minimum. Network fee 0.0000198 SOL. [tx](https://solscan.io/tx/5VrwzFugQPstJSuhvVXiwV6AnaGPytYMWP9CoE8iFgPbjegQQuMNKs6P9wdn3j98bEYn9A7Jbxsvg2WDj7ffhV26). Two earlier tries said nothing was sent while Solflare was still open: the browser's RPC answered the block height with the slot. Fixed in PR #62 and #63.
 - Steakhouse USDC (25 Oct, real holders, simulated): 10 USDC and the whole position pass for staked shares (unstake, then redeem) and unstaked shares (redeem every share, close the shares account). About 0.001 USDC less lands than asked, as in Kamino's app.
 
 The same checks as the deposits: Kamino's transaction against the deposit allow-list, Jupiter Lend's program only with the user the only signer, the swap with the user the only signer. Each is simulated, and SOL may not leave the wallet beyond the fee and a token account (0.01 SOL).
