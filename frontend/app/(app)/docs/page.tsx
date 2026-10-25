@@ -338,7 +338,7 @@ export default function Docs() {
                   X
                 </a>{" "}
                 or{" "}
-                <a href="https://t.me/+gYZPiesNgH85YzE8" target="_blank" rel="noopener noreferrer" className={LINK}>
+                <a href="https://t.me/+I2pSaIdIykgwMDQ0" target="_blank" rel="noopener noreferrer" className={LINK}>
                   Telegram
                 </a>
                 .
