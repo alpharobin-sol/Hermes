@@ -288,7 +288,7 @@ export const ROUTES: RouteConfig[] = [
     token: 'USDC',
     curator: 'Steakhouse Financial',
     direct: { kind: 'kamino-vault', ...STEAKHOUSE_USDC },
-    website: 'https://app.kamino.finance',
+    website: `https://kamino.com/earn/lend/${STEAKHOUSE_USDC.vault}`,
     source: { kind: 'kamino-vault', vault: STEAKHOUSE_USDC.vault },
     // DefiLlama lists the vault only since Oct 2026. Kamino's history starts the day the vault opened.
     trackedSince: '2025-04-02',
