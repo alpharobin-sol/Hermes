@@ -27,7 +27,23 @@ import { GROUP_INVITE, impersonates, inspect, Strikes } from './spam';
  */
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const GROUP_ID = process.env.TELEGRAM_GROUP_ID ? Number(process.env.TELEGRAM_GROUP_ID) : null;
+// The group's id, forgiving quotes and spaces pasted with it. NaN when it isn't a number.
+const GROUP_ID_RAW = (process.env.TELEGRAM_GROUP_ID ?? '').replace(/["'\s]/g, '');
+const GROUP_ID = GROUP_ID_RAW ? Number(GROUP_ID_RAW) : null;
+
+// What /status shows when the group id doesn't arrive: the names (never the values) of settings that look like it,
+// so a typo or a setting on the wrong service shows up
+function groupIdProblem(here: number): string {
+  if (process.env.TELEGRAM_GROUP_ID !== undefined && !GROUP_ID_RAW) return `TELEGRAM_GROUP_ID: set but empty. Set it to ${here} on Render.`;
+  if (GROUP_ID !== null && Number.isNaN(GROUP_ID)) return `TELEGRAM_GROUP_ID: not a number. Set it to ${here} on Render, nothing else in the value.`;
+  const lookalikes = Object.keys(process.env).filter((key) => /tele|group|chat/i.test(key) && key !== 'TELEGRAM_BOT_TOKEN');
+  return [
+    `TELEGRAM_GROUP_ID: not set. Set it to ${here} on Render, on the hermes-api service, then Save, rebuild and deploy.`,
+    lookalikes.length
+      ? `Settings I can see with similar names: ${lookalikes.map((key) => JSON.stringify(key)).join(', ')}. The name must be exactly "TELEGRAM_GROUP_ID".`
+      : 'I see no setting with a similar name, so it is on another service or wasn\'t saved and deployed.',
+  ].join('\n');
+}
 const AUTO_ANSWER = process.env.HERALD_AUTO_ANSWER !== 'false';
 const WEBHOOK_PATH = '/telegram/webhook';
 
@@ -365,8 +381,8 @@ export function createHeraldBot(options: HeraldOptions): Bot {
         : 'Group: basic group. The welcome check needs a supergroup: set Chat history for new members to Visible.'
     );
     lines.push(
-      options.groupId === null
-        ? `TELEGRAM_GROUP_ID: not set. Set it to ${here} on Render.`
+      options.groupId === null || Number.isNaN(options.groupId)
+        ? groupIdProblem(here)
         : inGroup(here)
           ? 'TELEGRAM_GROUP_ID: this group, ok'
           : `TELEGRAM_GROUP_ID: ${options.groupId}, not this group. Set it to ${here} on Render.`
