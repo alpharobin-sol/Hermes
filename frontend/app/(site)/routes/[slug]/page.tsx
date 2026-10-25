@@ -43,13 +43,10 @@ async function allRoutes(): Promise<YieldRoute[]> {
   return YieldAPI.getRoutes(undefined, { revalidate: 60, signal: AbortSignal.timeout(10_000) })
 }
 
+// No pages at build time: each renders on its first visit and is kept for a minute after. A deploy never waits on
+// the API, and an API that is down during a build can't fail it.
 export async function generateStaticParams() {
-  try {
-    return (await allRoutes()).map((route) => ({ slug: routeSlug(route) }))
-  } catch {
-    // The API is down at build time: each page renders on its first visit instead
-    return []
-  }
+  return []
 }
 
 // The route for this address, with every route for the comparison. A failed read throws, so Next keeps the last
