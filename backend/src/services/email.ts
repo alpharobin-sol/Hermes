@@ -90,7 +90,8 @@ const routeNames = (ids: string[]) =>
 // ---------- The look ----------
 // Night in an email: umber around an umber card, parchment text, gold for ornament, the teal button. A dark email
 // looks meant in dark mode, so mail apps leave it as it is. The hero is a Roman marble of Hermes (1st or 2nd century
-// CE, The Metropolitan Museum of Art, open access) toned to the palette, in a gilt arch like the site's.
+// CE, The Metropolitan Museum of Art, open access) toned to the palette, in a gilt arch like the site's. The Met's
+// open access images are CC0, so the card carries no credit line.
 
 const C = {
   page: '#0f0806',
@@ -111,7 +112,6 @@ const HERO = `${SITE_URL}/brand/email-hermes.jpg`;
 const QUOTE = 'Look within. Let neither the peculiar quality of anything nor its value escape thee.';
 
 const SAFETY_LINE = 'Hermes never asks for your seed phrase or private key.';
-const CREDIT = 'Marble statue of Hermes, Roman, 1st or 2nd century CE. The Metropolitan Museum of Art.';
 
 function roman(n: number): string {
   const numerals: [number, string][] = [
@@ -165,7 +165,7 @@ ${options.body}
 <tr><td align="center" style="padding:10px 24px 34px;font-family:${SANS};font-size:10px;letter-spacing:2px;color:${C.gold}">MARCUS AURELIUS &middot; MEDITATIONS VI.3</td></tr>
 </table>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px"><tr><td align="center" style="padding:20px 24px 0;font-family:${SANS};font-size:12px;line-height:1.7;color:${C.faint}">
-${options.footer}<br>${SAFETY_LINE}<br><span style="font-size:11px">${CREDIT}</span>
+${options.footer}<br>${SAFETY_LINE}
 </td></tr></table>
 </td></tr></table>
 </body></html>`;
