@@ -22,7 +22,7 @@ import { GROUP_INVITE, impersonates, inspect, Strikes } from './spam';
  *   question about Hermes. Answers come from Claude (answers.ts).
  *
  * Telegram delivers updates to a webhook on the API (POST /telegram/webhook), checked by a secret header, so a
- * redeploy hands over cleanly. Herald works only in the group TELEGRAM_GROUP_ID names and leaves any other.
+ * redeploy hands over cleanly. Herald works only in the group TELEGRAM_GROUP_ID names and stays quiet anywhere else.
  * Needs TELEGRAM_BOT_TOKEN, and admin rights in the group to delete messages and ban users.
  */
 
@@ -75,6 +75,12 @@ function welcomeText(user: User): string {
   ].join('\n');
 }
 
+const SUPERGROUP_NOTE = [
+  'Admins: I can\'t hold new members back until they tap the welcome button. Telegram allows that only in supergroups.',
+  '',
+  'Open the group\'s settings and set Chat history for new members to Visible. Telegram upgrades the group and gives it a new id, which I\'ll post here. Set TELEGRAM_GROUP_ID to it on Render.',
+].join('\n');
+
 const RULES_TEXT = [
   'Hermes group rules:',
   '',
@@ -115,7 +121,9 @@ export function createHeraldBot(options: HeraldOptions): Bot {
   const pending = new Map<string, NodeJS.Timeout>(); // welcome checks waiting for a tap
   const admins = new Map<number, { ids: Set<number>; names: Set<string>; at: number }>();
 
-  const inGroup = (chatId: number) => options.groupId !== null && chatId === options.groupId;
+  let migratedTo: number | null = null; // the group's new id, once it became a supergroup
+  let toldAboutSupergroup = false;
+  const inGroup = (chatId: number) => options.groupId !== null && (chatId === options.groupId || chatId === migratedTo);
 
   async function adminsOf(ctx: Context, chatId: number) {
     const known = admins.get(chatId);
@@ -171,12 +179,25 @@ export function createHeraldBot(options: HeraldOptions): Bot {
     const joined = (was === 'left' || was === 'kicked') && now === 'member';
     if (!joined) return;
     const user = update.new_chat_member.user;
-    // Someone an admin added is trusted, bots included
-    if (update.from.id !== user.id && (await isAdmin(ctx, chatId, update.from))) return;
-    if (user.is_bot) return ban(ctx, chatId, user, 'a bot added by a member');
+    // A bot an admin added is trusted. Every person gets the check, whoever added them.
+    if (user.is_bot) {
+      if (update.from.id === user.id || !(await isAdmin(ctx, chatId, update.from))) await ban(ctx, chatId, user, 'a bot added by a member');
+      return;
+    }
     if (await impostor(ctx, chatId, user)) return ban(ctx, chatId, user, 'a name made to look like Hermes staff');
 
-    await ctx.api.restrictChatMember(chatId, user.id, SILENT);
+    try {
+      await ctx.api.restrictChatMember(chatId, user.id, SILENT);
+    } catch (error) {
+      // Telegram holds members back only in supergroups. Welcome them anyway, and tell the admins once how to fix it.
+      logger.warn(`Herald could not hold back ${user.id} in ${chatId}: ${error instanceof Error ? error.message : error}`);
+      await quietly(ctx.api.sendMessage(chatId, welcomeText(user), { link_preview_options: { is_disabled: true } }));
+      if (!toldAboutSupergroup) {
+        toldAboutSupergroup = true;
+        await quietly(ctx.api.sendMessage(chatId, SUPERGROUP_NOTE));
+      }
+      return;
+    }
     const keyboard = new InlineKeyboard().text("I'm human", `verify:${user.id}`);
     const sent = await ctx.api.sendMessage(
       chatId,
@@ -236,15 +257,21 @@ export function createHeraldBot(options: HeraldOptions): Bot {
 
   // ---------- Groups Herald doesn't belong to ----------
 
-  bot.on('my_chat_member', async (ctx) => {
+  // He stays, but does nothing there. Leaving could lose the Hermes group itself: its id changes when it becomes a
+  // supergroup.
+  bot.on('my_chat_member', (ctx) => {
     const chat = ctx.myChatMember.chat;
-    if (chat.type === 'private' || options.groupId === null || inGroup(chat.id)) return;
-    const status = ctx.myChatMember.new_chat_member.status;
-    if (status === 'member' || status === 'administrator') {
-      logger.info(`Herald was added to ${chat.id} (${'title' in chat ? chat.title : ''}) and left: not the Hermes group`);
-      await quietly(ctx.api.sendMessage(chat.id, `I only work in the Hermes group: ${GROUP_INVITE}`));
-      await quietly(ctx.api.leaveChat(chat.id));
+    if (chat.type !== 'private' && !inGroup(chat.id)) {
+      logger.info(`Herald is in ${chat.id} (${'title' in chat ? chat.title : ''}), not the Hermes group: he stays quiet there`);
     }
+  });
+
+  // The Hermes group became a supergroup, with a new id. Herald follows it until a restart, and says what to set.
+  bot.on('message:migrate_from_chat_id', async (ctx) => {
+    if (options.groupId === null || ctx.msg.migrate_from_chat_id !== options.groupId) return;
+    migratedTo = ctx.chat.id;
+    logger.warn(`Herald: the Hermes group is now ${ctx.chat.id}. Set TELEGRAM_GROUP_ID to it.`);
+    await quietly(ctx.reply(`Admins: this group is now a supergroup, with the id ${ctx.chat.id}. Set TELEGRAM_GROUP_ID to it on Render.`));
   });
 
   // ---------- Private chats ----------
