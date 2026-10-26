@@ -20,6 +20,7 @@ import {
   type SortBy,
   type View,
 } from "./safety"
+import { MatchChip, MatchNote, type MatchPrefs } from "./match"
 
 export const RISK_LEVELS: { value: RiskTier; label: string; color: string; text: string }[] = [
   { value: "low", label: "Low", color: "bg-success", text: "text-success" },
@@ -60,6 +61,8 @@ interface RateBoardProps {
   onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
+  match: MatchPrefs | null // the answers while Match sorts the list, in place of the view
+  onChangeMatch: () => void
   horizon: Horizon // what the figures count over once an amount is typed
   onHorizon: (horizon: Horizon) => void
   routes: YieldRoute[] // for the token, in the view, in sortBy order
@@ -84,6 +87,8 @@ export function RateBoard({
   onExpandedChange,
   sortBy,
   onSort,
+  match,
+  onChangeMatch,
   horizon,
   onHorizon,
   routes,
@@ -97,9 +102,10 @@ export function RateBoard({
   className,
 }: RateBoardProps) {
   const hidden = totalForToken - routes.length
-  // The best quote for the amount once quotes are in, the best APY until then
+  // The best quote for the amount once quotes are in. Until then the best APY, or under Match the top match.
   const quoted = amount > 0 ? bestQuoteRoute(routes, amount, live, horizon) : null
-  const best = quoted ?? bestApyRoute(routes)
+  const best = quoted ?? (match ? (routes[0] ?? null) : bestApyRoute(routes))
+  const bestLabel = quoted ? "Best quote" : match ? "Best match" : "Best APY"
   const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
 
   return (
@@ -146,9 +152,10 @@ export function RateBoard({
               <span className="label-roman whitespace-nowrap text-xs">Sort</span>
               <SortToggle value={sortBy} onChange={onSort} />
             </span>
-            <ViewToggle value={view} onChange={onView} />
+            {match ? <MatchChip prefs={match} onChange={onChangeMatch} /> : <ViewToggle value={view} onChange={onView} />}
           </div>
         </div>
+        {match && !loading && !error && <MatchNote horizon={horizon} className="border-b border-hairline px-3 py-2 md:px-[18px]" />}
 
 
         {loading ? (
@@ -177,6 +184,13 @@ export function RateBoard({
           <p className="border-t border-row-line px-5 py-8 text-center text-sm text-muted-foreground">
             {totalForToken === 0 ? (
               `No ${token} routes in Hermes right now.`
+            ) : match ? (
+              <>
+                No {token} route fits your answers right now.{" "}
+                <button type="button" onClick={onChangeMatch} className="font-medium text-ink underline underline-offset-2">
+                  Change answers
+                </button>
+              </>
             ) : (
               <>
                 No {token} route is top rated right now.{" "}
@@ -193,7 +207,7 @@ export function RateBoard({
                 key={route.id}
                 route={route}
                 best={route === best}
-                bestLabel={quoted ? "Best quote" : "Best APY"}
+                bestLabel={bestLabel}
                 quote={live.byRoute[route.id]}
                 selected={route.id === selectedId}
                 amount={amount}
@@ -213,10 +227,21 @@ export function RateBoard({
             )}
             {hidden > 0 && (
               <p className="border-t border-row-line px-3 py-3 text-xs text-muted-foreground md:px-[18px]">
-                {hidden} more {hidden === 1 ? "route isn't" : "routes aren't"} top rated.{" "}
-                <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-                  Switch to All routes
-                </button>
+                {match ? (
+                  <>
+                    {hidden} more {hidden === 1 ? "route doesn't" : "routes don't"} fit your answers.{" "}
+                    <button type="button" onClick={onChangeMatch} className="font-medium text-ink underline underline-offset-2">
+                      Change answers
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {hidden} more {hidden === 1 ? "route isn't" : "routes aren't"} top rated.{" "}
+                    <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                      Switch to All routes
+                    </button>
+                  </>
+                )}
               </p>
             )}
           </div>

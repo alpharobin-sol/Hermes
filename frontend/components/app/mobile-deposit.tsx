@@ -27,6 +27,7 @@ import { RouteAlertToggle } from "./alerts"
 import { RouteTypeButton, RouteTypeExplainer } from "./route-type"
 import { HorizonToggle, LiveBadge, bestQuoteRoute, estimatedReturn, formatEarned, horizonSuffix, type Horizon, type LiveQuotes } from "./live-quotes"
 import { SplitAction, SplitCard, SplitMessages, type SplitState } from "./split"
+import { MatchChip, type MatchPrefs } from "./match"
 
 interface MobileDepositProps {
   tokens: (Token & { count: number })[]
@@ -50,6 +51,8 @@ interface MobileDepositProps {
   onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
+  match: MatchPrefs | null // the answers while Match sorts the list, in place of the view
+  onChangeMatch: () => void
   route: YieldRoute | null
   onSelectRoute: (id: string) => void
   ratesStatus: "loading" | "error" | "ready"
@@ -86,6 +89,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
     onExpandedChange,
     sortBy,
     onSort,
+    match,
+    onChangeMatch,
     route,
     onSelectRoute,
     ratesStatus,
@@ -190,6 +195,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             onExpandedChange={onExpandedChange}
             sortBy={sortBy}
             onSort={onSort}
+            match={match}
+            onChangeMatch={onChangeMatch}
             horizon={horizon}
             onHorizon={onHorizon}
           />
@@ -201,6 +208,8 @@ export const MobileDeposit = forwardRef<HTMLElement, MobileDepositProps>(functio
             token={token.symbol}
             ratesStatus={ratesStatus}
             onView={onView}
+            match={match}
+            onChangeMatch={onChangeMatch}
           />
         )}
 
@@ -269,6 +278,8 @@ function BestRoute({
   token,
   ratesStatus,
   onView,
+  match,
+  onChangeMatch,
 }: {
   route: YieldRoute | null
   routes: YieldRoute[]
@@ -276,6 +287,8 @@ function BestRoute({
   token: string
   ratesStatus: "loading" | "error" | "ready"
   onView: (view: View) => void
+  match: MatchPrefs | null
+  onChangeMatch: () => void
 }) {
   const [explainType, setExplainType] = useState(false)
   return (
@@ -288,7 +301,9 @@ function BestRoute({
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="font-display text-[22px] font-bold leading-[1.1]">{route.name}</span>
-                {bestApyRoute(routes)?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
+                {match
+                  ? routes[0]?.id === route.id && <span className={BEST_TAG}>Best match</span>
+                  : bestApyRoute(routes)?.id === route.id && <span className={BEST_TAG}>Best APY</span>}
               </span>
               <span className="text-xs text-muted-foreground">
                 <RouteTypeButton route={route} open={explainType} onToggle={() => setExplainType((open) => !open)} />
@@ -313,6 +328,13 @@ function BestRoute({
             "Checking live rates..."
           ) : ratesStatus === "error" ? (
             "Rates unavailable"
+          ) : match ? (
+            <>
+              No {token} route fits your answers right now.{" "}
+              <button type="button" onClick={onChangeMatch} className="font-medium text-ink underline underline-offset-2">
+                Change answers
+              </button>
+            </>
           ) : (
             <>
               No {token} route is top rated right now.{" "}
@@ -343,6 +365,8 @@ function RouteChoices({
   onExpandedChange,
   sortBy,
   onSort,
+  match,
+  onChangeMatch,
   horizon,
   onHorizon,
 }: {
@@ -358,13 +382,15 @@ function RouteChoices({
   onExpandedChange: (expanded: boolean) => void
   sortBy: SortBy
   onSort: (sort: SortBy) => void
+  match: MatchPrefs | null
+  onChangeMatch: () => void
   live: LiveQuotes
   horizon: Horizon
   onHorizon: (horizon: Horizon) => void
 }) {
-  // The best quote once quotes are in, the best APY until then
+  // The best quote once quotes are in. Until then the best APY, or under Match the top match.
   const quoted = bestQuoteRoute(routes, amount, live, horizon)
-  const best = quoted ?? bestApyRoute(routes)
+  const best = quoted ?? (match ? (routes[0] ?? null) : bestApyRoute(routes))
   const listed = listedRoutes(routes, expanded, selectedId, quoted?.id)
   const hidden = totalForToken - routes.length
 
@@ -378,20 +404,31 @@ function RouteChoices({
           <LiveBadge live={live} />
         </span>
         <SortToggle value={sortBy} onChange={onSort} compact />
-        <ViewToggle value={view} onChange={onView} compact />
+        {match ? <MatchChip prefs={match} onChange={onChangeMatch} compact /> : <ViewToggle value={view} onChange={onView} compact />}
       </div>
       <div className="flex items-center justify-between gap-2 border-b border-row-line bg-card px-3 py-2">
-        <span className="text-[12px] text-muted-foreground">After costs, over</span>
+        <span className="text-[12px] text-muted-foreground">{match ? "Ranked after costs, over" : "After costs, over"}</span>
         <HorizonToggle value={horizon} onChange={onHorizon} compact />
       </div>
 
       <div role="radiogroup" aria-label={`${token} routes`} data-tour="routes">
         {routes.length === 0 && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No {token} route is top rated right now.{" "}
-            <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-              {showAllLabel(totalForToken, token)}
-            </button>
+            {match ? (
+              <>
+                No {token} route fits your answers right now.{" "}
+                <button type="button" onClick={onChangeMatch} className="font-medium text-ink underline underline-offset-2">
+                  Change answers
+                </button>
+              </>
+            ) : (
+              <>
+                No {token} route is top rated right now.{" "}
+                <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                  {showAllLabel(totalForToken, token)}
+                </button>
+              </>
+            )}
           </p>
         )}
         {listed.map((r) => {
@@ -422,7 +459,7 @@ function RouteChoices({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="font-display text-[19px] font-bold leading-[1.1]">{r.name}</span>
-                  {isBest && <span className={BEST_TAG}>{quoted ? "Best quote" : "Best APY"}</span>}
+                  {isBest && <span className={BEST_TAG}>{quoted ? "Best quote" : match ? "Best match" : "Best APY"}</span>}
                 </span>
                 <span className="text-[11px] text-muted-foreground">{safetyText(r)}</span>
               </span>
@@ -457,10 +494,21 @@ function RouteChoices({
         )}
         {hidden > 0 && routes.length > 0 && (
           <p className="border-t border-row-line bg-card px-3 py-2 text-[11px] text-muted-foreground">
-            {hidden} more aren&apos;t top rated.{" "}
-            <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
-              Switch to All routes
-            </button>
+            {match ? (
+              <>
+                {hidden} more don&apos;t fit your answers.{" "}
+                <button type="button" onClick={onChangeMatch} className="font-medium text-ink underline underline-offset-2">
+                  Change answers
+                </button>
+              </>
+            ) : (
+              <>
+                {hidden} more aren&apos;t top rated.{" "}
+                <button type="button" onClick={() => onView("all")} className="font-medium text-ink underline underline-offset-2">
+                  Switch to All routes
+                </button>
+              </>
+            )}
           </p>
         )}
       </div>
