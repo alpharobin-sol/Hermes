@@ -8,11 +8,13 @@ import { markStep } from "@/lib/onboarding"
 import { apyWindowText, sourceName } from "@/lib/route-copy"
 import { RISK_LEVELS } from "./rate-board"
 
-export type SortBy = "safety" | "apy"
+// Match ranks the routes that fit the user's answers (match.tsx)
+export type SortBy = "safety" | "apy" | "match"
 
 export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "safety", label: "Safety" },
   { value: "apy", label: "APY" },
+  { value: "match", label: "Match" },
 ]
 
 // Top rated: the first screen (the capstone's "Sleep Well"). Routes that score 80 or more and whose reserve isn't
@@ -79,7 +81,8 @@ export function listedRoutes(routes: YieldRoute[], expanded: boolean, selectedId
 // Unscored routes sort last
 const scoreOf = (route: YieldRoute) => route.safety?.score ?? -1
 
-export function compareRoutes(sortBy: SortBy) {
+// Safety Score then APY, or APY alone. Match has its own order (compareMatch).
+export function compareRoutes(sortBy: "safety" | "apy") {
   return (a: YieldRoute, b: YieldRoute) => (sortBy === "safety" ? scoreOf(b) - scoreOf(a) || b.apy - a.apy : b.apy - a.apy)
 }
 
@@ -107,6 +110,7 @@ export function SortToggle({ value, onChange, compact = false }: { value: SortBy
           type="button"
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
+          title={option.value === "match" ? "Routes that fit your risk, time and access to the money" : undefined}
           className={cn(
             "inline-flex items-center rounded-[2px] font-medium transition-colors",
             compact ? "h-8 px-2 text-xs" : "h-9 px-2.5 text-[13px] md:px-3",

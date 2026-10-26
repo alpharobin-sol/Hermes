@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 export const metadata: Metadata = {
   title: "Docs · Hermes",
   description:
-    "How Hermes works: live Solana yield routes, the Safety Score, live quotes, what can go wrong, withdrawing, rerouting, your portfolio, alerts and fees.",
+    "How Hermes works: live Solana yield routes, the Safety Score, live quotes, matching routes to you, what can go wrong, withdrawing, rerouting, your portfolio, alerts and fees.",
   alternates: { canonical: "/docs" },
 }
 
@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: "routes", title: "Routes" },
   { id: "safety-score", title: "Safety Score" },
   { id: "quotes", title: "Live quotes" },
+  { id: "match", title: "Match" },
   { id: "split", title: "Top rated split" },
   { id: "risks", title: "What can go wrong" },
   { id: "withdrawing", title: "Withdrawing" },
@@ -90,7 +91,8 @@ export default function Docs() {
                 <li>Pick a token: SOL, USDC or USDT.</li>
                 <li>
                   Pick a route. Top rated shows routes with a Safety Score of 80 or more. Switch to All routes to see
-                  the rest.
+                  the rest, or sort by <a href="#match" className={LINK}>Match</a> to answer three questions and see the
+                  routes that fit you.
                 </li>
                 <li>Type an amount. Every route quotes it live, and the best quote is marked.</li>
                 <li>Review the deposit and sign it in your wallet.</li>
@@ -211,6 +213,34 @@ export default function Docs() {
               </List>
               <p>Best quote marks the route that leaves you the most over the length you picked. The deposit dialog shows all three.</p>
               <p>APY is today&apos;s rate. It changes, and it is not a promise of returns.</p>
+            </Section>
+
+            <Section id="match">
+              <p>
+                Pick <strong>Match</strong> beside Safety and APY in the sort, and answer three questions. Hermes shows only
+                the routes that fit, best first. Your answers stay on this device, and the list keeps them until you change
+                them.
+              </p>
+              <List>
+                <li>
+                  <strong>How much risk?</strong> Low shows top rated routes only (Safety 80 or more). Moderate adds routes
+                  scoring 60 or more. Any shows every route, scored or not.
+                </li>
+                <li>
+                  <strong>How long will you leave it?</strong> 1 month, 6 months or 1 year. The same lengths as the quotes.
+                </li>
+                <li>
+                  <strong>When might you need it back?</strong> Any day leaves out lending reserves with 95% or more borrowed
+                  or held back, where a withdrawal may have to wait. It can wait keeps them.
+                </li>
+              </List>
+              <p>
+                The routes that fit are ranked by what each leaves after your time at today&apos;s APY, with the exit cost taken
+                off. Over a month, a staking token&apos;s exit cost can outweigh its higher APY, so lending often comes first.
+                Over a year, the higher APY usually wins. Best match marks the top route. Once you type an amount, Best quote
+                marks the route that leaves you the most for that amount, the entry cost counted too.
+              </p>
+              <p>A match is today&apos;s picture from today&apos;s rates. Rates move, and it is not a promise of returns.</p>
             </Section>
 
             <Section id="split">

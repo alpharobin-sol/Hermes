@@ -18,6 +18,7 @@ import { BASE_TOKENS } from "./tokens"
 import { compareRoutes, isTopRated, type SortBy, type View } from "./safety"
 import { Onboarding } from "./onboarding"
 import { SplitDialog, SplitToggle, splitAmounts, splitCandidates, splitCap, splitReserve, type SplitSize, type SplitState } from "./split"
+import { MatchDialog, compareMatch, fitsMatch, readMatch, saveMatch, type MatchPrefs } from "./match"
 
 const RATE_REFRESH_MS = 60 * 1000
 
@@ -58,6 +59,9 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   // How long the money stays in: what the routes' figures and the best quote count over
   const [horizon, setHorizon] = useState<Horizon>("1y")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Match: the user's answers on risk, time and access, kept on this device. Asked the first time Match is picked.
+  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs | null>(null)
+  const [matchOpen, setMatchOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   // Top rated split: even parts across the highest-scoring top rated routes, signed in one approval
   const [splitOn, setSplitOn] = useState(false)
@@ -135,11 +139,17 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   }, [balances, routes])
   const selectedToken = tokens.find((token) => token.symbol === selectedSymbol) ?? tokens[0]
 
+  useEffect(() => setMatchPrefs(readMatch()), [])
+  // Match shows only the routes that fit the answers, in place of the Top rated and All routes views
+  const match = sortBy === "match" ? matchPrefs : null
   const forToken = useMemo(
-    () => routes.filter((route) => route.token === selectedToken.symbol).sort(compareRoutes(sortBy)),
-    [routes, selectedToken.symbol, sortBy]
+    () =>
+      routes
+        .filter((route) => route.token === selectedToken.symbol)
+        .sort(match ? compareMatch(horizon) : compareRoutes(sortBy === "apy" ? "apy" : "safety")),
+    [routes, selectedToken.symbol, sortBy, match, horizon]
   )
-  const visibleRoutes = view === "all" ? forToken : forToken.filter(isTopRated)
+  const visibleRoutes = match ? forToken.filter((route) => fitsMatch(route, match)) : view === "all" ? forToken : forToken.filter(isTopRated)
   const selectedRoute = visibleRoutes.find((route) => route.id === selectedId) ?? visibleRoutes[0] ?? null
 
   // A route page's Launch app opens /app?route=jito on that route: its token, and All routes when it isn't top rated
@@ -201,6 +211,41 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
   const solShort =
     isConnected && selectedToken.symbol !== "SOL" && neededSol != null && solBalance !== undefined && solBalance < neededSol ? solBalance : null
 
+  // Picking Match asks the questions the first time, then uses the saved answers and their time
+  const handleSort = (sort: SortBy) => {
+    if (sort === "match") {
+      if (!matchPrefs) {
+        setMatchOpen(true)
+        return
+      }
+      setHorizon(matchPrefs.horizon)
+      setSelectedId(null)
+    }
+    setSortBy(sort)
+  }
+
+  // New answers show their best route: it becomes the pick, and a split ends
+  const applyMatch = (prefs: MatchPrefs) => {
+    saveMatch(prefs)
+    setMatchPrefs(prefs)
+    setHorizon(prefs.horizon)
+    setSortBy("match")
+    setSelectedId(null)
+    setExpanded(false)
+    setSplitOn(false)
+    setMatchOpen(false)
+  }
+
+  // While Match sorts, the time is one of the answers, so a new horizon is saved with them
+  const handleHorizon = (next: Horizon) => {
+    setHorizon(next)
+    if (match) {
+      const prefs = { ...match, horizon: next }
+      saveMatch(prefs)
+      setMatchPrefs(prefs)
+    }
+  }
+
   const split: SplitState = {
     available: candidates.length >= 2,
     on: splitActive,
@@ -212,7 +257,7 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
     amounts: splitParts,
     live: splitLive,
     horizon,
-    onHorizon: setHorizon,
+    onHorizon: handleHorizon,
     cap: splitCapValue,
     overCap: splitActive && splitCapValue != null && numericAmount > splitCapValue,
     reserve: solReserve,
@@ -305,9 +350,11 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         expanded={expanded}
         onExpandedChange={setExpanded}
         sortBy={sortBy}
-        onSort={setSortBy}
+        onSort={handleSort}
+        match={match}
+        onChangeMatch={() => setMatchOpen(true)}
         horizon={horizon}
-        onHorizon={setHorizon}
+        onHorizon={handleHorizon}
         route={loading || error ? null : selectedRoute}
         onSelectRoute={(id) => {
           setSelectedId(id)
@@ -329,9 +376,11 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
         expanded={expanded}
         onExpandedChange={setExpanded}
         sortBy={sortBy}
-        onSort={setSortBy}
+        onSort={handleSort}
+        match={match}
+        onChangeMatch={() => setMatchOpen(true)}
         horizon={horizon}
-        onHorizon={setHorizon}
+        onHorizon={handleHorizon}
         routes={visibleRoutes}
         totalForToken={forToken.length}
         // During a split no single route is picked. Picking one ends the split.
@@ -366,6 +415,17 @@ export function YieldPanel({ initialRoutes }: { initialRoutes?: YieldRoute[] | n
       />
 
       <Onboarding route={selectedRoute} onConnect={() => setWalletModalVisible(true)} onDeposit={focusAmount} />
+
+      {matchOpen && (
+        <MatchDialog
+          open={matchOpen}
+          onOpenChange={setMatchOpen}
+          initial={matchPrefs ?? { risk: "low", horizon, access: "any-day" }}
+          routes={forToken}
+          token={selectedToken.symbol}
+          onSave={applyMatch}
+        />
+      )}
 
       {reviewOpen && selectedRoute && (
         <DepositDialog
